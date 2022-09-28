@@ -1,0 +1,4 @@
+{
+  "scripts/devscripts/test/test_flake8.py::Flake8TestCase::test_flake8": true,
+  "scripts/devscripts/test/test_pylint.py::PylintTestCase::test_pylint": true
+}

@@ -1,0 +1,7 @@
+[
+  "scripts/devscripts/test/test_flake8.py::Flake8TestCase::test_flake8",
+  "scripts/devscripts/test/test_logger.py::LoggerTestCase::testArgs",
+  "scripts/devscripts/test/test_logger.py::LoggerTestCase::testCommand",
+  "scripts/devscripts/test/test_logger.py::LoggerTestCase::testNoArgs",
+  "scripts/devscripts/test/test_pylint.py::PylintTestCase::test_pylint"
+]
