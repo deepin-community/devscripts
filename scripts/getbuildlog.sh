@@ -20,7 +20,7 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
 usage() {
     cat <<EOT
@@ -65,7 +65,7 @@ EOT
 
 [ $# -ge 1 ] && [ $# -le 3 ] || { usage && exit 1; }
 
-if ! which wget >/dev/null 2>&1; then
+if ! which wget > /dev/null 2>&1; then
     echo "$PROGNAME: this program requires the wget package to be installed";
     exit 1
 fi
@@ -73,7 +73,7 @@ fi
 PACKAGE=$1
 VERSION=${2:-[:~+.[:alnum:]-]+}
 ARCH=${3:-[[:alnum:]-]+}
-ESCAPED_PACKAGE=`echo "$PACKAGE" | sed -e 's/\+/\\\+/g'`
+ESCAPED_PACKAGE=$(echo "$PACKAGE" | sed -e 's/\+/\\\+/g')
 
 GET_LAST_VERSION=no
 if [ "$VERSION" = "last" ]; then
@@ -105,7 +105,7 @@ getbuildlog() {
     # the listed versions and determine the highest
     if [ "$GET_LAST_VERSION" != "no" ]; then
 	LASTVERSION=$( \
-	    for match in `grep -E -o "$PATTERN" $ALL_LOGS`; do
+	    for match in $(grep -E -o "$PATTERN" $ALL_LOGS); do
 		ver=${match##*ver=}
 		echo ${ver%%&*}
 	    done | perl -e '
@@ -121,12 +121,12 @@ arch=$ARCH&ver=$LASTVERSION&stamp=[[:digit:]]+"
 	NEWPATTERN=$PATTERN
     fi
 
-    for match in `grep -E -o "$NEWPATTERN" $ALL_LOGS`; do
+    for match in $(grep -E -o "$NEWPATTERN" $ALL_LOGS); do
 	ver=${match##*ver=}
 	ver=${ver%%&*}
 	arch=${match##*arch=}
 	arch=${arch%%&*}
-	match=`echo $match | sed -e 's/\+/%2B/g'`
+	match=$(echo $match | sed -e 's/\+/%2B/g')
 	# Mimic wget's behaviour, using a numerical suffix if needed,
 	# to support downloading several logs for a given tuple
 	# (unfortunately, -nc and -O means only the first file gets

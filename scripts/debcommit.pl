@@ -785,9 +785,14 @@ sub getmessage {
         } elsif ($prog eq 'git') {
             if (git_repo_has_commits()) {
                 if ($all) {
-                    @diffcmd = ('git', 'diff', '-w', '--no-color');
+                    @diffcmd
+                      = ('git', 'diff', '--no-ext-diff', '-w', '--no-color');
                 } else {
-                    @diffcmd = ('git', 'diff', '-w', '--cached', '--no-color');
+                    @diffcmd = (
+                        'git',           'diff',
+                        '--no-ext-diff', '-w',
+                        '--cached',      '--no-color'
+                    );
                 }
             } else {
                 # No valid head!  Rather than fail, cheat and use 'diff'

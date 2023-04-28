@@ -126,7 +126,8 @@ sub wget {
     my @cmd = ($wget);
     # curl does not follow document moved headers, and does not exit
     # with a non-zero error code by default if a document is not found
-    push @cmd, "-f", "-L" if $wget eq "curl";
+    # also try to retain the mtime of the remote file
+    push @cmd, "-f", "-L", "-R" if $wget eq "curl";
     push @cmd, ($wget eq "wget" ? "-nv" : ("-s", "-S")) if $opt->{'quiet'};
     push @cmd, ($wget eq "wget" ? "--no-check-certificate" : "--insecure")
       if $opt->{'insecure'};

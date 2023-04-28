@@ -27,10 +27,10 @@ clean: ../doc/devscripts.1
 	$(MAKE) -C ../doc devscripts.1
 
 %.1:: %.pl translate
-	podchecker $<
+	-podchecker $<
 	pod2man --utf8 --center=" " --release="$(DESC_$(dir $@))" $< > $@
 %.1:: %.pod translate
-	podchecker $<
+	-podchecker $<
 	pod2man --utf8 --center=" " --release="$(DESC_$(dir $@))" $< > $@
 %.1:: %.dbk translate
 	xsltproc --nonet \
@@ -39,4 +39,4 @@ clean: ../doc/devscripts.1
 	# (which is imported by the above stylesheet) insists in writing the output
 	# to where it wants to.  we can only move the file ourselves.
 	# ($* → de/deb-reversion.de)
-	cp $(notdir $(basename $*)).1 $@
+	mv $(notdir $(basename $*)).1 $@

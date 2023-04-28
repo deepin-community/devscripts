@@ -19,12 +19,14 @@
 
 set -eu
 
-die () {
+PROGNAME=${0##*/}
+
+die() {
 	echo "$*" >&2
 	exit 2
 }
 
-setzip () {
+setzip() {
 	case $1 in
 		*.gz) ZIP=--gzip ;;
 		*.xz) ZIP=--xz ;;
@@ -43,7 +45,7 @@ done
 # shift away args
 shift $(($OPTIND - 1))
 
-[ $# = 2 ] || die "Usage: $(basename $0) <dsc> <file>"
+[ $# = 2 ] || die "Usage: $PROGNAME <dsc> <file>"
 DSC="$1"
 test -e "$DSC" || die "$DSC not found"
 FILE="$2"

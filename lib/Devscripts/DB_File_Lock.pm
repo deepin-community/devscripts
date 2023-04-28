@@ -21,9 +21,9 @@ use vars qw($VERSION @ISA $locks);
 $VERSION = '0.05';
 
 use DB_File ();
-use Fcntl qw(:flock O_RDWR O_RDONLY O_WRONLY O_CREAT);
-use Carp qw(croak carp);
-use Symbol ();
+use Fcntl   qw(:flock O_RDWR O_RDONLY O_WRONLY O_CREAT);
+use Carp    qw(croak carp);
+use Symbol  ();
 
 # import function can't be inherited, so this magic required
 sub import {

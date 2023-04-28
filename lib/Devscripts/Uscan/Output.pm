@@ -7,7 +7,7 @@ use File::Basename;
 
 our @EXPORT = (
     @Devscripts::Output::EXPORT, qw(
-      uscan_msg uscan_verbose dehs_verbose uscan_warn uscan_debug
+      uscan_msg uscan_verbose dehs_verbose uscan_warn uscan_debug uscan_msg_raw
       uscan_extra_debug uscan_die dehs_output $dehs $verbose $dehs_tags
       $dehs_start_output $dehs_end_output $found
     ));
@@ -18,21 +18,40 @@ our ($dehs, $dehs_tags, $dehs_start_output, $dehs_end_output, $found)
 
 our $progname = basename($0);
 
-sub printwarn {
+sub printwarn_raw {
     my ($msg, $w) = @_;
-    chomp $msg;
     if ($w or $dehs) {
-        print STDERR "$msg\n";
+        print STDERR "$msg";
     } else {
-        print "$msg\n";
+        print "$msg";
     }
 }
 
-*uscan_msg = \&ds_msg;
+sub printwarn {
+    my ($msg, $w) = @_;
+    chomp $msg;
+    printwarn_raw("$msg\n", $w);
+}
 
-*uscan_verbose = \&ds_verbose;
+sub uscan_msg_raw {
+    printwarn_raw($_[0]);
+}
 
-*uscan_extra_debug = \&ds_extra_debug;
+sub uscan_msg {
+    printwarn($_[0]);
+}
+
+sub uscan_verbose {
+    ds_verbose($_[0], $dehs);
+}
+
+sub uscan_debug {
+    ds_debug($_[0], $dehs);
+}
+
+sub uscan_extra_debug {
+    ds_extra_debug($_[0], $dehs);
+}
 
 sub dehs_verbose ($) {
     my $msg = $_[0];
@@ -45,8 +64,6 @@ sub uscan_warn ($) {
     push @{ $dehs_tags->{'warnings'} }, $msg if $dehs;
     printwarn("$progname warn: $msg" . &Devscripts::Output::who_called, 1);
 }
-
-*uscan_debug = \&ds_debug;
 
 sub uscan_die ($) {
     my $msg = $_[0];

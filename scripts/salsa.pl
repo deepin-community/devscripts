@@ -25,10 +25,11 @@ salsa - tool to manipulate salsa repositories and group members
   salsa update_user maintainer foobar --group js-team
   salsa del_user foobar --group js-team
   salsa last_ci_status js-team/nodejs
+  salsa pipelines js-team/nodejs
 
 =head1 DESCRIPTION
 
-B<salsa> is a designed to create and configure repositories on
+B<salsa> is designed to create and configure repositories on
 L<https://salsa.debian.org> and manage users of groups.
 
 A Salsa token is required, except for search* commands, and must be set in
@@ -165,8 +166,8 @@ user:
 
   salsa --user yadd co devscripts autodep8
   salsa co yadd/devscripts js-team/npm
-  salsa --group js-team co --all           # All js-team repos
-  salsa co --all                           # All your repos
+  salsa --group js-team co --all           # All js-team active repos
+  salsa co --all-archived                  # All your repos including archived
 
 =item B<create_repo>
 
@@ -257,6 +258,16 @@ are displayed using STDOUT while other are displayed I<(with details)> using
 STDERR. Then you can easily see only failures using:
 
   salsa --group js-team last_ci_status --all --no-fail >/dev/null
+
+=item B<pipeline>, B<schedule>
+
+Control pipeline schedule
+
+=item B<pipelines>, B<schedules>
+
+Lists current pipeline schedule items.
+
+You can use B<--no-fail> and B<--all> options here.
 
 =item B<merge_request>, B<mr>
 
@@ -375,7 +386,7 @@ Examples:
 =item B<rename_branch>
 
 Rename branch given in B<--source-branch> with name given in B<--dest-branch>.
-You can use B<--no-fail> and B<--all> options here.
+You can use B<--no-fail>, B<--all> and B<--all-archived> options here.
 
 =item B<search>, B<search_project>, B<search_repo>
 
@@ -389,7 +400,7 @@ information.
 =item B<update_repo>
 
 Configure repo(s) using parameters given to command line.
-A repo name has to be given unless B<--all> is set. Prefer to use
+A repo name has to be given unless B<--all> or B<--all-archived> is set. Prefer to use
 B<update_safe>.
 
   salsa --user yadd --tagpending --kgb --irc=devscripts update_repo test
@@ -581,7 +592,7 @@ C<.devscripts> value: B<SALSA_YES> (yes/no)
 
 =over
 
-=item B<--archived> B<--no-archived>
+=item B<--archived>, B<--no-archived>
 
 Instead of looking to active projects, list or search in archived projects.
 Note that you can't have both archived and unarchived projects in the same
@@ -595,13 +606,15 @@ C<.devscripts> value: B<SALSA_ARCHIVED> (yes/no)
 
 =over
 
-=item B<--all>
+=item B<--all>, B<--all-archived>
 
-When set, all project of group/user are affected by command.
+When set, all projects of group/user are affected by command.
+B<--all> will filter all active projects, whereas B<--all-archived> will
+include active and archived projects.
 
 =over
 
-=item B<--skip>: ignore project with B<--all>. Example:
+=item B<--skip>: ignore project with B<--all> or B<--all-achived>. Example:
 
   salsa update_repo --tagpending --all --skip qa --skip devscripts
 
@@ -618,15 +631,32 @@ C<.devscripts> value: B<SALSA_SKIP_FILE>
 
 =back
 
+=item B<--build-timeout>
+
+The maximum amount of time, in seconds, that a job can run.
+
+Default: 3600 (60 minutes)
+
+  salsa update_safe myrepo --build-timeout 3600
+
+C<.devscripts> value: B<SALSA_BUILD_TIMEOUT>
+
+=item B<--avatar-path>
+
+Path to an image for the project's avatar.
+If path value contains "%p", it is replaced by project name.
+
+C<.devscripts> value: B<SALSA_AVATAR_PATH>
+
 =item B<--ci-config-path>
 
 Configure configuration file path of GitLab CI. Default: empty. Example:
 
-  salsa update_safe --ci-config-path debian/.gitlab-ci.yml debian/devscripts
+  salsa update_safe --ci-config-path recipes/debian.yml@salsa-ci-team/pipeline debian/devscripts
 
 C<.devscripts> value: B<SALSA_CI_CONFIG_PATH>
 
-=item B<--desc> B<--no-desc>
+=item B<--desc>, B<--no-desc>
 
 Configure repo description using pattern given in B<desc-pattern>
 
@@ -659,18 +689,108 @@ If recipient value contains "%p", it is replaced by project name.
 C<.devscripts> value: B<SALSA_EMAIL_RECIPIENTS> (use spaces to separate
 multiples recipients)
 
-=item B<--enable-issues>, B<--no-enable-issues>, B<--disable-issues>,
-B<--no-disable-issues>
+=item B<--issues>
 
-Enable, ignore or disable issues.
+Set issues feature with permissions.
 
-C<.devscripts> values: B<SALSA_ENABLE_ISSUES> (yes/ignore/no, default: ignore)
+C<.devscripts> values: B<SALSA_ENABLE_ISSUES> (yes/private/no, default: yes)
 
-=item B<--enable-mr>, B<--no-enable-mr>, B<--disable-mr>, B<--no-disable-mr>
+=item B<--repo>
 
-Enable, ignore or disable merge requests.
+Set repository feature with permissions.
 
-C<.devscripts> values: B<SALSA_ENABLE_MR> (yes/ignore/no, default: ignore)
+C<.devscripts> values: B<SALSA_ENABLE_REPO> (yes/private/no, default: yes)
+
+=item B<--mr>
+
+Set merge requests feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_MR> (yes/private/no, default: yes)
+
+=item B<--forks>, B<--forks-mr>
+
+Set forking a repository feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_FORKS> (yes/private/no, default: yes)
+
+=item B<--lfs>
+
+Set Large File Storage (LFS) feature.
+
+C<.devscripts> values: B<SALSA_ENABLE_LFS> (yes/no, default: yes)
+
+=item B<--packages>
+
+Set packages feature.
+
+C<.devscripts> values: B<SALSA_ENABLE_PACKAGING> (yes/no, default: yes)
+
+=item B<--jobs>
+
+Set jobs feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_JOBS> (yes/private/no, default: yes)
+
+=item B<--container>
+
+Set container feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_CONTAINER> (yes/private/no, default: yes)
+
+=item B<--analytics>
+
+Set analytics feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_ANALYTICS> (yes/private/no, default: yes)
+
+=item B<--requirements>
+
+Set requirements feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_REQUIREMENTS> (yes/private/no, default: yes)
+
+=item B<--wiki>
+
+Set wiki feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_WIKI> (yes/private/no, default: yes)
+
+=item B<--snippets>
+
+Set snippets feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_SNIPPETS> (yes/private/no, default: yes)
+
+=item B<--pages>
+
+Set pages feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_PAGES> (yes/private/no, default: yes)
+
+=item B<--releases>
+
+Set releases feature with permissions.
+
+C<.devscripts> values: B<SALSA_ENABLE_RELEASES> (yes/private/no, default: yes)
+
+=item B<--auto-devops>
+
+Set auto devops feature.
+
+C<.devscripts> values: B<SALSA_ENABLE_AUTO_DEVOPS> (yes/no, default: yes)
+
+=item B<--request-acc>
+
+Set request access feature.
+
+C<.devscripts> values: B<SALSA_ENABLE_REQUEST_ACC> (yes/no, default: yes)
+
+=item B<--enable-remove-source-branch>, B<--disable-remove-source-branch>
+
+Enable or disable deleting source branch option by default for all new merge
+requests.
+
+C<.devscripts> values: B<SALSA_REMOVE_SOURCE_BRANCH> (yes/no, default: yes)
 
 =item B<--irc-channel>
 
@@ -730,9 +850,15 @@ C<.devscripts> value: B<SALSA_KGB_OPTIONS>
 
 =item B<--no-fail>
 
-Don't stop on error when using B<update_repo> with B<--all>.
+Don't stop on error when using B<update_repo> with B<--all> or B<--all-archived>.
 
 C<.devscripts> value: B<SALSA_NO_FAIL> (yes/no)
+
+=item B<--request-access>
+
+Allow users to request member access.
+
+C<.devscripts> value: B<SALSA_REQUEST_ACCESS> (yes/no)
 
 =item B<--rename-head>, B<--no-rename-head>
 
@@ -758,6 +884,40 @@ C<.devscripts> value: B<SALSA_DEST_BRANCH>
 Enable, ignore or disable "tagpending" webhook.
 
 C<.devscripts> value: B<SALSA_TAGPENDING> (yes/ignore/no, default: ignore)
+
+=back
+
+=head2 Pipeline schedules
+
+=over
+
+=item B<--schedule-desc>
+
+Description of the pipeline schedule.
+
+=item B<--schedule-ref>
+
+Branch or tag name that is triggered.
+
+=item B<--schedule-cron>
+
+Cron schedule, for example: 0 1 * * *.
+
+=item B<--schedule-tz>
+
+Time zone to run cron schedule. Default: UTC
+
+=item B<--schedule-enable>, B<--schedule-disable>
+
+Enable/disable the pipeline schedule to run. Default: disabled
+
+=item B<--schedule-run>
+
+Trigger B<--schedule-desc> scheduled pipeline to run immediately. Default:
+
+=item B<--schedule-delete>
+
+Delete B<--schedule-desc> pipeline schedule
 
 =back
 

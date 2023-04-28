@@ -6,9 +6,9 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
-usage () {
+usage() {
 	cat <<EOF
 Usage: $PROGNAME [package] [package] ... [options]
   Check which maintainers a particular package depends on.
@@ -19,7 +19,7 @@ Usage: $PROGNAME [package] [package] ... [options]
 EOF
 }
 
-version () {
+version() {
 	cat <<EOF
 This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is by Moshe Zadka <moshez@debian.org>, and is in the public domain.
@@ -38,7 +38,7 @@ while [ -n "$1" ]; do
 		--version) version; exit 0 ;;
 		*)
 			echo "Dependent maintainers for $1:"
-			for package in `apt-cache showpkg $1 | sed -n '/Reverse Depends:/,/Dependencies/p' | grep '^ '|sed 's/,.*//'`; do
+			for package in $(apt-cache showpkg $1 | sed -n '/Reverse Depends:/,/Dependencies/p' | grep '^ '|sed 's/,.*//'); do
 				if [ $source ]; then
 					apt-cache showsrc $package |
 					awk '/^Maintainer:/ {maint=$0} /^Package:/ {pkg=$0} END {print maint, pkg}' |

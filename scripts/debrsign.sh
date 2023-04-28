@@ -32,9 +32,9 @@
 # Abort if anything goes wrong
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
-usage () {
+usage() {
     echo \
 "Usage: debrsign [options] [username@]remotehost [changes or dsc]
   Options:
@@ -54,7 +54,7 @@ usage () {
   is performed on remotehost using ssh and debsign."
 }
 
-version () {
+version() {
     echo \
 "This is debrsign, from the Debian devscripts package, version ###VERSION###
 This code is copyright 1999 by Mike Goldman and Julian Gilbey,
@@ -63,7 +63,7 @@ You are free to redistribute this code under the terms of the
 GNU General Public License, version 2 or later."
 }
 
-mustsetvar () {
+mustsetvar() {
     if [ "x$2" = x ]
     then
         echo >&2 "$PROGNAME: unable to determine $3"
@@ -74,7 +74,7 @@ mustsetvar () {
     fi
 }
 
-withecho () {
+withecho() {
     echo " $@"
     "$@"
 }
@@ -86,7 +86,7 @@ withecho () {
 # this in a shell script.
 unset IFS
 PATH=/usr/local/bin:/usr/bin:/bin
-umask `perl -e 'printf "%03o\n", umask | 022'`
+umask $(perl -e 'printf "%03o\n", umask | 022')
 
 eval $(
     set +e
@@ -102,7 +102,7 @@ eval $(
 signargs=
 while [ $# != 0 ]
 do
-    value="`echo x\"$1\" | sed -e 's/^x-.//'`"
+    value="$(echo x"$1" | sed -e 's/^x-.//')"
     case "$1" in
         -S)         sourceonly="true" ;;
         -a*)        targetarch="$value" ;;
@@ -130,10 +130,10 @@ case $# in
                 ;;
             *.changes)
                 changes=$2
-                dsc=`echo $changes | \
-                    perl -pe 's/\.changes$/.dsc/; s/(.*)_(.*)_(.*)\.dsc/\1_\2.dsc/'`
-                buildinfo=`echo $changes | \
-                    perl -pe 's/\.changes$/.buildinfo/; s/(.*)_(.*)_(.*)\.buildinfo/\1_\2_\3.buildinfo/'`
+                dsc=$(echo $changes | \
+                    perl -pe 's/\.changes$/.dsc/; s/(.*)_(.*)_(.*)\.dsc/\1_\2.dsc/')
+                buildinfo=$(echo $changes | \
+                    perl -pe 's/\.changes$/.buildinfo/; s/(.*)_(.*)_(.*)\.buildinfo/\1_\2_\3.buildinfo/')
                 ;;
             *)
                 echo "$PROGNAME: Only a .changes or .dsc file is allowed as second argument!" >&2
@@ -176,7 +176,7 @@ case $# in
             arch=source
         fi
 
-        sversion=`echo "$version" | perl -pe 's/^\d+://'`
+        sversion=$(echo "$version" | perl -pe 's/^\d+://')
         pv="${package}_${sversion}"
         pva="${package}_${sversion}${arch:+_${arch}}"
         dsc="../$pv.dsc"
@@ -212,9 +212,9 @@ then
 fi
 
 declare -A base
-base["$changes"]=`basename "$changes"`
-base["$dsc"]=`basename "$dsc"`
-base["$buildinfo"]=`basename "$buildinfo"`
+base["$changes"]=$(basename "$changes")
+base["$dsc"]=$(basename "$dsc")
+base["$buildinfo"]=$(basename "$buildinfo")
 
 if [ -n "$changes" ]
 then

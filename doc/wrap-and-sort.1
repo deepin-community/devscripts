@@ -83,6 +83,18 @@ The default maximum line length is 79 characters.
 \fB\-N\fR, \fB\-\-dry\-run\fR
 Do not modify any file, instead only print the files that would be modified.
 
+.TP
+\fB\-\-experimental\-rts\-parser\fR
+Enable the experimental round\-trip safe parser.  When enabled, most comments
+in deb822 control will be preserved.
+
+The option is a temporary means to enable users to opt-in to this new experimental
+feature. The option will be removed once the new parser is mature enough and is
+ready to unconditionally replace the previous parser.
+
+This option requires python\-debian version 0.1.43 or later to work.  However, some
+features will require 0.1.44 or later.
+
 .SH AUTHORS
 \fBwrap\-and\-sort\fP and this manpage have been written by
 Benjamin Drung <bdrung@debian.org>.

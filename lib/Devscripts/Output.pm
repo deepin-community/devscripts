@@ -27,15 +27,15 @@ sub printwarn {
     }
 }
 
-sub ds_msg($) {
+sub ds_msg {
     my $msg = $_[0];
-    printwarn "$progname: $msg";
+    printwarn("$progname: $msg", $_[1]);
 }
 
-sub ds_verbose($) {
+sub ds_verbose {
     my $msg = $_[0];
     if ($verbose > 0) {
-        printwarn "$progname info: $msg";
+        printwarn("$progname info: $msg", $_[1]);
     }
 }
 
@@ -45,24 +45,24 @@ sub who_called {
     return " [$out[0]: $out[2]]";
 }
 
-sub ds_warn ($) {
+sub ds_warn {
     my $msg = $_[0];
     printwarn("$progname warn: $msg" . who_called, 1);
 }
 
-sub ds_debug($) {
+sub ds_debug {
     my $msg = $_[0];
-    printwarn "$progname debug: $msg" if $verbose > 1;
+    printwarn("$progname debug: $msg", $_[1]) if $verbose > 1;
 }
 
-sub ds_extra_debug($) {
+sub ds_extra_debug {
     my $msg = $_[0];
-    printwarn "$progname debug: $msg" if $verbose > 2;
+    printwarn("$progname debug: $msg", $_[1]) if $verbose > 2;
 }
 
 *ds_die = \&ds_error;
 
-sub ds_error($) {
+sub ds_error {
     my $msg = $_[0];
     $msg = "$progname error: $msg" . who_called;
     if ($die_on_error) {

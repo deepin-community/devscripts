@@ -3,6 +3,9 @@ package Devscripts::Salsa::check_repo;
 
 use strict;
 use Devscripts::Output;
+use Digest::MD5  qw(md5_hex);
+use Digest::file qw(digest_file_hex);
+use LWP::UserAgent;
 use Moo::Role;
 
 with "Devscripts::Salsa::Repo";
@@ -13,16 +16,28 @@ sub check_repo {
     return $res;
 }
 
+sub _url_md5_hex {
+    my $res = LWP::UserAgent->new->get(shift());
+    if (!$res->is_success) {
+        return undef;
+    }
+    return Digest::MD5::md5_hex($res->content);
+}
+
 sub _check_repo {
     my ($self, @reponames) = @_;
     my $res = 0;
     my @fail;
-    unless (@reponames or $self->config->all) {
-        ds_warn "Repository name is missing";
+    unless (@reponames or $self->config->all or $self->config->all_archived) {
+        ds_warn "Usage $0 check_repo <--all|--all-archived|names>";
         return 1;
     }
     if (@reponames and $self->config->all) {
         ds_warn "--all with a reponame makes no sense";
+        return 1;
+    }
+    if (@reponames and $self->config->all_archived) {
+        ds_warn "--all-archived with a reponame makes no sense";
         return 1;
     }
     # Get repo list from Devscripts::Salsa::Repo
@@ -39,14 +54,41 @@ sub _check_repo {
             next;
         }
         # check description
-        my %prms = $self->desc($name);
+        my %prms           = $self->desc($name);
+        my %prms_multipart = $self->desc_multipart($name);
         if ($self->config->desc) {
             $project->{description} //= '';
             push @err, "bad description: $project->{description}"
               if ($prms{description} ne $project->{description});
         }
-        # check issues/MR authorizations
-        foreach (qw(issues_enabled merge_requests_enabled ci_config_path)) {
+        # check build timeout
+        if ($self->config->desc) {
+            $project->{build_timeout} //= '';
+            push @err, "bad build_timeout: $project->{build_timeout}"
+              if ($prms{build_timeout} ne $project->{build_timeout});
+        }
+        # check features (w/permission) & ci config
+        foreach (
+            qw(analytics_access_level
+            auto_devops_enabled
+            builds_access_level
+            container_registry_access_level
+            forking_access_level
+            issues_access_level
+            lfs_enabled
+            merge_requests_access_level
+            packages_enabled
+            pages_access_level
+            releases_access_level
+            repository_access_level
+            request_access_enabled
+            requirements_access_level
+            snippets_access_level
+            wiki_access_level
+            remove_source_branch_after_merge
+            ci_config_path
+            request_access_enabled)
+        ) {
             push @err, "$_ should be $prms{$_}"
               if (defined $prms{$_}
                 and (!defined($project->{$_}) or $project->{$_} ne $prms{$_}));
@@ -63,6 +105,22 @@ sub _check_repo {
         unless (defined $hooks) {
             ds_warn "Unable to get $name hooks";
             next;
+        }
+        # check avatar's path
+        if ($self->config->avatar_path) {
+            my ($md5_file, $md5_url) = "";
+            if ($prms_multipart{avatar}) {
+                ds_verbose "Calculating local checksum";
+                $md5_file = digest_file_hex($prms_multipart{avatar}, "MD5")
+                  or die "$prms_multipart{avatar} failed md5: $!";
+                if ($project->{avatar_url}) {
+                    ds_verbose "Calculating remote checksum";
+                    $md5_url = _url_md5_hex($project->{avatar_url})
+                      or die "$project->{avatar_url} failed md5: $!";
+                }
+                push @err, "Will set the avatar to be: $prms_multipart{avatar}"
+                  if ($md5_file ne $md5_url);
+            }
         }
         # KGB
         if ($self->config->kgb and not $hooks->{kgb}) {

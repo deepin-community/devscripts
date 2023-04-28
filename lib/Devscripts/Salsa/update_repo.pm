@@ -17,12 +17,16 @@ sub update_repo {
           "update_repo can't be launched when -i is set, use update_safe";
         return 1;
     }
-    unless (@reponames or $self->config->all) {
-        ds_warn "Repository name is missing";
+    unless (@reponames or $self->config->all or $self->config->all_archived) {
+        ds_warn "Usage $0 update_repo <--all|--all-archived|names>";
         return 1;
     }
     if (@reponames and $self->config->all) {
         ds_warn "--all with a reponame makes no sense";
+        return 1;
+    }
+    if (@reponames and $self->config->all_archived) {
+        ds_warn "--all-archived with a reponame makes no sense";
         return 1;
     }
     return $self->_update_repo(@reponames);
@@ -32,7 +36,7 @@ sub _update_repo {
     my ($self, @reponames) = @_;
     my $res = 0;
     # Common options
-    my $configparams = { wiki_enabled => 0, };
+    my $configparams = {};
     # visibility can be modified only by group owners
     $configparams->{visibility} = 'public'
       if $self->access_level >= $GITLAB_ACCESS_LEVEL_OWNER;
@@ -45,8 +49,12 @@ sub _update_repo {
         my $str = $repo->[1];
         eval {
             # apply new parameters
-            $self->api->edit_project($id,
-                { %$configparams, $self->desc($repo->[1]) });
+            $self->api->edit_project(
+                $id,
+                {
+                    %$configparams,
+                    $self->desc($repo->[1]),
+                    $self->desc_multipart($repo->[1]) });
             # add hooks if needed
             $str =~ s#^.*/##;
             $self->add_hooks($id, $str);

@@ -4,8 +4,11 @@ Priority: optional
 Maintainer: Devscripts Maintainers <devscripts@packages.debian.org>
 Uploaders:
  Mattia Rizzolo <mattia@debian.org>,
+ Benjamin Drung <bdrung@debian.org>,
 Build-Depends:
+ autodep8 <!nocheck>,
  bash-completion,
+ black <!nocheck>,
  debhelper-compat (= 13),
  dh-sequence-python3,
  docbook-xsl,
@@ -15,6 +18,7 @@ Build-Depends:
  git (>= 1:2.7.0) <!nocheck>,
  gnupg <!nocheck> | gnupg2 <!nocheck>,
  help2man,
+ isort <!nocheck>,
  libdistro-info-perl <!nocheck>,
  libdpkg-perl <!nocheck>,
  libfile-desktopentry-perl <!nocheck>,
@@ -45,20 +49,21 @@ Build-Depends:
  python3-debian <!nocheck>,
  python3-flake8 <!nocheck>,
  python3-magic <!nocheck>,
+ python3-pycurl <!nocheck>,
  python3-pyftpdlib <!nocheck>,
  python3-requests <!nocheck>,
  python3-setuptools,
  python3-unidiff <!nocheck>,
  python3-xdg <!nocheck>,
  shunit2 <!nocheck>,
- subversion <!nocheck>,
+ subversion [!i386] <!nocheck>,
  unzip <!nocheck>,
  wdiff <!nocheck>,
  xsltproc,
  xz-utils <!nocheck>,
- zstd <!nocheck>,
  zip <!nocheck>,
-Standards-Version: 4.6.0
+ zstd <!nocheck>,
+Standards-Version: 4.6.2
 Rules-Requires-Root: no
 Vcs-Browser: https://salsa.debian.org/debian/devscripts
 Vcs-Git: https://salsa.debian.org/debian/devscripts.git
@@ -103,7 +108,6 @@ Recommends:
  lintian,
  man-db,
  patch,
- pristine-tar,
  python3-apt,
  python3-debian (>= 0.1.15),
  python3-magic,

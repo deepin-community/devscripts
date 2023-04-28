@@ -2,36 +2,93 @@
 # Bash command completion for ‘debsign(1)’.
 # Documentation: ‘bash(1)’, section “Programmable Completion”.
 
-_debsign()
-{
-    local cur prev options
+shopt -s progcomp
 
+_have _debsign_completion &&
+_debsign_completion () {
     COMPREPLY=()
-    cur=${COMP_WORDS[COMP_CWORD]}
-    prev=${COMP_WORDS[COMP_CWORD-1]}
-    options='-r -p -m -e -k -S -a -t --multi -h --help -version \
-             --re-sign --no-re-sign --debs-dir --no-conf --noconf'
 
-    case $prev in
-        -k)
-            keyid_options=$(gpg --fixed-list-mode --with-colons --fingerprint -K | awk -F: '/^sec/{print $5}')
-            COMPREPLY=( $( compgen -W "$keyid_options" | grep "^${cur:-.}" ) )
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    local options=(
+        -h --help --version
+        -r -m -e -k
+        -a -t --multi
+        -p --debs-dir
+        -S
+        --re-sign --no-re-sign
+        --no-conf --noconf
+    )
+
+    case "$prev" in
+        -r)
+            # The option requires a non-option argument here, but we
+            # have no feasible way to generate auto-completion matches
+            # for ‘username@remotehost’. Use an empty set.
+            local host_options=""
+            COMPREPLY=( $(compgen -W "$host_options" -- "$cur") )
             ;;
+
+        -m|-e)
+            # The previous option requires an argument, but we
+            # have no feasible way to generate auto-completion matches
+            # for a maintainer identifier. Use an empty set.
+            local maintainer_options=""
+            COMPREPLY=( $(compgen -W "$maintainer_options" -- "$cur") )
+            ;;
+
+        -k)
+            # Provide completions for GnuPG secret key IDs.
+            local keyid_options=$(
+                gpg --fixed-list-mode --with-colons --fingerprint \
+                    --list-secret-keys \
+                    | awk -F':' '/^sec/{print $5}' )
+            COMPREPLY=( $(
+                    compgen -W "$keyid_options" | grep "^${cur:-.}"
+                ) )
+            ;;
+
+        -a)
+            # Provide completions for system architecture identifiers.
+            local arch_options=$(dpkg-architecture --list-known)
+            COMPREPLY=( $(compgen -W "$arch_options" -- "$cur") )
+            ;;
+
+        -t)
+            # The previous option requires an argument, but we
+            # have no feasible way to generate auto-completion matches
+            # for a GNU system type identifier. Use an empty set.
+            local type_options=""
+            COMPREPLY=( $(compgen -W "$type_options" -- "$cur") )
+            ;;
+
+        -p)
+            # Provide completions for available commands.
+            COMPREPLY=( $(compgen -A command -- "$cur") )
+            ;;
+
+        --debs-dir)
+            # Provide completions for existing directory paths.
+            COMPREPLY=( $(compgen -o dirnames -A directory -- "$cur") )
+            ;;
+
         *)
             COMPREPLY=( $(
-                    compgen -f -X "!*.changes"   -- "$cur"
-                    compgen -f -X "!*.buildinfo" -- "$cur"
-                    compgen -f -X "!*.dsc"       -- "$cur"
-                    compgen -f -X "!*.commands"  -- "$cur"
-                    compgen -W "$options" | grep "^$cur"
+                    compgen -G "${cur}*.changes"
+                    compgen -G "${cur}*.buildinfo"
+                    compgen -G "${cur}*.dsc"
+                    compgen -G "${cur}*.commands"
+                    compgen -W "${options[*]}" -- "$cur"
                 ) )
+            compopt -o filenames
+            compopt -o plusdirs
             ;;
     esac
 
     return 0
 
-}
-complete -F _debsign -o filenames debsign
+} && complete -F _debsign_completion debsign
 
 
 # Local variables:

@@ -110,6 +110,25 @@ Examples:
 
   $ debrepro --before-second-build "patch -p1 < /path/to/patch"
 
+=item -B COMMAND, --build-command COMMAND
+
+Use custom build command. Default: I<dpkg-buildpackage -b -us -uc>.
+
+If a custom build command is specified, the restriction of only running
+against a Debian source tree is relaxed and you can run debrepro against
+any source directory.
+
+=item -a PATTERN, --artifact-pattern PATTERN
+
+Define a file glob pattern to determine which artifacts need to be
+compared across the builds. Default: I<../*.deb>.
+
+=item -n, --no-copy
+
+Do not copy the source directory to the temporary work directory before
+each build. Use this to run debrepro against the source directory
+directly.
+
 =item -t TIME, --timeout TIME
 
 Apply a timeout to all builds. I<TIME> must be a time specification

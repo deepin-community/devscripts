@@ -29,6 +29,8 @@ BEGIN {
     }
 }
 use Moo;
+use File::Basename;
+use File::Path qw(make_path);
 
 # Command aliases
 use constant cmd_aliases => {
@@ -39,6 +41,12 @@ use constant cmd_aliases => {
     search_repo => 'search_project',
     mr          => 'merge_request',
     mrs         => 'merge_requests',
+    pipe        => 'pipeline_schedule',
+    pipeline    => 'pipeline_schedule',     # preferred name
+    schedule    => 'pipeline_schedule',
+    pipes       => 'pipeline_schedules',
+    pipelines   => 'pipeline_schedules',    # preferred name
+    schedules   => 'pipeline_schedules',
 };
 
 =head1 ACCESSORS
@@ -67,6 +75,10 @@ has _cache => (
         return {} unless ($_[0]->config->cache_file);
         my %h;
         eval {
+            my ($cache_file, $cache_dir) = fileparse $_[0]->config->cache_file;
+            if (!-d $cache_dir) {
+                make_path $cache_dir;
+            }
             require Devscripts::JSONCache;
             tie %h, 'Devscripts::JSONCache', $_[0]->config->cache_file;
             ds_debug "Cache opened";

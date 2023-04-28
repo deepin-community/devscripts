@@ -36,7 +36,7 @@ our $KEYRING
   = "/usr/share/keyrings/debian-keyring.gpg:/usr/share/keyrings/debian-maintainers.gpg";
 our $TYPE = "package";
 our $GPG  = first { !system('sh', '-c', "command -v $_ >/dev/null 2>&1") }
-qw(gpg2 gpg);
+  qw(gpg2 gpg);
 our ($HELP, @ARGUMENTS, @DM_DATA, %GPG_CACHE);
 
 binmode STDIN,  ':encoding(console_in)';
@@ -233,7 +233,6 @@ sub leave {
 
 sub lookup_fingerprint {
     my $fingerprint = shift;
-    my $uid         = "";
 
     if (exists $GPG_CACHE{$fingerprint}) {
         return $GPG_CACHE{$fingerprint};
@@ -254,16 +253,21 @@ sub lookup_fingerprint {
             "--with-colons",        encode(locale => $fingerprint)));
     open(CMD, '-|', $GPG, @gpg_arguments) || leave "$GPG: $!\n";
     binmode CMD, ':utf8';
+    my $uid;
     while (my $l = <CMD>) {
-        if ($l =~ /^pub/) {
-            $uid = $l;
+        if ($l =~ /^uid/) {
+            my $id = (split(":", $l))[9];
+            if (!defined($uid)) {
+                $uid = $id;
+            }
+            if ($id =~ /debian\.org/) {
+                $uid = $id;
  # Consume the rest of the output to avoid a potential SIGPIPE when closing CMD
-            my @junk = <CMD>;
-            last;
+                my @junk = <CMD>;
+                last;
+            }
         }
     }
-    my @fields = split(":", $uid);
-    $uid = $fields[9];
     close(CMD)
       || leave("gpg returned an error looking for $fingerprint: " . ($? >> 8));
 

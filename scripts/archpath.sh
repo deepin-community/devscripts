@@ -20,7 +20,7 @@
 set -e
 
 # Which arch implementation should we use?
-if type baz >/dev/null 2>&1; then
+if type baz > /dev/null 2>&1; then
 	PROGRAM=baz
 else
 	PROGRAM=tla

@@ -102,7 +102,7 @@ dependencies, does not find transitive dependencies and does not take version
 relationships, architecture restrictions, build profiles or multiarch
 relationships into account.
 
-=item B<--quiet>
+=item B<-q>, B<--quiet>
 
 Don't print meta information (header, counter). Making it easier to use in
 scripts.

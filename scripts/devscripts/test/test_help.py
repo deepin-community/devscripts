@@ -39,22 +39,28 @@ class HelpTestCase(unittest.TestCase):
     @classmethod
     def populate(cls):
         for script in SCRIPTS:
-            setattr(cls, 'test_' + script, cls.make_help_tester(script))
+            setattr(cls, "test_" + script, cls.make_help_tester(script))
 
     @classmethod
     def make_help_tester(cls, script):
         def tester(self):
-            with subprocess.Popen(['./' + script, '--help'],
-                                  close_fds=True, stdin=subprocess.DEVNULL,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE) as process:
+            with subprocess.Popen(
+                ["./" + script, "--help"],
+                close_fds=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ) as process:
                 started = time.time()
                 out = []
 
                 fds = [process.stdout.fileno(), process.stderr.fileno()]
                 for fd in fds:
-                    fcntl.fcntl(fd, fcntl.F_SETFL,
-                                fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NONBLOCK)
+                    fcntl.fcntl(
+                        fd,
+                        fcntl.F_SETFL,
+                        fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NONBLOCK,
+                    )
 
                 while time.time() - started < TIMEOUT:
                     for fd in select.select(fds, [], fds, TIMEOUT)[0]:
@@ -68,8 +74,11 @@ class HelpTestCase(unittest.TestCase):
                     if process.poll() is None:
                         os.kill(process.pid, signal.SIGKILL)
 
-            self.assertEqual(process.poll(), 0,
-                             "%s failed to return usage within %i seconds.\n"
-                             "Output:\n%s"
-                             % (script, TIMEOUT, ''.encode('ascii').join(out)))
+            self.assertEqual(
+                process.poll(),
+                0,
+                f"{script} failed to return usage within {TIMEOUT} seconds.\n"
+                f"Output:\n{b''.join(out)}",
+            )
+
         return tester

@@ -24,9 +24,9 @@ def escape_arg(arg):
     """Shell-escape arg, if necessary.
     Fairly simplistic, doesn't escape anything except whitespace.
     """
-    if ' ' not in arg:
+    if " " not in arg:
         return arg
-    return '"%s"' % arg.replace('\\', r'\\').replace('"', r'\"')
+    return '"%s"' % arg.replace("\\", r"\\").replace('"', r"\"")
 
 
 class Logger:

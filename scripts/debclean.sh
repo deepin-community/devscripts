@@ -2,10 +2,10 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [options]
   Clean all debian build trees under current directory.
@@ -41,7 +41,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 1999 by Julian Gilbey, all rights reserved.
@@ -161,7 +161,7 @@ fi
 
 # Script to clean up debian directories
 
-OPWD="`pwd`"
+OPWD="$(pwd)"
 
 TESTDIR=$(echo $OPWD | grep -Eo '.*/debian/?' | sed 's/\/debian\/\?$//')
 
@@ -185,7 +185,7 @@ for i in $directories; do
 	echo "Directory $DIR: contains no debian/changelog, skipping" >&2
 	exit
     fi
-    package="`dpkg-parsechangelog -SSource`"
+    package="$(dpkg-parsechangelog -SSource)"
     if [ -z "$package" ]; then
 	echo "Directory $DIR: unable to determine package name, skipping" >&2
 	exit
@@ -193,15 +193,15 @@ for i in $directories; do
 
     # let's test the directory name if appropriate
     if [ $CHECK_DIRNAME_LEVEL -eq 2 -o \
-	\( $CHECK_DIRNAME_LEVEL -eq 1 -a "$OPWD" != "`pwd`" \) ]; then
+	\( $CHECK_DIRNAME_LEVEL -eq 1 -a "$OPWD" != "$(pwd)" \) ]; then
 	if ! perl -MFile::Basename -w \
 	    -e "\$pkg='$package'; \$re='$CHECK_DIRNAME_REGEX';" \
 	    -e '$re =~ s/PACKAGE/\\Q$pkg\\E/g; $pwd=`pwd`; chomp $pwd;' \
 	    -e 'if ($re =~ m%/%) { eval "exit (\$pwd =~ /^$re\$/ ? 0:1);"; }' \
 	    -e 'else { eval "exit (basename(\$pwd) =~ /^$re\$/ ? 0:1);"; }'
 	then
-	    echo "Full directory path `pwd` does not match package name, skipping." >&2
-	    echo "Run $progname --help for more information on directory name matching." >&2
+	    echo "Full directory path $(pwd) does not match package name, skipping." >&2
+	    echo "Run $PROGNAME --help for more information on directory name matching." >&2
 	    exit
 	fi
     fi

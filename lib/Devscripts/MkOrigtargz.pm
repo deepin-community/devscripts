@@ -6,6 +6,7 @@ use Devscripts::Compression
   qw/compression_guess_from_file compression_get_property/;
 use Devscripts::MkOrigtargz::Config;
 use Devscripts::Output;
+use Devscripts::Uscan::Output;
 use Devscripts::Utils;
 use Dpkg::Changelog::Debian;
 use Dpkg::Control::Hash;
@@ -130,7 +131,10 @@ sub make_orig_targz {
             compress_archive($destfiletar, $destfile,
                 $self->config->compression);
         };
-        return $self->status(1) if ($@);
+        if ($@) {
+            ds_die($@);
+            return $self->status(1);
+        }
 
         # rename means the user did not want this file to exist afterwards
         if ($self->config->mode eq "rename") {
@@ -187,7 +191,10 @@ sub make_orig_targz {
               = map { { glob => $_, used => 0, regex => glob_to_regex($_) } }
               @{ $self->exclude_globs };
         };
-        return $self->status(1) if ($@);
+        if ($@) {
+            ds_die($@);
+            return $self->status(1);
+        }
         for my $filename (sort @files) {
             my $last_match;
             for my $info (@exclude_info) {
@@ -264,7 +271,10 @@ sub make_orig_targz {
         }
         if ($self->config->upstream_comp) {
             eval { decompress_archive($upstream_tar, $destfiletar) };
-            return $self->status(1) if ($@);
+            if ($@) {
+                ds_die($@);
+                return $self->status(1);
+            }
         } else {
             copy $upstream_tar, $destfiletar;
         }
@@ -409,11 +419,11 @@ sub make_orig_targz {
             }
         }
     } elsif ($self->config->signature == 3) {
-        print
-"Skip adding upstream signature since upstream file has non-detached signature file.\n";
+        uscan_msg_raw
+"Skip adding upstream signature since upstream file has non-detached signature file.";
     } elsif ($self->config->signature == 4) {
-        print
-          "Skip adding upstream signature since upstream file is repacked.\n";
+        uscan_msg_raw
+          "Skip adding upstream signature since upstream file is repacked.";
     }
 
     # Final check: Is the tarball usable
@@ -434,19 +444,23 @@ sub make_orig_targz {
     $self->destfile_nice($destfile_nice);
 
     if ($same_name) {
-        print "Leaving $destfile_nice where it is";
+        uscan_msg_raw "Leaving $destfile_nice where it is";
     } else {
         if (   $self->config->upstream_type eq 'zip'
             or $do_repack
             or $deletecount
             or $self->config->force_repack) {
-            print "Successfully repacked $upstream_nice as $destfile_nice";
+            uscan_msg_raw
+              "Successfully repacked $upstream_nice as $destfile_nice";
         } elsif ($self->config->mode eq "symlink") {
-            print "Successfully symlinked $upstream_nice to $destfile_nice";
+            uscan_msg_raw
+              "Successfully symlinked $upstream_nice to $destfile_nice";
         } elsif ($self->config->mode eq "copy") {
-            print "Successfully copied $upstream_nice to $destfile_nice";
+            uscan_msg_raw
+              "Successfully copied $upstream_nice to $destfile_nice";
         } elsif ($self->config->mode eq "rename") {
-            print "Successfully renamed $upstream_nice to $destfile_nice";
+            uscan_msg_raw
+              "Successfully renamed $upstream_nice to $destfile_nice";
         } else {
             ds_die 'Unknown mode ' . $self->config->mode;
             return $self->status(1);
@@ -454,10 +468,10 @@ sub make_orig_targz {
     }
 
     if ($deletecount) {
-        print ", deleting ${deletecount} files from it";
+        uscan_msg_raw ", deleting ${deletecount} files from it";
     }
     if ($zipfile_deleted) {
-        print ", and removed the original file";
+        uscan_msg_raw ", and removed the original file";
     }
     print ".\n";
     return 0;

@@ -21,13 +21,13 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
-synopsis () {
+synopsis() {
     echo "Usage: $PROGNAME [-h|--help|--version] [-d] [-S|--source] [-i|--indep] [-f] <file1> <file2> [<file> ...]"
 }
 
-usage () {
+usage() {
     synopsis
     cat <<EOT
   Merge the changes files <file1>, <file2>, ....  Output on stdout
@@ -39,7 +39,7 @@ usage () {
 EOT
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright (C) 2002 Gergely Nagy <algernon@debian.org>
@@ -83,7 +83,7 @@ while [ $# -gt 0 ]; do
 	    shift
 	    ;;
 	-*)
-	    echo "Unrecognised option $1.  Use $progname --help for help" >&2
+	    echo "Unrecognised option $1.  Use $PROGNAME --help for help" >&2
 	    exit 1
 	    ;;
 	*)
@@ -108,7 +108,7 @@ for f in "$@"; do
 done
 
 # Get a (possibly multi-line) field.
-get_field () {
+get_field() {
     perl -e '
     use warnings;
     use strict;
@@ -252,7 +252,7 @@ if test -n "${UNSUPCHECKSUMS}"; then
 fi
 
 if test ${FILE} = 1; then
-    DIR=`dirname "$1"`
+    DIR=$(dirname "$1")
     REDIR1="> '${DIR}/${SOURCE}_${SVERSION}_multi.changes'"
     REDIR2=">$REDIR1"
 fi

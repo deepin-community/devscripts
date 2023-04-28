@@ -36,7 +36,7 @@ BEGIN {
 has agent =>
   (is => 'rw', default => sub { "Debian uscan $main::uscan_version" });
 has timeout => (is => 'rw');
-has pasv    => (
+has pasv => (
     is      => 'rw',
     default => 'default',
     trigger => sub {

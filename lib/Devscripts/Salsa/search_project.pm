@@ -33,12 +33,14 @@ Id       : $_->{id}
 Name     : $_->{name}
 Full path: $_->{path_with_namespace}
 END
-        print($_->{namespace}->{kind} eq 'group'
+        print(
+            $_->{namespace}->{kind} eq 'group'
             ? "Group id : "
             : "User id  : "
         );
         print "$_->{namespace}->{id}\n";
-        print($_->{namespace}->{kind} eq 'group'
+        print(
+            $_->{namespace}->{kind} eq 'group'
             ? "Group    : "
             : "User     : "
         );

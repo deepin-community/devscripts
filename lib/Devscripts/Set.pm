@@ -20,7 +20,7 @@ use strict;
 
 BEGIN {
     use Exporter ();
-    use vars qw(@EXPORT @ISA %EXPORT_TAGS);
+    use vars     qw(@EXPORT @ISA %EXPORT_TAGS);
     @EXPORT      = qw(SetMinus SetInter SetUnion);
     @ISA         = qw(Exporter);
     %EXPORT_TAGS = ();

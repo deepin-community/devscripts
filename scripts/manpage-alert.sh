@@ -117,7 +117,7 @@ for DIR in "$@"; do
         if [ "$F" = "/usr/bin/X11" ]; then continue; fi
         NUM_EXECUTABLES=$(( NUM_EXECUTABLES + 1 ))
 
-        if OUT=$(man -w -S 1:8:6 "${F##*/}" 2>&1 >/dev/null); then
+        if OUT=$(man -w -S 1:8:6 "${F##*/}" 2>&1 > /dev/null); then
             NUM_MANPAGES_FOUND=$(( NUM_MANPAGES_FOUND + 1 ))
         else
             if [ $SHOWPACKAGE = "PACKAGE" ]; then 

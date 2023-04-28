@@ -10,9 +10,9 @@ see the individual manpages.  They are contributed by multiple
 developers; for details of the authors, please see the code or
 manpages.
 
-Also, the directory \fI/usr/share/doc/devscripts/examples\fR contains
-examples of \fBprocmail\fR and \fBexim\fR scripts for sorting mail
-arriving to Debian mailing lists.
+Also, the directory \fI/usr/share/doc/devscripts/examples\fR contains an
+example \fBexim\fR script for sorting mail arriving to Debian mailing
+lists.
 .SH ENVIRONMENT
 Several scripts of the devscripts suite use the following environment
 variables. Check the man pages of individual scripts for more details on how the

@@ -14,6 +14,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+# pylint: disable=invalid-name
+# pylint: enable=invalid-name
+
 import argparse
 import os
 import sys
@@ -23,8 +26,7 @@ from devscripts.logger import Logger
 try:
     import magic
 except ImportError:
-    Logger.error(
-        "Please install 'python3-magic' in order to use this utility.")
+    Logger.error("Please install 'python3-magic' in order to use this utility.")
     sys.exit(1)
 
 DEFAULT_WHITELISTED_MIMETYPES = [
@@ -32,14 +34,14 @@ DEFAULT_WHITELISTED_MIMETYPES = [
     "application/vnd.font-fontforge-sfd",  # font source: fontforge
     "application/x-elc",
     "application/x-empty",
-    "application/x-font-otf",              # font object and source
-    "application/x-font-ttf",              # font object and source
-    "application/x-font-woff",             # font object and source
+    "application/x-font-otf",  # font object and source
+    "application/x-font-ttf",  # font object and source
+    "application/x-font-woff",  # font object and source
     "application/x-symlink",
     "application/xml",
     "audio/x-wav",
-    "font/otf",                            # font object and source
-    "font/ttf",                            # font object and source
+    "font/otf",  # font object and source
+    "font/ttf",  # font object and source
     "image/gif",
     "image/jpeg",
     "image/png",
@@ -73,8 +75,8 @@ DEFAULT_WHITELISTED_MIMETYPES = [
     "text/x-perl",
     "text/x-php",
     "text/x-po",
-    "text/x-python",
     "text/x-ruby",
+    "text/x-script.python",
     "text/x-shellscript",
     "text/x-tex",
     "text/x-texinfo",
@@ -82,30 +84,31 @@ DEFAULT_WHITELISTED_MIMETYPES = [
 ]
 
 DEFAULT_WHITELISTED_EXTENSIONS = [
-    ".el",     # elisp source files
-    ".fea",    # font source format: Adobe Font Development Kit for OpenType
-    ".fog",    # font source format: Fontographer
-    ".g2n",    # font source format: fontforge
-    ".gdh",    # font source format: Graphite (headers)
-    ".gdl",    # font source format: Graphite
+    ".el",  # elisp source files
+    ".fea",  # font source format: Adobe Font Development Kit for OpenType
+    ".fog",  # font source format: Fontographer
+    ".g2n",  # font source format: fontforge
+    ".gdh",  # font source format: Graphite (headers)
+    ".gdl",  # font source format: Graphite
     ".glyph",  # font source format: cross-toolkit UFO
-    ".gmo",    # GNU Machine Object File (for translations with gettext)
-    ".icns",   # Apple Icon Image format
-    ".java",   # Java source files
+    ".gmo",  # GNU Machine Object File (for translations with gettext)
+    ".icns",  # Apple Icon Image format
+    ".java",  # Java source files
     ".plate",  # font source format: Spiro
     ".rsa",
-    ".sfd",    # font source format: fontforge
+    ".sfd",  # font source format: fontforge
     ".sfdir",  # font source format: fontforge
-    ".ttx",    # font source format: fonttools
-    ".ufo",    # font source format: cross-toolkit UFO
-    ".vfb"     # font source format: FontLab
-    ".vtp",    # font source format: OpenType (VOLT)
-    ".xgf",    # font source format: Xgridfit
+    ".ttx",  # font source format: fonttools
+    ".ufo",  # font source format: cross-toolkit UFO
+    ".vfb",  # font source format: FontLab
+    ".vtp",  # font source format: OpenType (VOLT)
+    ".xgf",  # font source format: Xgridfit
 ]
 
 
-def suspicious_source(whitelisted_mimetypes, whitelisted_extensions, directory,
-                      verbose=False):
+def suspicious_source(
+    whitelisted_mimetypes, whitelisted_extensions, directory, verbose=False
+):
     magic_cookie = magic.open(magic.MAGIC_MIME_TYPE)
     magic_cookie.load()
 
@@ -113,8 +116,7 @@ def suspicious_source(whitelisted_mimetypes, whitelisted_extensions, directory,
         for _file in files:
             mimetype = magic_cookie.file(os.path.join(root, _file))
             if mimetype not in whitelisted_mimetypes:
-                if not [x for x in whitelisted_extensions
-                        if _file.lower().endswith(x)]:
+                if not [x for x in whitelisted_extensions if _file.lower().endswith(x)]:
                     output = os.path.join(root, _file)
                     if verbose:
                         output += " (" + mimetype + ")"
@@ -126,28 +128,49 @@ def suspicious_source(whitelisted_mimetypes, whitelisted_extensions, directory,
 
 def main():
     script_name = os.path.basename(sys.argv[0])
-    epilog = "See %s(1) for more info." % (script_name)
+    epilog = f"See {script_name}(1) for more info."
     parser = argparse.ArgumentParser(epilog=epilog)
 
-    parser.add_argument("-v", "--verbose", help="print more information",
-                        dest="verbose", action="store_true", default=False)
-    parser.add_argument("-d", "--directory",
-                        help="check the files in the specified directory",
-                        dest="directory", default=".")
-    parser.add_argument("-m", "--mimetype", metavar="MIMETYPE",
-                        help="Add MIMETYPE to list of whitelisted mimetypes.",
-                        dest="whitelisted_mimetypes", action="append",
-                        default=DEFAULT_WHITELISTED_MIMETYPES)
-    parser.add_argument("-e", "--extension", metavar="EXTENSION",
-                        help="Add EXTENSION to list of whitelisted extensions.",
-                        dest="whitelisted_extensions", action="append",
-                        default=DEFAULT_WHITELISTED_EXTENSIONS)
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="print more information",
+        dest="verbose",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-d",
+        "--directory",
+        help="check the files in the specified directory",
+        dest="directory",
+        default=".",
+    )
+    parser.add_argument(
+        "-m",
+        "--mimetype",
+        metavar="MIMETYPE",
+        help="Add MIMETYPE to list of whitelisted mimetypes.",
+        dest="whitelisted_mimetypes",
+        action="append",
+        default=DEFAULT_WHITELISTED_MIMETYPES,
+    )
+    parser.add_argument(
+        "-e",
+        "--extension",
+        metavar="EXTENSION",
+        help="Add EXTENSION to list of whitelisted extensions.",
+        dest="whitelisted_extensions",
+        action="append",
+        default=DEFAULT_WHITELISTED_EXTENSIONS,
+    )
 
     args = parser.parse_args()
 
     whitelisted_extensions = [x.lower() for x in args.whitelisted_extensions]
-    suspicious_source(args.whitelisted_mimetypes, whitelisted_extensions,
-                      args.directory, args.verbose)
+    suspicious_source(
+        args.whitelisted_mimetypes, whitelisted_extensions, args.directory, args.verbose
+    )
 
 
 if __name__ == "__main__":

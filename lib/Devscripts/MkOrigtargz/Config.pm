@@ -66,6 +66,7 @@ use constant keys => [
             if ($_[1]) {
                 $_[0]->orig("orig-$_[1]");
                 $_[0]->excludestanza("Files-Excluded-$_[1]");
+                $_[0]->includestanza("Files-Included-$_[1]");
             }
             1;
 

@@ -20,10 +20,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-progname=$(basename $0)
+PROGNAME=${0##*/}
 
-addtime ()
-{
+addtime() {
 	while IFS= read -r line; do
 		printf "%s %s: %s\n" "$(date "${FMT}")" "$1" "$line"
 	done
@@ -32,8 +31,7 @@ addtime ()
 	fi
 }
 
-addprefix ()
-{
+addprefix() {
 	while IFS= read -r line; do
 		printf "%s: %s\n" "$1" "$line"
 	done
@@ -42,10 +40,9 @@ addprefix ()
 	fi
 }
 
-usage ()
-{
+usage() {
 	echo \
-"Usage: $progname [options] program [args ...]
+"Usage: $PROGNAME [options] program [args ...]
   Run program and annotate STDOUT/STDERR with a timestamp.
 
   Options:

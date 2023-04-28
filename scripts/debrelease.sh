@@ -23,10 +23,10 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [debrelease options] [dupload/dput options]
   Run dupload on the newly created changes file.
@@ -58,7 +58,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 1999-2003 by Julian Gilbey, all rights reserved.
@@ -68,7 +68,7 @@ You are free to redistribute this code under the terms of the
 GNU General Public License, version 2 or later."
 }
 
-mustsetvar () {
+mustsetvar() {
     if [ "x$2" = x ]
     then
 	echo >&2 "$PROGNAME: unable to determine $3"
@@ -119,7 +119,7 @@ else
 
     # We do not replace this with a default directory to avoid accidentally
     # uploading a broken package
-    DEBRELEASE_DEBS_DIR="`echo \"$DEBRELEASE_DEBS_DIR\" | sed -e 's%/\+%/%g; s%\(.\)/$%\1%;'`"
+    DEBRELEASE_DEBS_DIR="$(echo "$DEBRELEASE_DEBS_DIR" | sed -e 's%/\+%/%g; s%\(.\)/$%\1%;')"
     if ! [ -d "$DEBRELEASE_DEBS_DIR" ]; then
 	debsdir_warning="config file specified DEBRELEASE_DEBS_DIR directory $DEBRELEASE_DEBS_DIR does not exist!"
     fi
@@ -158,8 +158,8 @@ debsdir="$DEBRELEASE_DEBS_DIR"
 while [ $# -gt 0 ]
 do
     case "$1" in
-    -a*) targetarch="`echo \"$1\" | sed -e 's/^-a//'`" ;;
-    -t*) targetgnusystem="`echo \"$1\" | sed -e 's/^-t//'`"
+    -a*) targetarch="$(echo "$1" | sed -e 's/^-a//')" ;;
+    -t*) targetgnusystem="$(echo "$1" | sed -e 's/^-t//')"
 	 # dupload has a -t option
 	 if [ -z "$targetgnusystem" ]; then break; fi ;;
     -S) sourceonly=source ;;
@@ -169,14 +169,14 @@ do
     # Delay checking of debsdir until we need it.  We need to make sure we're
     # in the package root directory first.
     --debs-dir=*)
-	opt_debsdir="`echo \"$1\" | sed -e 's/^--debs-dir=//; s%/\+%/%g; s%\(.\)/$%\1%;'`"
+	opt_debsdir="$(echo "$1" | sed -e 's/^--debs-dir=//; s%/\+%/%g; s%\(.\)/$%\1%;')"
 	;;
     --debs-dir)
 	shift
-	opt_debsdir="`echo \"$1\" | sed -e 's%/\+%/%g; s%\(.\)/$%\1%;'`"
+	opt_debsdir="$(echo "$1" | sed -e 's%/\+%/%g; s%\(.\)/$%\1%;')"
 	;;
     --check-dirname-level=*)
-	level="`echo \"$1\" | sed -e 's/^--check-dirname-level=//'`"
+	level="$(echo "$1" | sed -e 's/^--check-dirname-level=//')"
         case "$level" in
 	0|1|2) CHECK_DIRNAME_LEVEL=$level ;;
 	*) echo "$PROGNAME: unrecognised --check-dirname-level value (allowed are 0,1,2)" >&2
@@ -192,7 +192,7 @@ do
         esac
 	;;
     --check-dirname-regex=*)
-	regex="`echo \"$1\" | sed -e 's/^--check-dirname-level=//'`"
+	regex="$(echo "$1" | sed -e 's/^--check-dirname-level=//')"
 	if [ -z "$regex" ]; then
 	    echo "$PROGNAME: missing --check-dirname-regex parameter" >&2
 	    echo "try $PROGNAME --help for usage information" >&2
@@ -229,7 +229,7 @@ CHDIR=
 until [ -f debian/changelog ]; do
     CHDIR=yes
     cd ..
-    if [ `pwd` = "/" ]; then
+    if [ $(pwd) = "/" ]; then
 	echo "$PROGNAME: cannot find debian/changelog anywhere!" >&2
 	echo "Are you in the source code tree?" >&2
 	exit 1
@@ -270,13 +270,13 @@ if [ $CHECK_DIRNAME_LEVEL -eq 2 -o \
 	-e 'else { eval "exit (basename(\$pwd) =~ /^$re\$/ ? 0:1);"; }'
     then
 	echo >&2 <<EOF
-$progname: found debian/changelog for package $PACKAGE in the directory
+$PROGNAME: found debian/changelog for package $PACKAGE in the directory
   $pwd
 but this directory name does not match the package name according to the
 regex  $check_dirname_regex.
 
-To run $progname on this package, see the --check-dirname-level and
---check-dirname-regex options; run $progname --help for more info.
+To run $PROGNAME on this package, see the --check-dirname-level and
+--check-dirname-regex options; run $PROGNAME --help for more info.
 EOF
 	exit 1
     fi
@@ -294,7 +294,7 @@ else
     mustsetvar arch "$(dpkg-architecture -qDEB_HOST_ARCH)" "build architecture"
 fi
 
-sversion=`echo "$version" | perl -pe 's/^\d+://'`
+sversion=$(echo "$version" | perl -pe 's/^\d+://')
 pva="${package}_${sversion}_${arch}"
 pvs="${package}_${sversion}_source"
 changes="$debsdir/$pva.changes"

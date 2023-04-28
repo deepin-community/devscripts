@@ -27,7 +27,7 @@ use FileHandle;
 
 BEGIN {
     use Exporter ();
-    use vars qw(@EXPORT @ISA %EXPORT_TAGS);
+    use vars     qw(@EXPORT @ISA %EXPORT_TAGS);
     @EXPORT
       = qw(PackagesToFiles FilesToPackages PackagesMatch InstalledPackages);
     @ISA         = qw(Exporter);
