@@ -1,16 +1,396 @@
-devscripts (2.21.5) UNRELEASED; urgency=medium
+devscripts (2.23.3) unstable; urgency=medium
 
-  * update
+  [ Samuel Henrique ]
+  * Fix generation of the extended description (Closes: #1032337)
 
- -- Devscripts Maintainers <devscripts@packages.debian.org>  Mon, 13 Jun 2022 19:38:12 +0800
+  [ Benjamin Drung ]
+  * Fix complaints from pylint 2.16.2
+  * suspicious-source: Fix MIME type name for Python code
+  * Add myself to uploaders
+
+  [ Zixing Liu ]
+  * Salsa/check_repo: avoid dependency on Digest::MD5::File (LP: #2007279)
+  * Salsa/Hooks: using if-elsif chains to avoid Switch which is a deprecated
+    package (LP: #2007279)
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debootsnap:
+    - check to make sure that equivs-build, apt-ftparchive, mmdebstrap,
+      apt-get and dpkg-name exist
+    - allow reading package list from a file
+
+  [ Rémy Martin ]
+  * edit-patch: Fix failure on creating new patch (LP: #1222364)
+
+  [ Paul Wise ]
+  * bts: Fix mangled UTF-8 name
+
+ -- Benjamin Drung <bdrung@debian.org>  Wed, 15 Mar 2023 23:52:52 +0100
+
+devscripts (2.23.2) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Yadd ]
+  * Update French translation
+
+  [ Paul Wise ]
+  * wnpp-alert: Fix wnpp-alert --diff, which probably never worked
+
+  [ Benjamin Drung ]
+  * Format code with black 23.1 (Closes: #1031302)
+  * build-rdeps: Document -q in man page (Closes: #1030141)
+  * Update translations for recent changes
+
+  [ Jakub Wilk ]
+  * debchange.1: Fix uneven indentation in option list (Closes: #1031549)
+
+ -- Benjamin Drung <bdrung@debian.org>  Sun, 19 Feb 2023 00:56:21 +0100
+
+devscripts (2.23.1) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Jochen Sprickerhof ]
+  * debrelease: fix escaping in command substitution (Closes: #1030590)
+
+  [ Mattia Rizzolo ]
+  * Fix generation of the extended description.
+    Thanks to Beatrice Torracca <beatricet@libero.it>
+
+  [ Benjamin Drung ]
+  * debdiff-apply: Ask user to install python3-unidiff if missing
+    (Closes: #1029985)
+
+ -- Benjamin Drung <bdrung@debian.org>  Fri, 10 Feb 2023 10:17:18 +0100
+
+devscripts (2.23.0) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Mattia Rizzolo ]
+  * list-unreleased:
+    + Use find(1)'s -regex filter instead of piping through grep(1).
+      Thanks to Akbarkhon Variskhanov <akbarkhon.variskhanov@gmail.com>
+      for the patch!  Closes: #1012657
+  * dget:
+    + Retain the remote mtime also with curl.  Closes: #1020914
+
+  [ Niels Thykier ]
+  * wrap-and-sort:
+    + Do not sort multi-line comments and pin a comment to the value
+      directly following where possible.  Closes: #788998; MR: !268
+    + Always apply a trailing comma when run with -t also when the field
+      is not being wrapped.  Closes: #989785; MR: !267
+    + Enable the new RTS parser by default.  Closes: #820625; MR: !271
+  * Fix two minor python style nits.  MR: !287
+
+  [ Edward Betts ]
+  * Remove procmail examples. Procmail is a security liability and has been
+    abandoned upstream for the last two decades.  MR: !270
+    See https://anarc.at/blog/2022-03-02-procmail-considered-harmful/
+
+  [ Sebastian Dröge ]
+  * debcommit:
+    + Pass `--no-ext-diff` to `git diff`; external diff commands can produce
+      output that is not handled by debcommit.  MR: !266
+
+  [ Ben Finney ]
+  * debsign:
+    + Rework the bash completion script to:  MR: !265
+      - Fix behaviour with filenames with special characters.
+      - Improve the coding style.
+      - Correct use of Bash command completion to match file paths.
+        Closes: #1012156
+      - Correct Bash completion handling of ‘--version’ option.
+        Closes: #1012086
+      - Add Bash completion handling for more options that need it.
+        Closes: #1012158
+
+  [ Akbarkhon Variskhanov ]
+  * Shell scripts style cleanup:
+    + Uniform the way the shell script discover their own name, from shelling
+      out to `basename` to use ${0##*/}.  MR: !269
+    + Place opening braces on the same line as function definitions.  MR: !273
+    + Remove whitespace before parentheses.  MR: !273
+    + Replace backquoted form of command substitution with $().  MR: !274
+    + Remove the 2>/dev/null redirects from `command -v`.  MR: !275
+  * Fix grammatical typo in salsa(1)'s man page.  MR: !284
+
+  [ Américo Monteiro ]
+  * Update Portuguese translations.  Closes: #1019170
+
+  [ Yadd ]
+  * uscan:
+    + Fix DEHS output.  Closes: #1019259; MR: !279
+  * Update French translation.
+
+  [ Paul Wise ]
+  * grep-excuses:
+    + Add support for the pseudo-excuses for experimental.  MR: !280
+  * bts:
+    + Add reasons for "failing to download" errors , for easier dubug.  MR: !293
+  * rmadison:
+    + Add URL maps (`rmadison -u`) for archived releases ("archive") and
+      unofficial ports archive ("ports").  MR: !309
+
+  [ Andrea Pappacoda ]
+  * uscan:
+    + Support an optional 'v' prefix in @ANY_VERSION@.  MR: !281
+      This allows uscan to automatically look for version tags like "v1.0.2".
+
+  [ Ben Hutchings ]
+  * Remove use of distutils.command.clean, which no longer works.  MR: !291
+  * debbisect, debootsnap, reproducible-check:
+    + Fix new pylint warning, requiring a timeout for HTTP requests.  MR: !291
+
+  [ billchenchina ]
+  * salsa:
+    + verify the return of `git checkout` before continuing.  MR: !290
+
+  [ Jochen Sprickerhof]
+  * bts:
+    + Fix "Cc" feature (--cc-addr) that was printing the number of addresses
+    instead of the actual addresses.  Closes: #1006951
+
+  [ Jelmer Vernooĳ ]
+  * deb-janitor:
+    + Handle the `schedule` command not returning a queue position.  MR: !294
+    + Rename "suite" to "campaign", consistent with the service; this was done
+      to avoid confusion with the term 'suite' for apt repositories, which
+      only sometimes overlap with a campaign in the Debian Janitor.  MR: !301
+    + Use logging module for error output.  MR: !302
+    + Add status subcommand.  MR: !303
+    + Make source package argument optional, reading from local
+      debian/changelog instead.  MR: !304
+    + Add merge subcommand, merging changes from a campaign.  MR: !305
+
+  [ g0t mi1k ]
+  * build system:
+    + Fix build in docker due to permission issues.  MR: !298
+    + Fix errors reported by `podchecker` during the build.  MR: !298
+    + Add the missing +x bit to two perl source files.  MR: !295
+    + Correctly call pylint.  Closes: #1027759; MR: !313
+  * salsa:
+    + Add SALSA_REMOVE_SOURCE_BRANCH.  MR: !296
+    + Add SALSA_BUILD_TIMEOUT.  MR: !297
+    + Add/upgraded the ability to control:  MR: !299
+      - analytics/auto_devops/builds/container_registry/forking/lfs/
+        packages/pages/releases/repository/request_access/requirements/
+        snippets/wiki
+      - issues/merge_requests
+    + Add SALSA_REQUEST_ACCESS.  MR: !319
+    + Add SALSA_AVATAR_PATH.  MR: !311 & !321
+    + Add pipeline_schedule support.  MR: !314
+    + Switch the default for --all not to included archived projects.
+      Introduced --all-archive for original behaviour.  MR: !315
+    + Fix missing cache folder.  MR: !317
+    + Fix space issue with project name.  MR: !316
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debbisect:  MR: !306
+    + Support 'now' and 'today' as datetime input.
+    + Format timestamps such that they can be used as input to debbisect.
+    + Allow http status 302 in addition to 301.
+    + Check if script given as input is marked executable.
+    + Run mmdebstrap so it can handle Debian unstable as far back as 2006-08-10.
+  * debbisect:  MR: !320
+    + provide a pty to subprocess
+    + add --ignore-cached-results option
+    + use the maybe-jessie-or-older and maybe-merged-usr hooks
+    + require mmdebstrap (>= 1.3.0)
+    + allow running with --qemu but without --depends
+
+  [ Guillem Jover ]
+  * debcheckout:
+    + Remove all the code handling auth to alioth.debian.org.  MR: !308
+  * po4a:
+    + Update the po4a homepage links to the new location.  MR: !308
+
+  [ Jelmer Vernooĳ ]
+  * rmadison: Add shorthand for janitor
+
+  [ Benjamin Drung ]
+  * Make Python version PEP440 compliant (LP: #1991606)
+  * chdist: Default to Ubuntu 22.04 "jammy" in sources.list example
+    (Closes: #826313)
+  * Do not install Python test cases
+  * suspicious-source: Fix detecting .vfb and .vtp
+  * Format Python code with black and run black during package build
+  * Sort Python imports with isort and run isort during package build
+  * Update lintian overrides
+  * Use f-strings and fix pylint's invalid names in most Python scripts
+  * Rename devscripts.version to devscripts.__version__
+  * Bump Standards-Version to 4.6.2
+
+ -- Benjamin Drung <bdrung@debian.org>  Sun, 05 Feb 2023 00:00:22 +0100
+
+devscripts (2.22.2) unstable; urgency=medium
+
+  [ James McCoy ]
+  * who-permits-upload:
+    + Fix fingerprint lookup, so it actually finds the user id
+
+  [ David Paul ]
+  * debsnap:
+    + Add a -l option as the short version of --list.  Closes: #1006904
+
+  [ Antonio Terceiro ]
+  * sadt:
+    + Run autodep8 when looking for autopkgtests to run.
+  * deprepro:
+    + Add new options, to make it easier to debrepro against arbitrary source
+      directories (i.e. not Debian packages):
+      - -B, --build-command: specify custom build command
+      - -a, --artifact-pattern: specify custom artifacts to be compared
+        across builds
+      - --no-copy: run commands against the source tree directly, i.e. don't
+        copy it to a temporary build directory.
+
+  [ Mattia Rizzolo ]
+  * mk-origtargz:
+    + Apply patch from Vasyl Gello to make Files-Included-<component> work.
+  * Include the updated Portuguese translation.  Closes: #1011316
+    Thanks to Américo Monteiro <a_monteiro@gmx.com>.
+  * Run perltidy with the newer 20220217.
+  * Bump Standards-Version to 4.6.1, no changes needed.
+
+  [ Yadd ]
+  * mk-origtargz:
+    + Display compression/tar errors
+
+  [ Niels Thykier ]
+  * wrap-and-sort:
+    + Introduce an experimental mode using the RTS parser available with
+      python-debian >= 0.1.43.  This will let wrap-and-sort retain comments.
+      This feature is opt-in with a new flag.  MR: !237
+    + Futher improvements to the RTS mode, now also supporting short indent
+      (-s) among others.  MR: !263
+
+  [ Jelmer Vernooĳ ]
+  * deb-janitor:
+    + Add a new 'review' subcommand.  MR: !261
+  * README: Drop reference to 'bazaar' (1.x) package that has long been
+    removed from Debian.  MR: !264
+
+ -- Mattia Rizzolo <mattia@debian.org>  Sat, 18 Jun 2022 12:20:42 +0200
+
+devscripts (2.22.1) unstable; urgency=medium
+
+  [ Yadd ]
+  * Translations:
+    + fix some POD error in translations
+    + add uscan and salsa in translation list.  Closes: #1001157
+    + build translated manpages even if there are some POD errors
+
+  [ Vipul Kumar ]
+  * wnpp-check:
+    + Replace HTTP URLs with HTTPS.  Closes: #1002311, #902242; MR: !256
+  * rc-alert, wnpp-alert, wnpp-check:
+    + Allow curl to follow HTTP redirections.  MR: !257
+
+  [ Mattia Rizzolo ]
+  * wnpp-check:
+    + Document -e,--exact in the --help output.  Closes: #1003254
+  * Make pristine-tar a Suggests in Ubuntu, as it's not in main so it can't be
+    a Recommends.  LP: #1885766
+  * Don't build-depend on subversion on i386, skipping the test_uscan_svn
+    test; this is to avoid a delta with Ubuntu, that doesn't have svn on i386.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debrebuild:
+    + Use the new field_parse_binary_source() from libdpkg-perl >= 1.21.0
+      if available.  MR: !249
+
+  [ Hugh McMaster ]
+  * test_uscan_mangle:
+    + Use MGZREPACK to specify the expected file extension when necessary;
+      otherwise, use the default file extension.
+    + Add a workaround for testWatch4WebNonNativeMUT0(). MR: !258
+    + Test use of filenamemangle with single and multiple upstream tarballs.
+    + Modify helperWatch() to accept filenamemangled filenames.
+    + Allow filenamemangling with multiple upstream tarballs.
+  * uscan:
+    + Reassign $newfile_base to be the filename component of an upstream
+      filenamemangled URL if the given regex pattern only modifies the
+      upstream filename. Closes: #993585; MR: !255
+
+  [ Carlos Alberto Lopez Perez ]
+  * reproducible-check:
+    + Use the .json that contains data for all the Debian suites (instead of
+      the currently used one that contains only data for Debian testing), so
+      that there are chances for this to work in Debian stable as well. MR: !245
+
+  [ Lance Lin ]
+  * who-uploads:
+    + Prefer displaying a debian.org address, if one exists. Closes: #1003497;
+      MR: !260
+
+ -- Mattia Rizzolo <mattia@debian.org>  Sun, 23 Jan 2022 17:52:39 +0100
+
+devscripts (2.21.7) unstable; urgency=medium
+
+  [ Yadd ]
+  * l10n:
+    + Fix build to install translated manpages of uscan.
+  * uscan:
+    + Fix version mangling when using "group".  Closes: #1000969; MR: !252
+    + Fix urlbase when searchmode=plain.  Closes: #1001472; MR: !253
+
+  [ Mattia Rizzolo ]
+  * tests:
+    + Update the package_lifecycle test strings to match the changes done in
+      dpkg 1.21.0.
+
+ -- Mattia Rizzolo <mattia@debian.org>  Sat, 11 Dec 2021 13:54:32 +0100
+
+devscripts (2.21.6) unstable; urgency=medium
+
+  [ Mattia Rizzolo ]
+  * dscverify:
+    + Explicitly tell gpg to verify the signature, to avoid warning messages
+      from it.  Thanks to Jakub Wilk.  Closes: #999141
+  * Add zstd to the autopkgtests dependencies.  Closes: #1000417
+  * origtargz:
+    + Document pristine-lfs in README.
+  * uscan:
+    + Revert "Assign $newfile_base a filename, not a URL, when
+      filenamemangling".  Re-opens: #993585; Closes: #1000210
+  * Include the updated Portuguese translation.  Closes: #1000758
+    Thanks to Américo Monteiro <a_monteiro@gmx.com>.
+
+  [ Yadd ]
+  * Update French translation.
+
+  [ Unit 193 ]
+  * uscan:
+    + Better alignment for the verbose output.
+
+  [ Ville Skyttä ]
+  * Replace `switch` with `command -v`.  MR: !244
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * New script!
+    + debootsnap: bootstrap a Debian system from snapshot.debian.org.  MR: !231
+  * debbisect:
+    + Add an example debbisect script to use when one wants to bisect the
+      build of a Debian source package.  MR: !242
+
+  [ Paul Wise ]
+  * bts:  MR: !247
+    + Allow adding more --cc-addr options to add more CCs.
+    + Add package/submitter CCs when sending mails via mutt.
+    + Correct and update documentation about additional CCs.
+
+ -- Mattia Rizzolo <mattia@debian.org>  Tue, 30 Nov 2021 14:01:41 +0100
 
 devscripts (2.21.5) unstable; urgency=medium
 
   [ Paul Wise ]
   * bts:
-    + sync list of tags from the BTS debbugs config.
+    + Sync list of tags from the BTS debbugs config.
   * grep-excuses:
-    + allow passing multiple package names to -w/--wipnity.  MR: !232
+    + Allow passing multiple package names to -w/--wipnity.  MR: !232
 
   [ Daichi Fukui ]
   * dpkg-depcheck:

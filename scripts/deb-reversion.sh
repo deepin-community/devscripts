@@ -23,8 +23,7 @@ versioninfo() {
   echo "This programme is part of devscripts ###VERSION###."
 }
 
-usage()
-{
+usage() {
   cat <<-_eousage
 	Usage: $PROGNAME [options] .deb-file [log message]
 	       $PROGNAME -o <version> -c
@@ -49,21 +48,19 @@ usage()
 	_eooptions
 }
 
-write()
-{
+write() {
   local PREFIX; PREFIX="$1"; shift
   echo "${PREFIX}: $PROGNAME: $@" >&2
 }
 
-err()
-{
+err() {
   write E "$@"
 }
 
 CURDIR="$(pwd)"
 SHORTOPTS=hVo:v:ck:Ds:b
 LONGOPTS=help,version,old-version:,new-version:,calculate-only,hook:,debug,string:,force-bad-version
-eval set -- "$(getopt -s bash -o $SHORTOPTS -l $LONGOPTS -n $PROGNAME -- "$@")"
+eval set -- "$(getopt -s bash -o $SHORTOPTS -l $LONGOPTS -n "$PROGNAME" -- "$@")"
 
 CALCULATE=0
 DPKGDEB_DEBUG=
@@ -125,27 +122,23 @@ if [ -n "${NEW_VERSION:-}" ] && [ $CALCULATE -eq 1 ]; then
   exit 4
 fi
 
-make_temp_dir()
-{
+make_temp_dir() {
   TMPDIR=$(mktemp -d --tmpdir deb-reversion.XXXXXX)
   trap 'rm -rf "$TMPDIR"' EXIT
   mkdir -p ${TMPDIR}/package
   TMPDIR=${TMPDIR}/package
 }
 
-extract_deb_file()
-{
+extract_deb_file() {
   dpkg-deb $DPKGDEB_DEBUG --extract $1 .
   dpkg-deb $DPKGDEB_DEBUG --control $1 DEBIAN
 }
 
-get_version()
-{
+get_version() {
   dpkg --info $1 | sed -ne 's,^[[:space:]]Version: ,,p'
 }
 
-bump_version()
-{
+bump_version() {
   case "$1" in
     *${VERSTR}[0-9]*)
       REV=${1##*${VERSTR}}
@@ -157,15 +150,13 @@ bump_version()
   esac
 }
 
-call_hook()
-{
+call_hook() {
   [ -z "${HOOK:-}" ] && return 0
   export VERSION
   sh -c "$HOOK"
 }
 
-change_version()
-{
+change_version() {
   PACKAGE=$(sed -ne 's,^Package: ,,p' DEBIAN/control)
   VERSION=$1
 
@@ -193,8 +184,7 @@ change_version()
   rm -rf debian
 }
 
-repack_file()
-{
+repack_file() {
   cd ..
   dpkg-deb -b package >/dev/null
   debfile=$(dpkg-name package.deb | sed -e "s,.*['\`]\(.*\).,\1,")

@@ -104,7 +104,7 @@ use List::Util qw/first/;
 use Moo;
 
 use constant {
-    ANY_VERSION => '(?:[-_]?(\d[\-+\.:\~\da-zA-Z]*))',
+    ANY_VERSION => '(?:[-_]?v?(\d[\-+\.:\~\da-zA-Z]*))',
     ARCHIVE_EXT =>
       '(?i)(?:\.(?:tar\.xz|tar\.bz2|tar\.gz|tar\.zstd?|zip|tgz|tbz|txz))',
     DEB_EXT => '(?:[\+~](debian|dfsg|ds|deb)(\.)?(\d+)?$)',
@@ -116,7 +116,7 @@ has config      => (is => 'rw', required => 1);
 has package     => (is => 'ro', required => 1);    # Debian package
 has pkg_dir     => (is => 'ro', required => 1);
 has pkg_version => (is => 'ro', required => 1);
-has bare        => (
+has bare => (
     is      => 'rw',
     lazy    => 1,
     default => sub { $_[0]->config->bare });
@@ -439,7 +439,8 @@ sub process_group {
       @last_debian_mangled_uversions
       if (grep { $_ } @last_debian_mangled_uversions);
     my $mangled_ver
-      = Dpkg::Version->new("1:" . $dehs_tags->{'debian-uversion'} . "-0",
+      = Dpkg::Version->new(
+        "1:" . $dehs_tags->{'debian-mangled-uversion'} . "-0",
         check => 0);
     my $upstream_ver = Dpkg::Version->new("1:$new_version-0", check => 0);
     if ($mangled_ver == $upstream_ver) {

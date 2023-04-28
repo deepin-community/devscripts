@@ -52,17 +52,24 @@
 #
 # allow more than 1000 lines in this file
 # pylint: disable=C0302
+#
+# TODO: Adress invalid names
+# pylint: disable=invalid-name
 
 import argparse
+import atexit
 import collections
 import email.utils
-import http.server
 import http.client
-from http import HTTPStatus
+import http.server
+import io
 import logging
+import lzma
 import math
 import os
+import pty
 import re
+import select
 import shutil
 import socketserver
 import subprocess
@@ -71,29 +78,32 @@ import tempfile
 import threading
 import urllib.error
 import urllib.request
-import io
-import lzma
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from functools import partial
-import time
-import atexit
+from http import HTTPStatus
+from time import sleep
+
 import debian
 import debian.deb822
 import requests
 
-have_dateutil = True
+HAVE_DATEUTIL = True
 try:
     import dateutil.parser
 except ImportError:
-    have_dateutil = False
+    HAVE_DATEUTIL = False
 
-have_parsedatetime = True
+HAVE_PARSEDATETIME = True
 try:
     import parsedatetime
 except ImportError:
-    have_parsedatetime = False
+    HAVE_PARSEDATETIME = False
 
 DINSTALLRATE = 21600
+
+
+def format_timestamp(timestamp):
+    return timestamp.strftime("%Y%m%dT%H%M%SZ")
 
 
 # We utilize the fact that the HTTP interface of snapshot.d.o responds with a
@@ -108,7 +118,7 @@ def sanitize_timestamp(timestamp):
     res = conn.getresponse()
     if res.status == 200:
         return timestamp
-    assert res.status == 301
+    assert res.status in (301, 302), res.status  # moved permanently or temporarily
     prefix = "http://snapshot.debian.org/archive/debian/"
     location = res.headers["Location"]
     assert location.startswith(prefix)
@@ -133,11 +143,11 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
             c1, c2, c3, timestamp, _ = self.path.split("/", 4)
         except ValueError:
             logging.error("don't know how to handle this request: %s", self.path)
-            self.send_error(HTTPStatus.BAD_REQUEST, "Bad request path (%s)" % self.path)
+            self.send_error(HTTPStatus.BAD_REQUEST, f"Bad request path ({self.path})")
             return
         if ["", "archive", "debian"] != [c1, c2, c3]:
             logging.error("don't know how to handle this request: %s", self.path)
-            self.send_error(HTTPStatus.BAD_REQUEST, "Bad request path (%s)" % self.path)
+            self.send_error(HTTPStatus.BAD_REQUEST, f"Bad request path ({self.path})")
             return
         # make sure the pool directory is symlinked to the global pool
         linkname = os.path.join(self.directory, c2, c3, timestamp, "pool")
@@ -168,7 +178,7 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
                 headers = {}
                 if downloaded > 0:
                     # if file was partly downloaded, only request the rest
-                    headers["Range"] = "bytes=%d-" % downloaded
+                    headers["Range"] = f"bytes={downloaded}-"
                 req = urllib.request.Request(
                     "http://snapshot.debian.org/" + self.path, headers=headers
                 )
@@ -187,10 +197,10 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         totalsize = int(f.headers["Content-Length"])
                     while downloaded < totalsize:
-                        chunksize = 800 * 1024
+                        chunksize = 200 * 1024
                         if totalsize - downloaded < chunksize:
                             chunksize = totalsize - downloaded
-                        buf = f.read(chunksize)  # 800 kB/s
+                        buf = f.read(chunksize)  # 200 kB/s
                         if len(buf) != chunksize:
                             # something went wrong
                             logging.warning(
@@ -201,9 +211,9 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
                                 trynum + 1,
                                 maxtries,
                             )
-                            time.sleep(10)
+                            sleep(10)
                             break
-                        time.sleep(1)  # snapshot.d.o needs heavy throttling
+                        sleep(1)  # snapshot.d.o needs heavy throttling
                         out.write(buf)
                         self.wfile.write(buf)
                         downloaded += chunksize
@@ -228,9 +238,11 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
 
 def srcpkgversions_by_timestamp(srcpkgname, timestamp, suite):
     versions = set()
+    timestamp_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
     r = requests.get(
-        "http://snapshot.debian.org/archive/debian/%s/dists/%s/main/source/Sources.xz"
-        % (timestamp.strftime("%Y%m%dT%H%M%SZ"), suite)
+        f"http://snapshot.debian.org/archive/debian/{timestamp_str}"
+        f"/dists/{suite}/main/source/Sources.xz",
+        timeout=60,
     )
     data = lzma.decompress(r.content)
     for src in debian.deb822.Sources.iter_paragraphs(io.BytesIO(data)):
@@ -241,9 +253,11 @@ def srcpkgversions_by_timestamp(srcpkgname, timestamp, suite):
 
 
 def binpkgversion_by_timestamp(binpkgname, timestamp, suite, architecture):
+    timestamp_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
     r = requests.get(
-        "http://snapshot.debian.org/archive/debian/%s/dists/%s/main/binary-%s/Packages.xz"
-        % (timestamp.strftime("%Y%m%dT%H%M%SZ"), suite, architecture)
+        f"http://snapshot.debian.org/archive/debian/{timestamp_str}"
+        f"/dists/{suite}/main/binary-{architecture}/Packages.xz",
+        timeout=60,
     )
     data = lzma.decompress(r.content)
     for pkg in debian.deb822.Packages.iter_paragraphs(io.BytesIO(data)):
@@ -287,15 +301,16 @@ def first_seen_by_pkg(packages, timestamp_begin, timestamp_end, suite, architect
                 newest_version = max(newest_versions)
 
             for result in requests.get(
-                "http://snapshot.debian.org/mr/package/%s/" % pkg
+                f"http://snapshot.debian.org/mr/package/{pkg}/", timeout=60
             ).json()["result"]:
                 if debian.debian_support.Version(result["version"]) < oldest_version:
                     continue
                 if debian.debian_support.Version(result["version"]) > newest_version:
                     continue
                 r = requests.get(
-                    "http://snapshot.debian.org/mr/package/%s/%s/allfiles?fileinfo=1"
-                    % (pkg, result["version"])
+                    f"http://snapshot.debian.org/mr/package/{pkg}"
+                    f"/{result['version']}/allfiles?fileinfo=1",
+                    timeout=60,
                 )
                 logging.info("retrieving for: %s", result["version"])
                 for fileinfo in [
@@ -323,15 +338,16 @@ def first_seen_by_pkg(packages, timestamp_begin, timestamp_end, suite, architect
             if newest_version is None:
                 logging.error("binary package %s cannot be found in bad timestamp", pkg)
                 sys.exit(1)
-            r = requests.get("http://snapshot.debian.org/mr/binary/%s/" % pkg)
+            r = requests.get(f"http://snapshot.debian.org/mr/binary/{pkg}/", timeout=60)
             for result in r.json()["result"]:
                 if debian.debian_support.Version(result["version"]) < oldest_version:
                     continue
                 if debian.debian_support.Version(result["version"]) > newest_version:
                     continue
                 r = requests.get(
-                    "http://snapshot.debian.org/mr/binary/%s/%s/binfiles?fileinfo=1"
-                    % (pkg, result["version"])
+                    f"http://snapshot.debian.org/mr/binary/{pkg}"
+                    f"/{result['version']}/binfiles?fileinfo=1",
+                    timeout=60,
                 )
                 logging.info("retrieving for: %s", result["version"])
                 hashes = [
@@ -351,25 +367,58 @@ def first_seen_by_pkg(packages, timestamp_begin, timestamp_end, suite, architect
 
 
 def get_mirror(port, timestamp):
+    timestamp_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
     if port is not None:
-        return "http://%s:%d/archive/debian/%s" % (
-            "127.0.0.1",
-            port,
-            timestamp.strftime("%Y%m%dT%H%M%SZ"),
-        )
-    return "http://snapshot.debian.org/archive/debian/%s" % timestamp.strftime(
-        "%Y%m%dT%H%M%SZ"
-    )
+        return f"http://127.0.0.1:{port}/archive/debian/{timestamp_str}"
+    return f"http://snapshot.debian.org/archive/debian/{timestamp_str}"
+
+
+def runtest_cmd(cmd, env):
+    ret = 0
+    output = b""
+    try:
+        # we only use the more complex Popen method if live output is required
+        # for logging levels of INFO or lower
+        if logging.root.isEnabledFor(logging.INFO):
+            parent_fd, child_fd = pty.openpty()
+            with subprocess.Popen(
+                cmd,
+                stdin=child_fd,
+                stderr=child_fd,
+                stdout=child_fd,
+                close_fds=True,
+                env=env,
+            ) as process:
+                buf = io.BytesIO()
+                os.close(child_fd)
+                while process.poll() is None:
+                    ready, _, _ = select.select([parent_fd], [], [], 1)
+                    if parent_fd in ready:
+                        try:
+                            data = os.read(parent_fd, 10240)
+                        except OSError:
+                            break
+                        if not data:
+                            break  # EOF
+                        os.write(sys.stdout.fileno(), data)
+                        buf.write(data)
+                os.close(parent_fd)
+                ret = process.wait()
+                output = buf.getvalue()
+        else:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)
+    except subprocess.CalledProcessError as e:
+        ret = e.returncode
+        output = e.output
+    return (ret, output)
 
 
 def runtest(timestamp, staticargs, toupgrade=None, badtimestamp=None):
-    ret = 0
     goodmirror = get_mirror(staticargs.port, timestamp)
-    env = {
-        "DEBIAN_BISECT_EPOCH": "%d" % int(timestamp.timestamp()),
-        "DEBIAN_BISECT_TIMESTAMP": timestamp.strftime("%Y%m%dT%H%M%SZ"),
-        "PATH": os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin"),
-    }
+    env = {k: v for k, v in os.environ.items() if k.startswith("DEBIAN_BISECT_")}
+    env["DEBIAN_BISECT_EPOCH"] = str(int(timestamp.timestamp()))
+    env["DEBIAN_BISECT_TIMESTAMP"] = timestamp.strftime("%Y%m%dT%H%M%SZ")
+    env["PATH"] = os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
     if staticargs.port is not None:
         env["DEBIAN_BISECT_MIRROR"] = goodmirror
     if staticargs.depends or staticargs.qemu:
@@ -383,15 +432,20 @@ def runtest(timestamp, staticargs, toupgrade=None, badtimestamp=None):
         )
         if not os.path.exists(run_bisect):
             run_bisect = os.path.join("/usr/share/devscripts/scripts/", scriptname)
-        cmd = [
-            run_bisect,
-            staticargs.depends,
-            staticargs.script,
-            goodmirror,
-            staticargs.architecture,
-            staticargs.suite,
-            staticargs.components,
-        ]
+        cmd = [run_bisect]
+        if staticargs.depends is not None:
+            cmd.append(staticargs.depends)
+        else:
+            cmd.append("")
+        cmd.extend(
+            [
+                staticargs.script,
+                goodmirror,
+                staticargs.architecture,
+                staticargs.suite,
+                staticargs.components,
+            ]
+        )
         if staticargs.qemu:
             cmd.extend([staticargs.qemu["memsize"], staticargs.qemu["disksize"]])
         if toupgrade:
@@ -406,37 +460,13 @@ def runtest(timestamp, staticargs, toupgrade=None, badtimestamp=None):
             cmd = [staticargs.script]
         else:
             cmd = ["sh", "-c", staticargs.script]
-    output = b""
-    try:
-        # we only use the more complex Popen method if live output is required
-        # for logging levels of INFO or lower
-        if logging.root.isEnabledFor(logging.INFO):
-            with subprocess.Popen(
-                cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, env=env
-                    ) as process:
-                buf = io.BytesIO()
-                for line in iter(process.stdout.readline, b""):
-                    sys.stdout.buffer.write(line)
-                    sys.stdout.buffer.flush()
-                    buf.write(line)
-                ret = process.wait()
-                output = buf.getvalue()
-        else:
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)
-    except subprocess.CalledProcessError as e:
-        ret = e.returncode
-        output = e.output
-    return (ret, output)
+    return runtest_cmd(cmd, env)
 
 
 def get_log_fname(timestamp, goodbad, toupgrade=None):
     if toupgrade is None:
-        return "debbisect.%s.log.%s" % (timestamp.strftime("%Y%m%dT%H%M%SZ"), goodbad)
-    return "debbisect.%s.%s.log.%s" % (
-        timestamp.strftime("%Y%m%dT%H%M%SZ"),
-        toupgrade,
-        goodbad,
-    )
+        return f"debbisect.{timestamp.strftime('%Y%m%dT%H%M%SZ')}.log.{goodbad}"
+    return f"debbisect.{timestamp.strftime('%Y%m%dT%H%M%SZ')}.{toupgrade}.log.{goodbad}"
 
 
 def write_log_symlink(goodbad, output, timestamp, toupgrade=None):
@@ -458,7 +488,7 @@ def bisect(good, bad, staticargs):
     # unreadable
     # pylint: disable=too-many-statements
     diff = bad - good
-    print("snapshot timestamp difference: %f days" % (diff / timedelta(days=1)))
+    print(f"snapshot timestamp difference: {diff / timedelta(days=1)} days")
 
     stepnum = 1
     starttime = datetime.now(timezone.utc)
@@ -466,15 +496,15 @@ def bisect(good, bad, staticargs):
     steps = round(
         (math.log(diff.total_seconds()) - math.log(DINSTALLRATE)) / math.log(2) + 2
     )
-    print("approximately %d steps left to test" % steps)
+    print(f"approximately {steps} steps left to test")
     # verify that the good timestamp is really good and the bad timestamp is really bad
     # we try the bad timestamp first to make sure that the problem exists
-    if os.path.exists(get_log_fname(good, "good")):
-        print(
-            "#%d: using cached results from %s" % (stepnum, get_log_fname(good, "good"))
-        )
+    if not staticargs.ignore_cached_results and os.path.exists(
+        get_log_fname(good, "good")
+    ):
+        print(f"#{stepnum}: using cached results from {get_log_fname(good, 'good')}")
     else:
-        print("#%d: trying known good %s..." % (stepnum, good))
+        print(f"#{stepnum}: trying known good {format_timestamp(good)}...")
         ret, output = runtest(good, staticargs)
         if ret != 0:
             write_log_symlink("bad", output, good)
@@ -488,14 +518,14 @@ def bisect(good, bad, staticargs):
         (math.log(diff.total_seconds()) - math.log(DINSTALLRATE)) / math.log(2) + 1
     )
     timeleft = steps * (datetime.now(timezone.utc) - starttime) / (stepnum - 1)
-    print("computation time left: %s" % timeleft)
-    print("approximately %d steps left to test" % steps)
-    if os.path.exists(get_log_fname(bad, "bad")):
-        print(
-            "#%d: using cached results from %s" % (stepnum, get_log_fname(bad, "bad"))
-        )
+    print(f"computation time left: {timeleft}")
+    print(f"approximately {steps} steps left to test")
+    if not staticargs.ignore_cached_results and os.path.exists(
+        get_log_fname(bad, "bad")
+    ):
+        print(f"#{stepnum}: using cached results from {get_log_fname(bad, 'bad')}")
     else:
-        print("#%d: trying known bad %s..." % (stepnum, bad))
+        print(f"#{stepnum}: trying known bad {format_timestamp(bad)}...")
         ret, output = runtest(bad, staticargs)
         if ret == 0:
             write_log_symlink("good", output, bad)
@@ -525,27 +555,31 @@ def bisect(good, bad, staticargs):
             newts = sanitize_timestamp(bad - timedelta(seconds=1))
             if newts == good:
                 break
-        print("snapshot timestamp difference: %f days" % (diff / timedelta(days=1)))
+        print(f"snapshot timestamp difference: {diff / timedelta(days=1)} days")
         steps = round(
             (math.log(diff.total_seconds()) - math.log(DINSTALLRATE)) / math.log(2) + 0
         )
         timeleft = steps * (datetime.now(timezone.utc) - starttime) / (stepnum - 1)
-        print("computation time left: %s" % timeleft)
-        print("approximately %d steps left to test" % steps)
-        if os.path.exists(get_log_fname(newts, "good")):
+        print(f"computation time left: {timeleft}")
+        print(f"approximately {steps} steps left to test")
+        if not staticargs.ignore_cached_results and os.path.exists(
+            get_log_fname(newts, "good")
+        ):
             print(
-                "#%d: using cached result (was good) from %s"
-                % (stepnum, get_log_fname(newts, "good"))
+                f"#{stepnum}: using cached result (was good)"
+                f" from {get_log_fname(newts, 'good')}"
             )
             good = newts
-        elif os.path.exists(get_log_fname(newts, "bad")):
+        elif not staticargs.ignore_cached_results and os.path.exists(
+            get_log_fname(newts, "bad")
+        ):
             print(
-                "#%d: using cached result (was bad) from %s"
-                % (stepnum, get_log_fname(newts, "bad"))
+                f"#{stepnum}: using cached result (was bad)"
+                f" from {get_log_fname(newts, 'bad')}"
             )
             bad = newts
         else:
-            print("#%d: trying %s..." % (stepnum, newts))
+            print(f"#{stepnum}: trying {format_timestamp(newts)}...")
             ret, output = runtest(newts, staticargs)
             if ret == 0:
                 print("test script output: good")
@@ -560,6 +594,11 @@ def bisect(good, bad, staticargs):
 
 
 def datetimestr(val):
+    if val == "now":
+        return datetime.now(timezone.utc)
+    if val == "today":
+        return datetime.combine(date.today(), time(0, 0, 0, 0), timezone.utc)
+
     # since py3 we don't need pytz to figure out the local timezone
     localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
@@ -593,7 +632,7 @@ def datetimestr(val):
         return dt
 
     # next, try parsing using dateutil.parser
-    if have_dateutil:
+    if HAVE_DATEUTIL:
         try:
             dt = dateutil.parser.parse(val)
         except ValueError:
@@ -605,7 +644,7 @@ def datetimestr(val):
             return dt
 
     # if that didn't work, try freeform formats
-    if have_parsedatetime:
+    if HAVE_PARSEDATETIME:
         cal = parsedatetime.Calendar()
         dt, ret = cal.parseDT(val)
         if ret != 0:
@@ -614,13 +653,13 @@ def datetimestr(val):
                 dt = dt.replace(tzinfo=localtz)
             return dt
 
-    if not have_dateutil:
+    if not HAVE_DATEUTIL:
         logging.info("parsing date failed -- maybe install python3-dateutil")
-    if not have_parsedatetime:
+    if not HAVE_PARSEDATETIME:
         logging.info("parsing date failed -- maybe install python3-parsedatetime")
 
     # all failed, we cannot parse this
-    raise argparse.ArgumentTypeError("not a valid datetime: %s" % val)
+    raise argparse.ArgumentTypeError(f"not a valid datetime: {val}")
 
 
 def qemuarg(val):
@@ -637,13 +676,19 @@ def qemuarg(val):
         try:
             key, val = keyval.split("=", maxsplit=1)
         except ValueError as e:
-            raise argparse.ArgumentTypeError("no key=val pair: %s" % keyval) from e
+            raise argparse.ArgumentTypeError(f"no key=val pair: {keyval}") from e
         if key not in ["memsize", "disksize"]:
-            raise argparse.ArgumentTypeError("unknown key: %s" % key)
+            raise argparse.ArgumentTypeError(f"unknown key: {key}")
         if not re.fullmatch(r"\d+((k|K|M|G|T|P|E|Z|Y)(iB|B)?)?", val):
-            raise argparse.ArgumentTypeError("cannot parse size value: %s" % val)
+            raise argparse.ArgumentTypeError(f"cannot parse size value: {val}")
         ret[key] = val
     return ret
+
+
+def scriptarg(val):
+    if os.path.exists(val) and not os.access(val, os.X_OK):
+        logging.warning("script %s is a file but not executable", val)
+    return val
 
 
 def read_pkglist(infile):
@@ -658,46 +703,47 @@ def read_pkglist(infile):
 def upgrade_single_package(toupgrade, goodpkgs, badpkgs, good, bad, staticargs):
     if toupgrade in goodpkgs:
         print(
-            "test upgrading %s %s -> %s..."
-            % (toupgrade, goodpkgs[toupgrade], badpkgs[toupgrade])
+            f"test upgrading {toupgrade} {goodpkgs[toupgrade]}"
+            f" -> {badpkgs[toupgrade]}..."
         )
     else:
-        print("test installing %s %s..." % (toupgrade, badpkgs[toupgrade]))
-    newbadpkgpath = "./debbisect.%s.%s.pkglist" % (
-        good.strftime("%Y%m%dT%H%M%SZ"),
-        toupgrade,
-    )
-    if os.path.exists(newbadpkgpath) and os.path.exists(
-        get_log_fname(good, "good", toupgrade)
+        print(f"test installing {toupgrade} {badpkgs[toupgrade]}...")
+    newbadpkgpath = f"./debbisect.{good.strftime('%Y%m%dT%H%M%SZ')}.{toupgrade}.pkglist"
+    if (
+        not staticargs.ignore_cached_results
+        and os.path.exists(newbadpkgpath)
+        and os.path.exists(get_log_fname(good, "good", toupgrade))
     ):
         print(
-            "using cached result (was good) from %s"
-            % get_log_fname(good, "good", toupgrade)
+            f"using cached result (was good)"
+            f" from {get_log_fname(good, 'good', toupgrade)}"
         )
         if toupgrade in goodpkgs:
-            print("  upgrading %s does not cause the problem" % toupgrade)
+            print(f"  upgrading {toupgrade} does not cause the problem")
         else:
-            print("  installing %s does not cause the problem" % toupgrade)
+            print(f"  installing {toupgrade} does not cause the problem")
         return
-    if os.path.exists(newbadpkgpath) and os.path.exists(
-        get_log_fname(good, "bad", toupgrade)
+    if (
+        not staticargs.ignore_cached_results
+        and os.path.exists(newbadpkgpath)
+        and os.path.exists(get_log_fname(good, "bad", toupgrade))
     ):
         print(
-            "using cached result (was bad) from %s"
-            % get_log_fname(good, "bad", toupgrade)
+            f"using cached result (was bad)"
+            f" from {get_log_fname(good, 'bad', toupgrade)}"
         )
-        print("  upgrading %s triggered the problem" % toupgrade)
+        print(f"  upgrading {toupgrade} triggered the problem")
     else:
         ret, output = runtest(good, staticargs, toupgrade, bad)
         if ret == 0:
             write_log_symlink("good", output, good, toupgrade)
             if toupgrade in goodpkgs:
-                print("  upgrading %s does not cause the problem" % toupgrade)
+                print(f"  upgrading {toupgrade} does not cause the problem")
             else:
-                print("  installing %s does not cause the problem" % toupgrade)
+                print(f"  installing {toupgrade} does not cause the problem")
             return
         write_log_symlink("bad", output, good, toupgrade)
-        print("  upgrading %s triggered the problem" % toupgrade)
+        print(f"  upgrading {toupgrade} triggered the problem")
     # this package introduced the regression check if more than
     # just the package in question got upgraded
     newbadpkgs = read_pkglist(newbadpkgpath)
@@ -720,19 +766,16 @@ def upgrade_single_package(toupgrade, goodpkgs, badpkgs, good, bad, staticargs):
             if newtoupgrade == toupgrade:
                 continue
             print(
-                "    %s %s -> %s"
-                % (
-                    newtoupgrade,
-                    goodpkgs.get(newtoupgrade, "(n.a.)"),
-                    newbadpkgs[newtoupgrade],
-                )
+                f"    {newtoupgrade} {goodpkgs.get(newtoupgrade, '(n.a.)')}"
+                f" -> {newbadpkgs[newtoupgrade]}"
             )
 
 
 def parseargs():
+    progname = sys.argv[0]
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""\
+        description=f"""\
 
 Execute a script or a shell snippet for a known good timestamp and a known bad
 timestamp and then bisect the timestamps until a timestamp from
@@ -762,20 +805,16 @@ create a qemu virtual machine of the correct timestamp each time. The script
 will receive the correct ssh config to log into a host named qemu and execute
 arbitrary commands.
 
-""".format(
-            progname=sys.argv[0]
-        ),
-        epilog="""\
+""",
+        epilog=f"""\
 
 *EXAMPLES*
 
 Just run "do_something" which runs the test and returns a non-zero exit on
 failure.
 
-    $ {progname} "last week" today "mmdebstrap --customize-hook='chroot """.format(
-            progname=sys.argv[0]
-        )
-        + """\\"\\$1\\" do_something' unstable - \\$DEBIAN_BISECT_MIRROR >/dev/null"
+    $ {progname} "last week" today "mmdebstrap --customize-hook\
+='chroot \\"\\$1\\" do_something' unstable - \\$DEBIAN_BISECT_MIRROR >/dev/null"
     $ diff -u debbisect.log.good debbisect.log.bad
 
 Since the command can easily become very long and quoting very involved, lets
@@ -809,6 +848,15 @@ that we can see which packages differed in the logs at the end and uses
 command can be re-run without downloading everything from snapshot.debian.org
 again.
 
+If you want to build a source package you can use the script shipped by
+devscripts as /usr/share/doc/devscripts/examples/debbisect_buildsrc.sh and
+either use it unmodified like this:
+
+    $ DEBIAN_BISECT_SRCPKG=mysrc {progname} "two years ago" yesterday \
+    > /usr/share/doc/devscripts/examples/debbisect_buildsrc.sh
+
+or use the script as a starting point to do your own custom builds.
+
 Once debbisect has finished bisecting and figured out the last good and the
 first bad timestamp, there might be more than one package that differs in
 version between these two timestamps. debbisect can figure out which package is
@@ -818,20 +866,16 @@ to set up a chroot itself but is given the path to an existing chroot as the
 first argument. Here is a real example that verifies the package responsible
 for Debian bug #912935:
 
-    $ {progname} --depends=botch "2018-11-17" """.format(
-            progname=sys.argv[0]
-        )
-        + """"2018-11-22" 'chroot "$1" botch-dose2html --packages=/dev/null --help'
+    $ {progname} --depends=botch "2018-11-17" "2018-11-22" \
+'chroot "$1" botch-dose2html --packages=/dev/null --help'
     [...]
     test upgrading python3-minimal 3.6.7-1 -> 3.7.1-2...
       upgrading python3-minimal triggered the problem
 
 If you want to run above test under qemu, then you would run:
 
-    $ {progname} --depends=botch --qemu=defaults "2018-11-17" """.format(
-            progname=sys.argv[0]
-        )
-        + """"2018-11-22" 'ssh -F "$1" qemu botch-dose2html --packages=/dev/null --help'
+    $ {progname} --depends=botch --qemu=defaults "2018-11-17" "2018-11-22" \
+'ssh -F "$1" qemu botch-dose2html --packages=/dev/null --help'
 
 In the last two examples we omitted the --cache argument for brevity. But
 please make use of it to reduce the load on snapshot.debian.org.
@@ -856,6 +900,8 @@ Examples (corresponding to the items in above list, respectively):
     > 5:50 A.M. on June 13, 1990
     > two weeks ago
 
+The earliest timestamp that works with debbisect should be 2006-08-10.
+
 *ENVIRONMENT VARIABLES*
 
 The following environment variables are available to the test script:
@@ -870,6 +916,9 @@ DEBIAN_BISECT_TIMESTAMP Contains a timestamp in the format used by
                         snapshot.debian.org. Can also be generated from
                         DEBIAN_BISECT_EPOCH via:
                         date --utc --date=@$DEBIAN_BISECT_EPOCH +%Y%m%dT%H%M%SZ
+
+DEBIAN_BISECT_*         All environment variables starting with DEBIAN_BISECT_
+                        are passed to the test script.
 
 Written by Johannes Schauer Marin Rodrigues <josch@debian.org>
 """,
@@ -898,56 +947,62 @@ Written by Johannes Schauer Marin Rodrigues <josch@debian.org>
     parser.add_argument(
         "--port",
         help="manually choose port number for the apt cache instead of "
-        + "automatically choosing a free port",
+        "automatically choosing a free port",
         type=int,
         default=0,
     )
     parser.add_argument(
         "--depends",
         help="Comma separated list of binary packages the test script "
-        + "requires. With this option, the test script will run inside a "
-        + "chroot with the requested packages installed.",
+        "requires. With this option, the test script will run inside a "
+        "chroot with the requested packages installed.",
         type=str,
     )
     parser.add_argument(
         "--qemu",
         help="Create qemu virtual machine and pass a ssh config file to the "
-        + "test script. This argument takes a comma-separated series of "
-        + "key=value pairs to specify the virtual machine memory size (via "
-        + "memsize) and the virtual machine disksize (via disksize). Sizes "
-        + "are measured in bytes or with common unit suffixes like M or G. "
-        + "To pick the default values (disksize=4G,memsize=1G) the shorthand "
-        + "'defaults' can be passed.",
+        "test script. This argument takes a comma-separated series of "
+        "key=value pairs to specify the virtual machine memory size (via "
+        "memsize) and the virtual machine disksize (via disksize). Sizes "
+        "are measured in bytes or with common unit suffixes like M or G. "
+        "To pick the default values (disksize=4G,memsize=1G) the shorthand "
+        "'defaults' can be passed.",
         type=qemuarg,
     )
     parser.add_argument(
         "--architecture",
         help="Chosen architecture when creating the chroot with --depends or "
-        + "--qemu (default: native architecture)",
+        "--qemu (default: native architecture)",
         default=subprocess.check_output(["dpkg", "--print-architecture"]).rstrip(),
         type=str,
     )
     parser.add_argument(
         "--suite",
         help="Chosen suite when creating the chroot with --depends or --qemu "
-        + "(default: unstable)",
+        "(default: unstable)",
         default="unstable",
         type=str,
     )
     parser.add_argument(
         "--components",
         help="Chosen components (separated by comma or whitespace) when "
-        + "creating the chroot with --depends or --qemu (default: main)",
+        "creating the chroot with --depends or --qemu (default: main)",
         default="main",
         type=str,
     )
     parser.add_argument(
         "--no-find-exact-package",
         help="Normally, when the --depends argument is given so that "
-        + "debbisect takes care of managing dependencies, the precise package "
-        + "that introduced the problem is determined after bisection by "
-        + "installing the packages that differ between the last good and "
-        + "first bad timestamp one by one. This option disables this feature.",
+        "debbisect takes care of managing dependencies, the precise package "
+        "that introduced the problem is determined after bisection by "
+        "installing the packages that differ between the last good and "
+        "first bad timestamp one by one. This option disables this feature.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--ignore-cached-results",
+        help="Perform a run for a timestamp even if a log file for it exists "
+        "in the current directory",
         action="store_true",
     )
     parser.add_argument(
@@ -962,13 +1017,13 @@ Written by Johannes Schauer Marin Rodrigues <josch@debian.org>
     )
     parser.add_argument(
         "script",
-        type=str,
+        type=scriptarg,
         help="test script -- can either be a shell code snippet or an "
-        + "executable script. A non zero exit code indicates failure. "
-        + "When also --depends is used, then the first argument to the "
-        + "script will be the chroot directory. When --qemu is used, then "
-        + "the first argument to the script will an ssh config for a host "
-        + "named qemu.",
+        "executable script. A non zero exit code indicates failure. "
+        "When also --depends is used, then the first argument to the "
+        "script will be the chroot directory. When --qemu is used, then "
+        "the first argument to the script will an ssh config for a host "
+        "named qemu.",
     )
     return parser.parse_args()
 
@@ -1020,11 +1075,11 @@ def setupcache(cache, port):
 
 
 def find_exact_package(good, bad, staticargs, depends, no_find_exact_package):
-    goodpkglist = "./debbisect.%s.pkglist" % good.strftime("%Y%m%dT%H%M%SZ")
+    goodpkglist = f"./debbisect.{good.strftime('%Y%m%dT%H%M%SZ')}.pkglist"
     if not os.path.exists(goodpkglist):
         logging.error("%s doesn't exist", goodpkglist)
         sys.exit(1)
-    badpkglist = "./debbisect.%s.pkglist" % bad.strftime("%Y%m%dT%H%M%SZ")
+    badpkglist = f"./debbisect.{bad.strftime('%Y%m%dT%H%M%SZ')}.pkglist"
     if not os.path.exists(badpkglist):
         logging.error("%s doesn't exist", badpkglist)
         sys.exit(1)
@@ -1046,22 +1101,18 @@ def find_exact_package(good, bad, staticargs, depends, no_find_exact_package):
         sys.exit(1)
     elif len(upgraded) == 1:
         print(
-            "only one package differs: %s %s -> %s"
-            % (
-                upgraded[0],
-                goodpkgs.get(upgraded[0], "(n.a.)"),
-                badpkgs[upgraded[0]],
-            )
+            f"only one package differs: {upgraded[0]}"
+            f" {goodpkgs.get(upgraded[0], '(n.a.)')} -> {badpkgs[upgraded[0]]}"
         )
     else:
         print(
             "the following packages differ between the last good and "
-            + "first bad timestamp:"
+            "first bad timestamp:"
         )
         for toupgrade in upgraded:
             print(
-                "  %s %s -> %s"
-                % (toupgrade, goodpkgs.get(toupgrade, "(n.a.)"), badpkgs[toupgrade])
+                f"  {toupgrade} {goodpkgs.get(toupgrade, '(n.a.)')}"
+                f" -> {badpkgs[toupgrade]}"
             )
 
         # if debbisect was tasked with handling dependencies itself, try to
@@ -1073,6 +1124,25 @@ def find_exact_package(good, bad, staticargs, depends, no_find_exact_package):
                 )
 
 
+def ensure_mmdebstrap_version(reqver: str) -> bool:
+    try:
+        version = subprocess.check_output(
+            ["mmdebstrap", "--version"], stderr=subprocess.DEVNULL
+        )
+    except subprocess.CalledProcessError:
+        print("running mmdebstrap --version resulted in non-zero exit")
+        sys.exit(1)
+    except FileNotFoundError:
+        print("you need to install mmdebstrap")
+        sys.exit(1)
+
+    version = version.decode().removeprefix("mmdebstrap ")
+
+    return debian.debian_support.Version(version) >= debian.debian_support.Version(
+        reqver
+    )
+
+
 def main():
     args = parseargs()
 
@@ -1081,18 +1151,23 @@ def main():
     good = sanitize_timestamp(args.good)
     if good != args.good:
         print(
-            "good timestamp %s was remapped to snapshot.d.o timestamp %s"
-            % (args.good, good)
+            f"good timestamp {format_timestamp(args.good)} was remapped to"
+            f" snapshot.d.o timestamp {format_timestamp(good)}"
         )
     bad = sanitize_timestamp(args.bad)
     if bad != args.bad:
         print(
-            "bad timestamp %s was remapped to snapshot.d.o timestamp %s"
-            % (args.bad, bad)
+            f"bad timestamp {format_timestamp(args.bad)} was remapped to"
+            f" snapshot.d.o timestamp {format_timestamp(bad)}"
         )
 
     if good > bad:
         print("good is later than bad")
+        sys.exit(1)
+
+    # check if mmdebstrap is installed and at least 1.3.0
+    if (args.depends or args.qemu) and not ensure_mmdebstrap_version("1.3.0"):
+        print("you need at least mmdebstrap version 1.3.0")
         sys.exit(1)
 
     port = None
@@ -1102,21 +1177,32 @@ def main():
 
     staticargs = collections.namedtuple(
         "args",
-        ["script", "port", "depends", "architecture", "suite", "components", "qemu"],
+        [
+            "script",
+            "port",
+            "depends",
+            "architecture",
+            "suite",
+            "components",
+            "qemu",
+            "ignore_cached_results",
+        ],
     )
-    staticargs.port = port
-    for a in ["script", "depends", "architecture", "suite", "components", "qemu"]:
+    for a in staticargs._fields:
         setattr(staticargs, a, getattr(args, a))
+    staticargs.port = port
     if good == bad:
         # test only single timestamp
-        print("testing single timestamp")
-        if os.path.exists(get_log_fname(good, "good")):
-            print(
-                "using cached result (was good) from %s" % get_log_fname(good, "good")
-            )
+        print(f"trying single timestamp {format_timestamp(good)}...")
+        if not staticargs.ignore_cached_results and os.path.exists(
+            get_log_fname(good, "good")
+        ):
+            print(f"using cached result (was good) from {get_log_fname(good, 'good')}")
             ret = 0
-        elif os.path.exists(get_log_fname(good, "bad")):
-            print("using cached result (was bad) from %s" % get_log_fname(good, "bad"))
+        elif not staticargs.ignore_cached_results and os.path.exists(
+            get_log_fname(good, "bad")
+        ):
+            print(f"using cached result (was bad) from {get_log_fname(good, 'bad')}")
             ret = 1
         else:
             ret, output = runtest(good, staticargs)
@@ -1131,8 +1217,8 @@ def main():
     if res is not None:
         good, bad = res
         print("bisection finished successfully")
-        print("  last good timestamp: %s" % good)
-        print("  first bad timestamp: %s" % bad)
+        print(f"  last good timestamp: {format_timestamp(good)}")
+        print(f"  first bad timestamp: {format_timestamp(bad)}")
 
         find_exact_package(
             good, bad, staticargs, args.depends, args.no_find_exact_package

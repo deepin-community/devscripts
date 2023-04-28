@@ -10,18 +10,25 @@ with "Devscripts::Salsa::Hooks";
 sub get_repo {
     my ($self, $prompt, @reponames) = @_;
     my @repos;
-    if ($self->config->all and @reponames == 0) {
+    if (($self->config->all or $self->config->all_archived)
+        and @reponames == 0) {
         ds_debug "--all is set";
+        my $options = {};
+        $options->{order_by} = 'name';
+        $options->{sort}     = 'asc';
+        $options->{archived} = 'false' if not $self->config->all_archived;
         my $projects;
         # This rule disallow trying to configure all "Debian" projects:
         #  - Debian id is 2
         #  - next is 1987
         if ($self->group_id) {
             $projects
-              = $self->api->paginator('group_projects', $self->group_id)->all;
+              = $self->api->paginator('group_projects', $self->group_id,
+                $options)->all;
         } elsif ($self->user_id) {
             $projects
-              = $self->api->paginator('user_projects', $self->user_id)->all;
+              = $self->api->paginator('user_projects', $self->user_id,
+                $options)->all;
         } else {
             ds_warn "Missing or invalid token";
             return 1;
@@ -32,7 +39,7 @@ sub get_repo {
         }
         @repos = map {
             $self->projectCache->{ $_->{path_with_namespace} } = $_->{id};
-            [$_->{id}, $_->{name}]
+            [$_->{id}, $_->{path}]
         } @$projects;
         if (@{ $self->config->skip }) {
             @repos = map {

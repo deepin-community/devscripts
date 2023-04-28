@@ -21,14 +21,14 @@ set -eu
 
 check_dependencies() {
     for optional in disorderfs diffoscope; do
-        if ! which "$optional" > /dev/null; then
+        if ! command -v "$optional" > /dev/null; then
             echo "W: $optional not installed, there will be missing functionality" >&2
         fi
     done
 
     local failed=''
     for mandatory in faketime; do
-        if ! which "$mandatory" > /dev/null; then
+        if ! command -v "$mandatory" > /dev/null; then
             echo "E: $mandatory not installed, cannot proceed." >&2
             failed=yes
         fi
@@ -45,6 +45,14 @@ usage() {
     echo ""
     echo " -b,--before-second-build COMMAND  Run COMMAND before second build"
     echo "                                   (e.g. apply a patch)"
+    echo " -B, --build-command COMMAND       Use COMMAND as the build command"
+    echo "                                   (default: dpkg-buildpackage -b -us -uc)"
+    echo " -a, --artifact-pattern            Shell glob pattern to determine which"
+    echo "                                   artifacts should be compared across the"
+    echo "                                   different builds (default: ../*.deb)"
+    echo " -n, --no-copy                     Does not copy the source tree before"
+    echo "                                   each build; run commands directly in the"
+    echo "                                   source tree."
     echo " -s,--skip VARIATION               Don't perform the named variation"
     echo " -h,--help                         Display this help message and exit"
 }
@@ -115,7 +123,7 @@ create_build_script() {
         'export TZ=GMT+12' \
         'export TZ=GMT-14'
 
-    if which disorderfs >/dev/null; then
+    if command -v disorderfs >/dev/null; then
         disorderfs_commands='cd .. &&
 mv source orig &&
 mkdir source &&
@@ -137,7 +145,7 @@ cd source'
         echo "build_prefix=\"timeout $timeout \$build_prefix\""
     fi
 
-    echo '${build_prefix:-} dpkg-buildpackage -b -us -uc'
+    echo '${build_prefix:-} '"${build_command:-dpkg-buildpackage -b -us -uc}"
 }
 
 
@@ -145,17 +153,26 @@ build() {
     export which_build="$1"
     mkdir "$tmpdir/build"
 
-    cp -r "$SOURCE" "$tmpdir/build/source"
-    cd "$tmpdir/build/source"
+    if [ "${copy}" = yes ]; then
+        cp -r "$SOURCE" "$tmpdir/build/source"
+        cd "$tmpdir/build/source"
+    fi
 
     if [ "$which_build" = second ] && [ -n "$before_second_build_command" ]; then
         banner "I: running before second build: $before_second_build_command"
         sh -c "$before_second_build_command"
     fi
 
-    create_build_script > ../build.sh
-    sh ../build.sh
-    cd -
+    create_build_script > $tmpdir/build/build.sh
+    if ! sh $tmpdir/build/build.sh; then
+        echo "E: $which_build build failed"
+        exit 1
+    fi
+    mkdir -p $tmpdir/build/artifacts
+    cp ${artifact_pattern} $tmpdir/build/artifacts/ || true
+    if [ "${copy}" = yes ]; then
+        cd - > /dev/null
+    fi
 
     mv "$tmpdir/build" "$tmpdir/$which_build"
 }
@@ -166,35 +183,40 @@ binmatch() {
 
 compare() {
     rc=0
-    for first_deb in "$tmpdir"/first/*.deb; do
-        deb="$(basename "$first_deb")"
-        second_deb="$tmpdir"/second/"$deb"
-        if binmatch "$first_deb" "$second_deb"; then
-            echo "✓ $deb: binaries match"
+    diff=binmatch
+    if command -v diffoscope >/dev/null; then
+        diff=diffoscope
+    fi
+    for first_artifact in "$tmpdir"/first/artifacts/${artifact_pattern}; do
+        artifact_name="$(basename "$first_artifact")"
+        second_artifact="$tmpdir"/second/artifacts/"$artifact_name"
+        if [ ! -f "${first_artifact}" ]; then
+            echo "✗ $artifact_name: not found"
+            rc=1
+        elif ${diff} "$first_artifact" "$second_artifact"; then
+            echo "✓ $artifact_name: files match"
         else
-            echo "✗ $deb: binaries don't match"
+            echo "✗ $artifact_name: files don't match"
             rc=1
         fi
     done
     if [ "$rc" -ne 0 ]; then
-        if which diffoscope >/dev/null; then
-            diffoscope "$tmpdir"/first/*.changes "$tmpdir"/second/*.changes || true
-        else
-            echo "I: install diffoscope for a deep comparison between artifacts"
-        fi
         echo "E: package is not reproducible."
     fi
     return "$rc"
 }
 
-TEMP=$(getopt -n "debrepro" -o 'hs:b:t:' \
-    -l 'help,skip:,before-second-build:,timeout:' \
+TEMP=$(getopt -n "debrepro" -o 'hs:b:B:a:nft:' \
+    -l 'help,skip:,before-second-build:,build-command:,artifact-pattern:,no-copy,force,timeout:' \
     -- "$@") || (rc=$?; usage >&2; exit $rc)
 eval set -- "$TEMP"
 
 skip_variations=""
 before_second_build_command=''
 timeout=''
+build_command=''
+artifact_pattern="../*.deb"
+copy=yes
 while true; do
     case "$1" in
         -s|--skip)
@@ -212,6 +234,18 @@ while true; do
         -b|--before-second-build)
             before_second_build_command="$2"
             shift
+            ;;
+        -B|--build-command)
+            build_command="$2"
+            shift
+            ;;
+        -a|--artifact-pattern)
+            artifact_pattern="$2"
+            shift
+            ;;
+        -n|--no-copy)
+            copy=no
+            skip_variations="$skip_variations filesystem-ordering"
             ;;
         -t|--timeout)
             timeout="$2"
@@ -234,8 +268,12 @@ if [ -z "$SOURCE" ]; then
     SOURCE="$(pwd)"
 fi
 if [ ! -f "$SOURCE/debian/changelog" ]; then
-    echo "E: $SOURCE does not look like a Debian source package"
-    exit 2
+    if [ -n "${build_command}" ]; then
+        echo "W: $SOURCE does not look like a Debian source package, but proceeding anyway since a custom build command as provided"
+    else
+        echo "E: $SOURCE does not look like a Debian source package"
+        exit 2
+    fi
 fi
 
 tmpdir=$(mktemp --directory --tmpdir debrepro.XXXXXXXXXX)
@@ -249,7 +287,7 @@ build first
 banner "Second build"
 build second
 
-banner "Comparing binaries"
+banner "Comparing artifacts"
 compare first second
 
 # vim:ts=4 sw=4 et

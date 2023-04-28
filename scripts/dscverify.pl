@@ -32,9 +32,9 @@ use File::HomeDir;
 use File::Spec;
 use File::Temp;
 use File::Basename;
-use POSIX qw(:errno_h);
+use POSIX        qw(:errno_h);
 use Getopt::Long qw(:config bundling permute no_getopt_compat);
-use List::Util qw(first);
+use List::Util   qw(first);
 
 my $progname = basename $0;
 my $modified_conf_msg;
@@ -44,7 +44,7 @@ my $verify_sigs          = 1;
 my $use_default_keyrings = 1;
 my $verbose              = 0;
 my $havegpg = first { !system('sh', '-c', "command -v $_ >/dev/null 2>&1") }
-qw(gpg2 gpg);
+  qw(gpg2 gpg);
 
 sub usage {
     print <<"EOF";
@@ -130,7 +130,7 @@ sub check_signature($\@;\$) {
     push @cmd, $havegpg, "--status-fd", $fd,
       qw(--batch --no-options --no-default-keyring --always-trust);
     foreach (@$rings) { push @cmd, '--keyring'; push @cmd, $_; }
-
+    push @cmd, '--verify', '--output', '-';
     my ($out, $err) = ('', '');
     eval {
         spawn(

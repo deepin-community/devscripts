@@ -13,14 +13,8 @@ use List::Util qw/first/;
 sub new {
     my ($class) = @_;
     my $keyring;
-    my $havegpgv = first {
-        which $_
-    }
-    qw(gpgv2 gpgv);
-    my $havegpg = first {
-        which $_
-    }
-    qw(gpg2 gpg);
+    my $havegpgv = first { which $_ } qw(gpgv2 gpgv);
+    my $havegpg  = first { which $_ } qw(gpg2 gpg);
     uscan_die("Please install gpgv or gpgv2.")   unless defined $havegpgv;
     uscan_die("Please install gnupg or gnupg2.") unless defined $havegpg;
 

@@ -18,7 +18,10 @@ sub fork {
     $self->api->fork_project($project, { namespace => $path });
     my $p = $project;
     $p =~ s#.*/##;
-    $self->checkout($p);
+    if ($self->checkout($p)) {
+        ds_warn "Failed to checkout $project";
+        return 1;
+    }
     chdir $p;
     spawn(
         exec => [

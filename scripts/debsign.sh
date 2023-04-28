@@ -23,8 +23,8 @@
 # Abort if anything goes wrong
 set -e
 
+PROGNAME=${0##*/}
 PRECIOUS_FILES=0
-PROGNAME=`basename $0`
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 HAVE_SIGNED=""
 NUM_SIGNED=0
@@ -37,7 +37,7 @@ trap cleanup_tmpdir EXIT
 
 # --- Functions
 
-mksigningdir () {
+mksigningdir() {
     if [ -z "$signingdir" ]; then
 	signingdir="$(mktemp -dt debsign.XXXXXXXX)" || {
 	    echo "$PROGNAME: Can't create temporary directory" >&2
@@ -47,7 +47,7 @@ mksigningdir () {
     fi
 }
 
-mkremotefilesdir () {
+mkremotefilesdir() {
     if [ -z "$remotefilesdir" ]; then
 	remotefilesdir="$(mktemp -dt debsign.XXXXXXXX)" || {
 	    echo "$PROGNAME: Can't create temporary directory" >&2
@@ -57,7 +57,7 @@ mkremotefilesdir () {
     fi
 }
 
-usage () {
+usage() {
     echo \
 "Usage: debsign [options] [changes, buildinfo, dsc or commands file]
   Options:
@@ -91,7 +91,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is debsign, from the Debian devscripts package, version ###VERSION###
 This code is copyright 1999 by Julian Gilbey, all rights reserved.
@@ -104,7 +104,7 @@ temp_filename() {
     local filename
 
     if ! [ -w "$(dirname "$1")" ]; then
-	filename=`mktemp -t "$(basename "$1").$2.XXXXXXXXXX"` || {
+	filename=$(mktemp -t "$(basename "$1").$2.XXXXXXXXXX") || {
 	    echo "$PROGNAME: Unable to create temporary file; aborting" >&2
 	    exit 1
 	}
@@ -128,7 +128,7 @@ movefile() {
     fi
 }
 
-cleanup_tmpdir () {
+cleanup_tmpdir() {
     if [ -n "$remotefilesdir" ] && [ -d "$remotefilesdir" ]; then
 	if [ "$PRECIOUS_FILES" -gt 0 ]; then
 	    echo "$PROGNAME: aborting with $PRECIOUS_FILES signed files in $remotefilesdir" >&2
@@ -145,7 +145,7 @@ cleanup_tmpdir () {
     fi
 }
 
-mustsetvar () {
+mustsetvar() {
     if [ "x$2" = x ]
     then
 	echo >&2 "$PROGNAME: unable to determine $3"
@@ -160,7 +160,7 @@ mustsetvar () {
 # key or maintainer name to use.  NOTE: this usage differs from that
 # of dpkg-buildpackage, because we do not know all of the necessary
 # information when this function is read first.
-signfile () {
+signfile() {
     local type="$1"
     local file="$2"
     local signas="$3"
@@ -170,9 +170,9 @@ signfile () {
     ASCII_SIGNED_FILE="${UNSIGNED_FILE}.asc"
     (cat "$file" ; echo "") > "$UNSIGNED_FILE"
 
-    gpgversion=`$signcommand --version | head -n 1 | cut -d' ' -f3`
-    gpgmajorversion=`echo $gpgversion | cut -d. -f1`
-    gpgminorversion=`echo $gpgversion | cut -d. -f2`
+    gpgversion=$($signcommand --version | head -n 1 | cut -d' ' -f3)
+    gpgmajorversion=$(echo $gpgversion | cut -d. -f1)
+    gpgminorversion=$(echo $gpgversion | cut -d. -f2)
 
     if [ $gpgmajorversion -gt 1 -o $gpgminorversion -ge 4 ]
     then
@@ -204,7 +204,7 @@ signfile () {
     movefile "$ASCII_SIGNED_FILE" "$file"
 }
 
-withecho () {
+withecho() {
     echo " $@"
     "$@"
 }
@@ -225,7 +225,7 @@ unsignfile() {
 # resigning the file or accepting it as is.  Returns success if already
 # and failure if the file needs signing.  Parameters: $1=filename,
 # $2=file type for message (e.g. "changes", "commands")
-check_already_signed () {
+check_already_signed() {
     file_is_already_signed "$1" || return 1
 
     local resign
@@ -320,9 +320,9 @@ signcommand=''
 if [ -n "$DEBSIGN_PROGRAM" ]; then
     signcommand="$DEBSIGN_PROGRAM"
 else
-    if command -v gpg > /dev/null 2>&1; then
+    if command -v gpg > /dev/null; then
 	signcommand=gpg
-    elif command -v gpg2 > /dev/null 2>&1; then
+    elif command -v gpg2 > /dev/null; then
 	signcommand=gpg2
     fi
 fi
@@ -503,10 +503,10 @@ guess_signas() {
     if [ -n "$maint" ]
     then maintainer="$maint"
     # Try the new "Changed-By:" field first
-    else maintainer=`sed -n 's/^Changed-By: //p' $1`
+    else maintainer=$(sed -n 's/^Changed-By: //p' $1)
     fi
     if [ -z "$maintainer" ]
-    then maintainer=`sed -n 's/^Maintainer: //p' $1`
+    then maintainer=$(sed -n 's/^Maintainer: //p' $1)
     fi
 
     echo "${signkey:-$maintainer}"
@@ -612,10 +612,10 @@ dosigning() {
 	remotebuildinfo=$buildinfo
 	remotedsc=$dsc
 	remotecommands=$commands
-	changes=`basename "$changes"`
-	buildinfo=`basename "$buildinfo"`
-	dsc=`basename "$dsc"`
-	commands=`basename "$commands"`
+	changes=$(basename "$changes")
+	buildinfo=$(basename "$buildinfo")
+	dsc=$(basename "$dsc")
+	commands=$(basename "$commands")
 
 	if [ -n "$changes" ]; then
 	    if [ ! -f "$changes" ]; then
@@ -682,7 +682,7 @@ for valid format" >&2;
 	if [ -n "$maint" ]
 	then maintainer="$maint"
 	else
-            maintainer=`sed -n 's/^Uploader: //p' $commands`
+            maintainer=$(sed -n 's/^Uploader: //p' $commands)
             if [ -z "$maintainer" ]
             then
 		echo "Unable to parse Uploader, .commands file invalid."
@@ -811,7 +811,7 @@ case $# in
 	    arch=source
 	fi
 
-	sversion=`echo "$version" | perl -pe 's/^\d+://'`
+	sversion=$(echo "$version" | perl -pe 's/^\d+://')
 	pva="${package}_${sversion}_${arch}"
 	changes="$debsdir/$pva.changes"
 	if [ -n "$multiarch" -o ! -r $changes ]; then

@@ -19,6 +19,7 @@ OUR_TESTS= \
 	uscan_mangle \
 	uscan_group \
 	perltidy \
+	wrap-and-sort \
 
 # Tests that must run as root, and alter the state of the system by
 # adding/removing packages

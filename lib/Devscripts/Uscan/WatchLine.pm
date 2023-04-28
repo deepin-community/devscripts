@@ -982,7 +982,7 @@ sub search {
       . "    \$filepattern = $self->{parse_result}->{filepattern} found\n"
       . "    \$newfile     = $newfile\n"
       . "    \$newversion  = $newversion\n"
-      . "    \$lastversion = $self->{parse_result}->{lastversion}";
+      . "    \$lastversion = $self->{parse_result}->{mangled_lastversion}";
     $self->search_result({
         newversion => $newversion,
         newfile    => $newfile,
@@ -1139,11 +1139,11 @@ sub cmp_versions {
         if ($compver eq 'newer') {
             uscan_msg "Newest version of $name on remote site is "
               . "$self->{search_result}->{newversion}, "
-              . "local version is $self->{parse_result}->{lastversion}\n"
+              . "local version is $self->{parse_result}->{mangled_lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
-                : " (mangled local version is $mangled_lastversion)\n"
+                : "       (mangled local version is $mangled_lastversion)\n"
               );
 
             # There's a newer upstream version available, which may already
@@ -1155,11 +1155,11 @@ sub cmp_versions {
         } elsif ($compver eq 'same') {
             uscan_verbose "Newest version of $name on remote site is "
               . $self->search_result->{newversion}
-              . ", local version is $self->{parse_result}->{lastversion}\n"
+              . ", local version is $self->{parse_result}->{mangled_lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
-                : " (mangled local version is $mangled_lastversion)\n"
+                : "            (mangled local version is $mangled_lastversion)\n"
               );
             uscan_verbose " => Package is up to date from:\n"
               . "             => $self->{upstream_url}";
@@ -1176,11 +1176,11 @@ sub cmp_versions {
         } else {    # $compver eq 'old'
             uscan_verbose "Newest version of $name on remote site is "
               . $self->search_result->{newversion}
-              . ", local version is $self->{parse_result}->{lastversion}\n"
+              . ", local version is $self->{parse_result}->{mangled_lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
-                : " (mangled local version is $mangled_lastversion)\n"
+                : "            (mangled local version is $mangled_lastversion)\n"
               );
             uscan_verbose " => Only older package available from:\n"
               . "             => $self->{upstream_url}";
@@ -1634,7 +1634,7 @@ sub mkorigtargz {
           if $self->component;
         push @ARGV, "--compression",
           $Devscripts::MkOrigtargz::found_comp || $self->compression;
-        push @ARGV, "--directory",      $self->config->destdir;
+        push @ARGV, "--directory", $self->config->destdir;
         push @ARGV, "--copyright-file", "debian/copyright"
           if ($self->config->exclusion && -e "debian/copyright");
         push @ARGV, "--copyright-file", $self->config->copyright_file

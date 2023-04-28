@@ -146,8 +146,8 @@ use File::Copy qw(cp);
 use File::HomeDir;
 use File::Path qw(make_path);
 use File::Basename;
-use Getopt::Long qw(:config gnu_compat bundling require_order);
-use Cwd qw(abs_path cwd);
+use Getopt::Long  qw(:config gnu_compat bundling require_order);
+use Cwd           qw(abs_path cwd);
 use Dpkg::Version qw(version_compare);
 use Pod::Usage;
 
@@ -398,10 +398,8 @@ EOF
 #deb http://deb.debian.org/debian/ unstable main contrib non-free
 #deb-src http://deb.debian.org/debian/ unstable main contrib non-free
 
-#deb http://archive.ubuntu.com/ubuntu dapper main restricted
-#deb http://archive.ubuntu.com/ubuntu dapper universe multiverse
-#deb-src http://archive.ubuntu.com/ubuntu dapper main restricted
-#deb-src http://archive.ubuntu.com/ubuntu dapper universe multiverse
+#deb http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse
+#deb-src http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse
 EOF
     }
     close FH;

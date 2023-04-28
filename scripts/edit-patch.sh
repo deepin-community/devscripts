@@ -22,6 +22,7 @@
 
 set -e
 
+PROGNAME=${0##*/}
 
 PATCHSYSTEM="unknown"
 PATCHNAME="no-patch-name"
@@ -121,8 +122,10 @@ edit_patch_dpatch() {
 
 edit_patch_quilt() {
     export QUILT_PATCHES=debian/patches
-    top_patch=$(quilt top)
-    echo "Top patch: $top_patch"
+    if [ -e $QUILT_PATCHES ]; then
+        top_patch=$(quilt top)
+        echo "Top patch: $top_patch"
+    fi
     if [ -e $PREFIX/$1 ]; then
         # if it's an existing patch and we are at the end of the stack,
         # go back at the beginning
@@ -140,8 +143,10 @@ edit_patch_quilt() {
     # use a sub-shell
     quilt shell
     quilt refresh
-    echo "Reverting quilt back to $top_patch"
-    quilt pop $top_patch
+    if [ -n $top_patch ]; then
+        echo "Reverting quilt back to $top_patch"
+        quilt pop $top_patch
+    fi
     vcs_add $PREFIX/$1 $PREFIX/series
 }
 
@@ -293,9 +298,9 @@ main() {
     normalize_patch_path
     normalize_patch_extension
     handle_file_patch
-    if [ "$(basename $0 .sh)" = "edit-patch" ]; then
+    if [ "${PROGNAME%.sh}" = edit-patch ]; then
         edit_patch_$PATCHSYSTEM $PATCHNAME
-    elif [ "$(basename $0 .sh)" = "add-patch" ]; then
+    elif [ "${PROGNAME%.sh}" = add-patch ]; then
         add_patch_$PATCHSYSTEM $1 $PATCHNAME
     else
         fatal_error "Unknown script name: $0"

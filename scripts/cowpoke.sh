@@ -26,8 +26,7 @@ DEBOOTSTRAP="cdebootstrap"
 for f in /etc/cowpoke.conf ~/.cowpoke .cowpoke "$COWPOKE_CONF"; do [ -r "$f" ] && . "$f"; done
 
 
-get_archdist_vars()
-{
+get_archdist_vars() {
     _ARCHDIST_OPTIONS="RESULT_DIR BASE_PATH BASE_DIST CREATE_OPTS UPDATE_OPTS BUILD_OPTS SIGN_KEYID UPLOAD_QUEUE"
     _RESULT_DIR="result"
     _BASE_PATH="base.cow"
@@ -90,8 +89,7 @@ get_archdist_vars()
     done
 }
 
-display_override_vars()
-{
+display_override_vars() {
     _OVERRIDE_OPTIONS="CREATE_OPTS UPDATE_OPTS BUILD_OPTS SIGN_KEYID UPLOAD_QUEUE"
 
     for var in $_OVERRIDE_OPTIONS; do
@@ -101,9 +99,8 @@ display_override_vars()
 }
 
 
-PROGNAME="$(basename $0)"
-version ()
-{
+PROGNAME=${0##*/}
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is Copyright 2007-2014, Ron <ron@debian.org>.
@@ -113,8 +110,7 @@ GNU General Public License."
     exit 0
 }
 
-usage()
-{
+usage() {
     cat 1>&2 <<EOF
 
 cowpoke [options] package.dsc
@@ -317,8 +313,7 @@ cat > "$REMOTE_SCRIPT" <<-EOF
 	# cowpoke generated remote worker script.
 	# Normally this should have been deleted already, you can safely remove it now.
 
-	compare_changes()
-	{
+	compare_changes() {
 	    p1="\${1%_*.changes}"
 	    p2="\${2%_*.changes}"
 	    p1="\${p1##*_}"

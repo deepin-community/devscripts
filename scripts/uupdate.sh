@@ -44,10 +44,10 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage for a new archive:
   $PROGNAME [options] <new upstream archive> [<version>]
@@ -87,7 +87,7 @@ $PROGNAME [--help|--version]
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 Copyright 1999-2003, Julian Gilbey <jdg@debian.org>, all rights reserved.
@@ -97,7 +97,7 @@ You are free to redistribute this code under the terms of the
 GNU General Public License, version 2 or later."
 }
 
-mustsetvar () {
+mustsetvar() {
     if [ "x$2" = x ]
     then
 	echo >&2 "$PROGNAME: unable to determine $3"
@@ -108,7 +108,7 @@ mustsetvar () {
     fi
 }
 
-findzzz () {
+findzzz() {
     LISTNAME=$(ls -1 $@ 2>/dev/null |sed -e 's,\.[^\.]*$,,' | sort | uniq )
     for f in $LISTNAME ; do
 	if [ -r "$f.xz" ]; then
@@ -140,7 +140,7 @@ DEFAULT_UUPDATE_SYMLINK_ORIG=yes
 VARS="UUPDATE_ROOTCMD UUPDATE_PRISTINE UUPDATE_SYMLINK_ORIG"
 
 SUFFIX="1"
-if which dpkg-vendor >/dev/null 2>&1; then
+if command -v dpkg-vendor >/dev/null; then
   VENDER="$(dpkg-vendor --query Vendor 2>/dev/null|tr 'A-Z' 'a-z')"
   case "$VENDER" in
     debian) SUFFIX="1" ;;
@@ -287,7 +287,7 @@ mustsetvar PACKAGE "`dpkg-parsechangelog -SSource`" "source package"
 mustsetvar VERSION "`dpkg-parsechangelog -SVersion`" "source version"
 
 # Get epoch and upstream version
-eval `echo "$VERSION" | perl -ne '/^(?:(\d+):)?(.*)/; print "SVERSION=$2\nEPOCH=$1\n";'`
+eval $(echo "$VERSION" | perl -ne '/^(?:(\d+):)?(.*)/; print "SVERSION=$2\nEPOCH=$1\n";')
 
 if [ -n "$UUPDATE_VERBOSE" ]; then
     if [ "$OPMODE" = 1 ]; then
@@ -303,7 +303,7 @@ if [ -n "$UUPDATE_VERBOSE" ]; then
     echo "$PROGNAME: SVERSION    = \"$SVERSION\" is w/o-epoch part of \$VERSION" >&2
 fi
 
-UVERSION=`expr "$SVERSION" : '\(.*\)-[0-9a-zA-Z.+~]*$'`
+UVERSION=$(expr "$SVERSION" : '\(.*\)-[0-9a-zA-Z.+~]*$')
 if [ -z "$UVERSION" ]; then
     echo "$PROGNAME: a native Debian package cannot take upstream updates" >&2
     exit 1
@@ -314,7 +314,7 @@ if [ -n "$UUPDATE_VERBOSE" ]; then
 fi
 
 # Save pwd before we goes walkabout
-OPWD=`pwd`
+OPWD=$(pwd)
 
 if [ "$OPMODE" = 1 ]; then
     # --patch mode
@@ -384,8 +384,8 @@ if [ "$OPMODE" = 1 ]; then
     esac
     if [ "$NEW_VERSION" = "" ]; then
 	# Figure out the new version; we may have to remove a trailing ".diff"
-	NEW_VERSION=`echo "$X" |
-		perl -ne 's/\.diff$//; /'"$MPATTERN"'/ && print $1'`
+	NEW_VERSION=$(echo "$X" |
+		perl -ne 's/\.diff$//; /'"$MPATTERN"'/ && print $1')
 	if [ -z "$NEW_VERSION" ]; then
 	    echo "$PROGNAME: new version number not recognized from given filename" >&2
 	    echo "$PROGNAME: Please run $PROGNAME with the -v option" >&2
@@ -400,7 +400,7 @@ if [ "$OPMODE" = 1 ]; then
     fi
 
     # Strip epoch number
-    SNEW_VERSION=`echo "$NEW_VERSION" | perl -pe 's/^\d+://'`
+    SNEW_VERSION=$(echo "$NEW_VERSION" | perl -pe 's/^\d+://')
     if [ $SNEW_VERSION = $NEW_VERSION -a -n "$EPOCH" ]; then
 	NEW_VERSION="$EPOCH:$NEW_VERSION"
     fi
@@ -456,7 +456,7 @@ if [ "$OPMODE" = 1 ]; then
 	}
     fi
 
-    cd `pwd`/..
+    cd $(pwd)/..
     rm -rf $PACKAGE-$UVERSION.orig
 
     # Unpacking .orig.tar.gz is not quite trivial any longer ;-)
@@ -465,7 +465,7 @@ if [ "$OPMODE" = 1 ]; then
 	echo "$PROGNAME: aborting..." >&2
 	exit 1
     }
-    cd `pwd`/$TEMP_DIR
+    cd $(pwd)/$TEMP_DIR
     if [ "$OLDARCHIVETYPE" = gz ]; then
 	tar zxf ../$OLDARCHIVE || {
 	    echo "$PROGNAME: can't untar $OLDARCHIVE;" >&2
@@ -495,27 +495,27 @@ if [ "$OPMODE" = 1 ]; then
 	exit 1
     fi
 
-    if [ `ls | wc -l` -eq 1 ] && [ -d "`ls`" ]; then
-	mv "`ls`" ../${PACKAGE}-$UVERSION.orig
+    if [ $(ls | wc -l) -eq 1 ] && [ -d "$(ls)" ]; then
+	mv "$(ls)" ../${PACKAGE}-$UVERSION.orig
     else
 	mkdir ../$PACKAGE-$UVERSION.orig
 	mv * ../$PACKAGE-$UVERSION.orig
     fi
-    cd `pwd`/..
+    cd $(pwd)/..
     rm -rf $TEMP_DIR
 
-    cd `pwd`/$PACKAGE-$UVERSION.orig
+    cd $(pwd)/$PACKAGE-$UVERSION.orig
     if ! $CATPATCH > /dev/null; then
 	echo "$PROGNAME: can't run $CATPATCH;" >&2
 	echo "$PROGNAME: aborting..." >&2
 	exit 1
     fi
     if $CATPATCH | patch -sp1; then
-	cd `pwd`/..
+	cd $(pwd)/..
 	mv $PACKAGE-$UVERSION.orig $PACKAGE-$SNEW_VERSION.orig
 	echo "-- Originals could be successfully patched"
 	cp -a $PACKAGE-$UVERSION $PACKAGE-$SNEW_VERSION
-	cd `pwd`/$PACKAGE-$SNEW_VERSION
+	cd $(pwd)/$PACKAGE-$SNEW_VERSION
 	if $CATPATCH | patch -sp1; then
 	    echo "Success. The supplied diffs worked fine on the Debian sources."
 	else
@@ -537,7 +537,7 @@ if [ "$OPMODE" = 1 ]; then
 	exit
     else
 	echo "$PROGNAME: patch failed to apply to original sources $UVERSION" >&2
-	cd `pwd`/..
+	cd $(pwd)/..
 	rm -rf $PACKAGE-$UVERSION.orig
 	exit 1
     fi
@@ -601,7 +601,7 @@ elif [ "$OPMODE" = 2 ]; then
 
     if [ "$NEW_VERSION" = "" ]; then
 	# Figure out the new version
-	NEW_VERSION=`echo "$X" | perl -ne "/$MPATTERN/"' && print $1'`
+	NEW_VERSION=$(echo "$X" | perl -ne "/$MPATTERN/"' && print $1')
 	if [ -z "$NEW_VERSION" ]; then
 	    echo "$PROGNAME: new version number not recognized from given filename" >&2
 	    echo "$PROGNAME: Please run $PROGNAME with the -v option" >&2
@@ -615,7 +615,7 @@ elif [ "$OPMODE" = 2 ]; then
     fi
 
     # Strip epoch number
-    SNEW_VERSION=`echo "$NEW_VERSION" | perl -pe 's/^\d+://'`
+    SNEW_VERSION=$(echo "$NEW_VERSION" | perl -pe 's/^\d+://')
     if [ $SNEW_VERSION = $NEW_VERSION -a -n "$EPOCH" ]; then
 	NEW_VERSION="$EPOCH:$NEW_VERSION"
     fi
@@ -723,13 +723,13 @@ elif [ "$OPMODE" = 2 ]; then
 	esac
     fi
 
-    cd `pwd`/..
+    cd $(pwd)/..
     TEMP_DIR=$(mktemp -d uupdate.XXXXXXXX) || {
 	echo "$PROGNAME: can't create temporary directory;" >&2
 	echo "$PROGNAME: aborting..." >&2
 	exit 1
     }
-    cd `pwd`/$TEMP_DIR
+    cd $(pwd)/$TEMP_DIR
     if [ ! -d "$ARCHIVE_PATH" ]; then
 	echo "$PROGNAME: Untarring the new sourcecode archive $ARCHIVE"
 	$UNPACK "$ARCHIVE_PATH" || {
@@ -745,21 +745,21 @@ elif [ "$OPMODE" = 2 ]; then
 	}
     fi
 
-    cd `pwd`/..
-    if [ `ls $TEMP_DIR | wc -l` -eq 1 ]; then
+    cd $(pwd)/..
+    if [ $(ls $TEMP_DIR | wc -l) -eq 1 ]; then
 	# The files are stored in the archive under a top directory, we presume
 	mv $TEMP_DIR/* $PACKAGE-$SNEW_VERSION
     else
 	# Otherwise, we put them into a new directory
 	mkdir $PACKAGE-$SNEW_VERSION
 	mv $TEMP_DIR/* $PACKAGE-$SNEW_VERSION
-	if ls $TEMP_DIR/.[!.]* >/dev/null 2>&1 ; then
+	if ls $TEMP_DIR/.[!.]* > /dev/null 2>&1; then
 	    mv $TEMP_DIR/.[!.]* $PACKAGE-$SNEW_VERSION
 	fi
     fi
     rm -rf $TEMP_DIR
     cp -a $PACKAGE-$SNEW_VERSION $PACKAGE-$SNEW_VERSION.orig
-    cd `pwd`/$PACKAGE-$SNEW_VERSION
+    cd $(pwd)/$PACKAGE-$SNEW_VERSION
 
     if [ -r "../${PACKAGE}_$SVERSION.diff.gz" ]; then
 	DIFF="../${PACKAGE}_$SVERSION.diff.gz"
@@ -802,7 +802,7 @@ elif [ "$OPMODE" = 2 ]; then
 	    exit 1
 	fi
 	if [ -d debian/source -a -r debian/source/format ]; then
-	    if [ "`cat debian/source/format`" = "3.0 (quilt)" ]; then
+	    if [ "$(cat debian/source/format)" = "3.0 (quilt)" ]; then
 		# This is convenience for VCS users.
 		echo "$PROGNAME: debian/source/format is \"3.0 (quilt)\"." >&2
 		echo "$PROGNAME: Auto-generating ${PACKAGE}_$SVERSION.debian.tar.xz" >&2
@@ -819,7 +819,7 @@ elif [ "$OPMODE" = 2 ]; then
 	    echo "$PROGNAME: Skip auto-generating ${PACKAGE}_$SVERSION.debian.tar.xz" >&2
 	fi
 	# return back to upstream source
-	cd `pwd`/../$PACKAGE-$SNEW_VERSION
+	cd $(pwd)/../$PACKAGE-$SNEW_VERSION
     fi
 
     if [ "$DIFFTYPE" = diff ]; then
@@ -977,7 +977,7 @@ else
     # Get Parameters from the old source tree
     
     if [ -e debian/source -a -e debian/source/format ]; then
-        FORMAT=`cat debian/source/format`
+        FORMAT=$(cat debian/source/format)
     else
         FORMAT='1.0'
     fi
@@ -1016,7 +1016,7 @@ else
         echo "$PROGNAME: New:         <version>            = $NEW_VERSION"
     fi
     
-    if [ "`readlink -f ../${PACKAGE}-$NEW_VERSION`" = "$OPWD" ]; then
+    if [ "$(readlink -f ../${PACKAGE}-$NEW_VERSION)" = "$OPWD" ]; then
         echo "$PROGNAME: You can not execute this from ../${PACKAGE}-${NEW_VERSION}/." >&2
         exit 1
     fi
@@ -1028,7 +1028,7 @@ else
     fi
     
     # Move to the archive directory
-    cd `pwd`/..
+    cd $(pwd)/..
     ARCHIVE=$(findzzz ${PACKAGE}_$NEW_VERSION.orig.tar.*z*)
     if [ "$FORMAT" = "1.0" ]; then
         DEBIANFILE=$(findzzz ${PACKAGE}_$VERSION.debian.diff.*z*)
@@ -1039,7 +1039,7 @@ else
     cd $OPWD
     if [ -z "$DEBIANFILE" ]; then
 	if [ -d debian/source -a -r debian/source/format ]; then
-	    if [ "`cat debian/source/format`" = "3.0 (quilt)" ]; then
+	    if [ "$(cat debian/source/format)" = "3.0 (quilt)" ]; then
 		# This is convenience for VCS users.
 		echo "$PROGNAME: debian/source/format is \"3.0 (quilt)\"." >&2
 		echo "$PROGNAME: Auto-generating ${PACKAGE}_$SVERSION.debian.tar.xz" >&2
@@ -1057,7 +1057,7 @@ else
 	fi
     fi
     # Move to the archive directory
-    cd `pwd`/..
+    cd $(pwd)/..
     if [ "$FORMAT" = "1.0" ]; then
         COMP=${DEBIANFILE##*.}
 	NEW_DEBIANFILE="${PACKAGE}_${NEW_VERSION}-$SUFFIX.diff.$COMP"
@@ -1119,7 +1119,7 @@ else
         ls -l >&2
         exit 1
     fi
-    cd `pwd`/${PACKAGE}-${NEW_VERSION}
+    cd $(pwd)/${PACKAGE}-${NEW_VERSION}
     [ ! -d debian ] && echo "$PROGNAME: debian directory missing." >&2 && exit 1
     # Need to set permission for format=1.0
     [ -e debian/rules ] && chmod a+x debian/rules

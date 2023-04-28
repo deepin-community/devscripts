@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import http.server
-from http.server import SimpleHTTPRequestHandler
 import logging
+from http.server import SimpleHTTPRequestHandler
 
 
 class GetHandler(SimpleHTTPRequestHandler):
@@ -12,14 +12,14 @@ class GetHandler(SimpleHTTPRequestHandler):
 
 def test():
     Handler = GetHandler
-    httpd = http.server.HTTPServer(('', 0), Handler)
+    httpd = http.server.HTTPServer(("", 0), Handler)
 
     sa = httpd.socket.getsockname()
-    with open('port', 'w') as f:
+    with open("port", "w") as f:
         f.write(str(sa[1]))
 
     httpd.serve_forever()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()

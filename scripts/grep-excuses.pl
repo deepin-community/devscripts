@@ -69,9 +69,15 @@ my $progname = basename($0);
 my $modified_conf_msg;
 
 my $url = 'https://release.debian.org/britney/excuses.yaml';
+my $url_experimental
+  = 'https://release.debian.org/britney/pseudo-excuses-experimental.yaml';
 
 my $rmurl      = 'https://udd.debian.org/cgi-bin/autoremovals.cgi';
 my $rmurl_yaml = 'https://udd.debian.org/cgi-bin/autoremovals.yaml.cgi';
+
+my $wipnityurl = 'https://qa.debian.org/excuses.php?package=';
+my $wipnityurl_experimental
+  = 'https://qa.debian.org/excuses.php?experimental=1&package=';
 
 # No longer use these - see bug#309802
 my $cachedir  = File::HomeDir->my_home . "/.devscripts_cache/";
@@ -92,6 +98,7 @@ Options:
                       name must be given when using this option.
   --autopkgtests      Investigate and show autopkgtest (ci.debian.net) failures
   --no-autoremovals   Do not investigate and report autoremovals
+  --experimental, -e  Print pseudo-excuses for experimental
   --help              Show this help
   --version           Give version information
   --debug             Print debugging output to stderr
@@ -122,8 +129,7 @@ sub wipnity {
     }
 
     while (my $package = shift) {
-        my $dump
-          = `w3m -dump -cols $columns "https://qa.debian.org/excuses.php?package=$package"`;
+        my $dump = `w3m -dump -cols $columns "$wipnityurl$package"`;
         $dump =~ s/.*(Excuse for .*)\s+Maintainer page.*/$1/ms;
         $dump =~ s/.*(No excuse for .*)\s+Maintainer page.*/$1/ms;
         print($dump);
@@ -186,6 +192,13 @@ while (@ARGV and $ARGV[0] =~ /^-/) {
     }
     if ($ARGV[0] eq '--debug') {
         open DEBUG, ">&STDERR" or die $!;
+        shift;
+        next;
+    }
+    if ($ARGV[0] eq '--experimental' or $ARGV[0] eq '-e') {
+        $do_autoremovals = 0;
+        $url             = $url_experimental;
+        $wipnityurl      = $wipnityurl_experimental;
         shift;
         next;
     }

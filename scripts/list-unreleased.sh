@@ -40,15 +40,15 @@ done
 
 [ "$PATHS" ] || PATHS=.
 
-vcs_dirs='(\.(svn|hg|git|bzr)|_darcs|_MTN|CVS)'
+vcs_dirs='\(\.\(svn\|hg\|git\|bzr\)\|_darcs\|_MTN\|CVS\)'
 get_list() {
 	local path="$1"
 
 	for dir in $(
 		if [ "$RECURSE" ]; then
-			find "$path" -type d | grep -vE "$vcs_dirs"
+			find "$path" -type d ! -regex "$vcs_dirs"
 		else
-			find "$path" -maxdepth 1 -type d | grep -vE "$vcs_dirs"
+			find "$path" -maxdepth 1 -type d ! -regex "$vcs_dirs"
 		fi
 	); do
 		changelog="$dir/debian/changelog"

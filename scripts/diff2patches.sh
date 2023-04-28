@@ -22,9 +22,9 @@
 
 set -e
 
-PROGNAME=$(basename "$0")
+PROGNAME=${0##*/}
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [options] FILE.diff.gz
   Options:
@@ -37,7 +37,7 @@ usage () {
   patches are extracted there)."
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2007, 2008 by Raphael Geissert, all rights reserved.
@@ -51,7 +51,7 @@ case "$1" in
 	--version) version; exit 0 ;;
 esac
 
-if ! which lsdiff >/dev/null 2>&1; then
+if ! which lsdiff > /dev/null 2>&1; then
 	echo "lsdiff was not found in \$PATH, package patchutils probably not installed!"
 	exit 1
 fi

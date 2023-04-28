@@ -1,0 +1,11 @@
+# Comment that stays in the top
+# A multiline comment should not be re-ordered
+
+A
+# B can have a
+# multiline comment
+B
+# Some comment related to C
+C
+
+# Not sure why anyone would finish with a comment, but it should work

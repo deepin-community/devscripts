@@ -40,8 +40,8 @@ destructive-test-installed:
 	$(MAKE) -C test/ $@
 
 test:
-	#$(MAKE) test_scripts
-	#$(MAKE) test_test
+	$(MAKE) test_scripts
+	$(MAKE) test_test
 
 test-installed:
 	$(MAKE) -C test/ $@

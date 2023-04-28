@@ -325,7 +325,7 @@ if (@usedfiles) {
 }
 
 print "Packages ", ($opts{"pkgs"} eq 'all') ? "used" : "needed", ":\n  ";
-print join("\n  ", @packages), "\n";
+print join("\n  ", @packages),                                   "\n";
 
 if ($opts{"allpkgs"}) {
     if (@ess_packages) {

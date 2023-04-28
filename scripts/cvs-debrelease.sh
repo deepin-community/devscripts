@@ -23,9 +23,9 @@
 
 set -e
 
-PROGNAME=`basename $0 .sh`  # .sh for debugging purposes
+PROGNAME=${0##*/} PROGNAME="${PROGNAME%.sh}"  # .sh for debugging purposes
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [cvs-debrelease options] [--dopts [dupload/dput options]]
   Upload the .changes file(s) just created by cvs-buildpackage or
@@ -65,7 +65,7 @@ configuration files, run:  debrelease --help"
 }
 
 
-version () { echo \
+version() { echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2003, Julian Gilbey <jdg@debian.org>,
 all rights reserved.
@@ -78,18 +78,18 @@ the GNU General Public License, version 2 or later."
 setq() {
     # Variable Value Doc string
     if [ "x$2" = "x" ]; then
-	echo >&2 "$progname: Unable to determine $3"
+	echo >&2 "$PROGNAME: Unable to determine $3"
 	exit 1;
     else
 	if [ ! "x$Verbose" = "x" ]; then
-	    echo "$progname: $3 is $2";
+	    echo "$PROGNAME: $3 is $2";
 	fi
 	eval "$1=\"\$2\"";
     fi
 }
 
 # Is cvs-buildpackage installed?
-if ! command -v cvs-buildpackage >/dev/null 2>&1; then
+if ! command -v cvs-buildpackage > /dev/null; then
     echo "$PROGNAME: need the cvs-buildpackage package installed to run this" >&2
     exit 1
 fi
@@ -183,7 +183,7 @@ done
 
 if [ "x$opt_cvsmodule" = "x" -a "x$opt_package" = "x" -a \
       ! -e 'debian/changelog' ] ; then
-    echo >&2 "$progname should be run in the top working directory of"
+    echo >&2 "$PROGNAME should be run in the top working directory of"
     echo >&2 "a Debian Package, or an explicit package (or CVS module) name"
     echo >&2 "should be given."
     exit 1
@@ -209,7 +209,7 @@ fi
 # put a slash at the end of the prefix
 if [ "X$prefix" != "X" ]; then
     prefix="$prefix/";
-    prefix=`echo $prefix | sed 's://:/:g'`;
+    prefix=$(echo $prefix | sed 's://:/:g');
 fi
 
 if [ ! -f CVS/Root ]; then
@@ -380,6 +380,6 @@ cd $pkgdir || {
 
 # Just call debrelease, now that we are in the correct directory
 
-SUBPROG=${PROGNAME#cvs-}
+SUBPROG="${PROGNAME#cvs-}"
 
-exec $SUBPROG "${debreleaseopts[@]}" "$@"
+exec "$SUBPROG" "${debreleaseopts[@]}" "$@"

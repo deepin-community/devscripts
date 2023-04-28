@@ -23,10 +23,10 @@
 
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [options] package ...
   Display the most recent three uploaders of each package.
@@ -54,7 +54,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2006 by Julian Gilbey <jdg@debian.org>,
@@ -73,10 +73,10 @@ DEFAULT_WHOUPLOADS_DATE=no
 VARS="WHOUPLOADS_KEYRINGS WHOUPLOADS_MAXUPLOADS WHOUPLOADS_DATE"
 
 GPG=gpg
-if ! command -v $GPG >/dev/null 2>&1; then
+if ! command -v $GPG > /dev/null; then
     echo "$GPG missing"
     GPG=gpg2
-    if  ! command -v $GPG >/dev/null 2>&1; then
+    if  ! command -v $GPG > /dev/null; then
 	echo "$GPG missing"
 	exit 1
     fi
@@ -246,10 +246,22 @@ for package; do
 	GPG_ID=$(echo "$GPG_TEXT" | LC_ALL=C $GPG $GPG_NO_KEYRING --keyid-format long --verify 2>&1 |
 	         sed -rne 's/.*using [^ ]* key ([0-9A-Z]+).*/\1/p')
 
+	# First try to get the uid@debian.org email
 	UPLOADER=$($GPG $GPG_OPTIONS \
 	           "${GPG_DEFAULT_KEYRINGS[@]}" "${GPG_KEYRINGS[@]}" \
 	           --list-key --with-colons --fixed-list-mode $GPG_ID 2>/dev/null |
-	           awk  -F: '/@debian\.org>/ { a = $10; exit} /^uid/ { a = $10; exit} END { print a }' )
+	           awk  -F: '/@debian\.org/ { a = $10; exit} END { print a }' )
+
+	# If $UPLOADER is still null (no @debian.org email found), pull the next email uid
+	if [ -z "$UPLOADER" ]; then
+	UPLOADER=$($GPG $GPG_OPTIONS \
+	           "${GPG_DEFAULT_KEYRINGS[@]}" "${GPG_KEYRINGS[@]}" \
+	           --list-key --with-colons --fixed-list-mode $GPG_ID 2>/dev/null |
+	           awk  -F: '/^uid/ { a = $10; exit} END { print a }' )
+
+	fi
+
+	# If $UPLOADER is still null (no email found on the key) print the <unrecognized public key> message
 	if [ -z "$UPLOADER" ]; then UPLOADER="<unrecognised public key ($GPG_ID)>"; fi
 
 	output="$VERSION to $DISTRO: $UPLOADER"

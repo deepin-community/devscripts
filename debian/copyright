@@ -43,10 +43,6 @@ Copyright: 2008-2018, Benjamin Drung <bdrung@debian.org>
            2010-2011, Stefano Rivera <stefanor@ubuntu.com>
 License: ISC
 
-Files: examples/*.procmail
-Copyright: 1999, Edward Betts <edward@debian.org>
-License: GPL-2+
-
 Files:lib/Devscripts/DB_File_Lock.pm
 Copyright: 1999-2000, David Harris <dharris@drh.net>
 License: Artistic or GPL-1+
@@ -157,6 +153,10 @@ Files: scripts/debi.pl
 Copyright: 1999, Jim Van Zandt <jrv@vanzandt.mv.com>
  1999-2003, Julian Gilbey <jdg@debian.org>
 License: GPL-2+
+
+Files: scripts/debootsnap
+Copyright: 2021 Johannes Schauer Marin Rodrigues <josch@debian.org>
+License: Expat
 
 Files: scripts/deb-reversion*
 Copyright: martin f. krafft <madduck@madduck.net>

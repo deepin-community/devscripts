@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# Copyright (C) 2022, Niels Thykier <niels@thykier.net>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+set -u
+
+
+WORK_DIR="$(readlink -f "${0%/*}")"
+if test "${1:-}" = --installed; then
+    wrap_and_sort="wrap-and-sort "
+    shift
+else
+    wrap_and_sort="${WORK_DIR}/../scripts/wrap-and-sort"
+fi
+
+. "${WORK_DIR}/test_helper.sh"
+
+oneTimeSetUp() {
+  TEMP_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR" wrap-and-sort.XXXXX)
+}
+
+# Run as `prepare_and_run_wrap_and_sort <test-name> [args-for-wrap-and-sort]`
+prepare_and_run_wrap_and_sort() {
+  TEST_NAME="${1}"
+  TEST_DIR="${TEMP_DIR}/${TEST_NAME}"
+
+  mkdir "${TEST_DIR}"
+  cp -a "${WORK_DIR}/wrap-and-sort/${TEST_NAME}/in/"* "$TEST_DIR/" || exit 1
+  assertPasses $wrap_and_sort -d "$TEST_DIR"
+  assertPasses diff -Nuarp "${WORK_DIR}/wrap-and-sort/${TEST_NAME}/out" "${TEST_DIR}"
+}
+
+test_install_comments() {
+  prepare_and_run_wrap_and_sort 'install-comments'
+}
+
+. shunit2

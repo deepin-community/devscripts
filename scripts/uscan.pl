@@ -286,7 +286,7 @@ F<debian/changelog> file.
 
 This is substituted by the legal upstream version regex (capturing).
 
-  [-_]?(\d[\-+\.:\~\da-zA-Z]*)
+  [-_]?v?(\d[\-+\.:\~\da-zA-Z]*)
 
 =item B<@ARCHIVE_EXT@>
 
@@ -1249,9 +1249,9 @@ upstream tarball from into the standard F<< <project>-<version>.tar.gz >> using
 B<filenamemangle>:
 
   version=4
-  opts="filenamemangle=s%(?:.*?)?v?(\d[\d.]*)\.tar\.gz%@PACKAGE@-$1.tar.gz%" \
+  opts="filenamemangle=s%(?:.*?)?v?@ANY_VERSION@(@ARCHIVE_EXT@)%@PACKAGE@-$1$2%" \
       https://github.com/<user>/<project>/tags \
-      (?:.*?/)?@ANY_VERSION@@ARCHIVE_EXT@
+      (?:.*?/)?v?@ANY_VERSION@@ARCHIVE_EXT@
 
 =head2 PyPI
 
@@ -1261,7 +1261,7 @@ the redirector with the watch file:
 
   version=4
   https://pypi.python.org/packages/source/<initial>/<project>/ \
-      <tar-name>-@@ANY_VERSION@@ARCHIVE_EXT@
+      <tar-name>-@ANY_VERSION@@ARCHIVE_EXT@
 
 For B<cfn-sphere>, set the watch file as:
 

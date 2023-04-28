@@ -14,10 +14,10 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME
   Generate a diff for an NMU and mail it to the BTS.
@@ -54,7 +54,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
 	cat <<EOF
 This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2006 by Steinar H. Gunderson, with modifications
@@ -245,9 +245,9 @@ if [ $# -gt 0 ]; then
 fi
 
 if [ "$NMUDIFF_MUTT" = yes ]; then
-    if command -v mutt > /dev/null 2>&1; then
+    if command -v mutt > /dev/null; then
         MUTT_PRG=mutt
-    elif command -v neomutt > /dev/null 2>&1; then
+    elif command -v neomutt > /dev/null; then
         MUTT_PRG=neomutt
     else
         echo "$PROGNAME: can't find mutt, falling back to sendmail instead" >&2
@@ -354,11 +354,11 @@ else
 	TO_ADDRESSES_SENDMAIL="$TO_ADDRESSES_SENDMAIL,
   $b@bugs.debian.org"
 	TO_ADDRESSES_MUTT="$TO_ADDRESSES_MUTT $b@bugs.debian.org"
-	if [ "`bts select bugs:$b tag:patch`" != "$b" ]; then
+	if [ "$(bts select bugs:$b tag:patch)" != "$b" ]; then
 	    TAGS="$TAGS
 Control: tags $b + patch"
     fi
-    if [ "$NMUDIFF_DELAY" != "0" ] && [ "`bts select bugs:$b tag:pending`" != "$b" ] && [ $NMUDIFF_PENDING ]; then
+    if [ "$NMUDIFF_DELAY" != "0" ] && [ "$(bts select bugs:$b tag:pending)" != "$b" ] && [ $NMUDIFF_PENDING ]; then
 	TAGS="$TAGS
 Control: tags $b + pending"
 	fi
@@ -407,7 +407,7 @@ To: $TO_ADDRESSES_SENDMAIL
 Cc:
 Bcc: $BCC_ADDRESS_SENDMAIL
 Subject: $SOURCE: diff for NMU version $VERSION
-Date: `date -R`
+Date: $(date -R)
 X-NMUDIFF-Version: ###VERSION###
 
 $TAGS

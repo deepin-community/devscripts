@@ -33,9 +33,9 @@
 # c531310b18773d943249cfaa8b539a9b6e14b8f4  rcs_5.7-23_amd64.changes
 # $
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2008 by Romain Francoise, all rights reserved.
@@ -44,13 +44,11 @@ You are free to redistribute this code under the terms of the
 GNU General Public License, version 2 or later."
 }
 
-usage()
-{
+usage() {
     printf "Usage: %s [options] [command] [dsc or changes file] [...]\n" $PROGNAME
 }
 
-endswith()
-{
+endswith() {
     case $1 in
 	*$2) return 0 ;;
 	*) return 1;;
@@ -62,8 +60,7 @@ endswith()
 # that look like they might be part of the file list.
 RE="^ [0-9a-f]{32} [0-9]+ ((([a-zA-Z0-9_.-]+/)?[a-zA-Z0-9_.-]+|-) ([a-zA-Z]+|-) )?(.*)$"
 
-maybe_expand()
-{
+maybe_expand() {
     local dir
     local sedre
     if [ -e "$1" ] && (endswith "$1" .changes || endswith "$1" .dsc || endswith "$1" .buildinfo); then

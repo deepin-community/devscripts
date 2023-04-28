@@ -33,6 +33,8 @@
 # If not only six but eight arguments are given, then the second mirror URL
 # (7.) will be added to the apt sources and the single package (8.) will be
 # upgraded to its version from (7.).
+#
+# shellcheck disable=SC2016
 
 set -exu
 
@@ -48,10 +50,26 @@ architecture=$4
 suite=$5
 components=$6
 
+# The following hacks are needed to go back as far as 2006-08-10:
+#
+#  - Acquire::Check-Valid-Until "false" allows Release files with an expired
+#    Valid-Until dates
+#  - Apt::Key::gpgvcommand allows expired GPG keys
+#  - Apt::Hashes::SHA1::Weak "yes" allows GPG keys with weak SHA1 signature
+#  - /usr/share/keyrings lets apt use debian-archive-removed-keys.gpg
+#  - /usr/share/mmdebstrap/hooks/jessie-or-older performs some setup that is
+#    only required for Debian Jessie or older
+#
 if [ $# -eq 6 ]; then
 	mmdebstrap \
 		--verbose \
 		--aptopt='Acquire::Check-Valid-Until "false"' \
+		--aptopt='Apt::Key::gpgvcommand "/usr/libexec/mmdebstrap/gpgvnoexpkeysig"' \
+		--aptopt='Apt::Hashes::SHA1::Weak "yes"' \
+		--keyring=/usr/share/keyrings \
+		--hook-dir=/usr/share/mmdebstrap/hooks/maybe-jessie-or-older \
+		--hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
+		--skip=check/signed-by \
 		--variant=apt \
 		--components="$components" \
 		--include="$depends" \
@@ -59,7 +77,7 @@ if [ $# -eq 6 ]; then
 		--customize-hook='chroot "$1" sh -c "dpkg-query -W > /pkglist"' \
 		--customize-hook='download /pkglist ./debbisect.'"$DEBIAN_BISECT_TIMESTAMP"'.pkglist' \
 		--customize-hook='rm "$1"/pkglist' \
-		--customize-hook='chroot "$1" dpkg -l' \
+		--customize-hook='chroot "$1" dpkg-query --list --no-pager' \
 		--customize-hook="$script" \
 		"$suite" \
 		- \
@@ -71,6 +89,12 @@ elif [ $# -eq 8 ]; then
 	mmdebstrap \
 		--verbose \
 		--aptopt='Acquire::Check-Valid-Until "false"' \
+		--aptopt='Apt::Key::gpgvcommand "/usr/libexec/mmdebstrap/gpgvnoexpkeysig"' \
+		--aptopt='Apt::Hashes::SHA1::Weak "yes"' \
+		--keyring=/usr/share/keyrings \
+		--hook-dir=/usr/share/mmdebstrap/hooks/maybe-jessie-or-older \
+		--hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
+		--skip=check/signed-by \
 		--variant=apt \
 		--components="$components" \
 		--include="$depends" \
@@ -81,7 +105,7 @@ elif [ $# -eq 8 ]; then
 		--customize-hook='chroot "$1" sh -c "dpkg-query -W > /pkglist"' \
 		--customize-hook='download /pkglist ./debbisect.'"$DEBIAN_BISECT_TIMESTAMP.$toupgrade"'.pkglist' \
 		--customize-hook='rm "$1"/pkglist' \
-		--customize-hook='chroot "$1" dpkg -l' \
+		--customize-hook='chroot "$1" dpkg-query --list --no-pager' \
 		--customize-hook="$script" \
 		"$suite" \
 		- \

@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=invalid-name
+# pylint: enable=invalid-name
+
 import argparse
 import bz2
 import collections
@@ -34,7 +37,7 @@ try:
 except ImportError:
     print("This script requires the xdg python3 module.", file=sys.stderr)
     print(
-        "Please install the python3-xdg Debian package in order to use" "this utility.",
+        "Please install the python3-xdg Debian package in order to use this utility.",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -49,9 +52,7 @@ class ReproducibleCheck:
     NAME = os.path.basename(__file__)
     VERSION = 1
 
-    STATUS_URL = (
-        "https://tests.reproducible-builds.org/debian/reproducible-tracker.json.bz2"
-    )
+    STATUS_URL = "https://tests.reproducible-builds.org/debian/reproducible.json.bz2"
 
     CACHE = os.path.join(xdg_cache_home, NAME, os.path.basename(STATUS_URL))
     CACHE_AGE_SECONDS = 86400
@@ -116,7 +117,7 @@ class ReproducibleCheck:
 
         self.log.info(
             "These results are based on data from the Reproducible Builds "
-            "CI framework, showing only the show the theoretical (and "
+            "CI framework, showing only the theoretical (and "
             "unofficial) reproducibility of these Debian packages."
         )
 
@@ -147,13 +148,13 @@ class ReproducibleCheck:
         new_cache = f"{self.CACHE}.new"
         self.log.info("Updating cache to %s...", new_cache)
 
-        response = requests.get(self.STATUS_URL)
+        response = requests.get(self.STATUS_URL, timeout=60)
 
         os.makedirs(os.path.dirname(self.CACHE), exist_ok=True)
 
         with open(new_cache, "wb") as f:
-            for x in response.iter_content(chunk_size=2 ** 16):
-                f.write(x)
+            for content in response.iter_content(chunk_size=2**16):
+                f.write(content)
 
         os.rename(new_cache, self.CACHE)
 
@@ -171,14 +172,13 @@ class ReproducibleCheck:
         with bz2.open(self.CACHE) as f:
             all_packages = json.loads(f.read().decode("utf-8"))
 
-            for x in all_packages:
-                for y in x["architecture_details"]:
-                    if y["status"] != "reproducible":
-                        continue
+            for pkg in all_packages:
+                if pkg["status"] != "reproducible":
+                    continue
 
-                    data.add((x["package"], y["architecture"], x["version"]))
+                data.add((pkg["package"], pkg["architecture"], pkg["version"]))
 
-                    source_packages.add(x["package"])
+                source_packages.add(pkg["package"])
 
         self.log.debug("Parsed data about %d source packages", len(source_packages))
 
@@ -191,16 +191,18 @@ class ReproducibleCheck:
         """
 
         result = {}
-        for x in apt.Cache():
-            for y in x.versions:
-                if not y.is_installed:
+        for pkg in apt.Cache():
+            for pkg_ver in pkg.versions:
+                if not pkg_ver.is_installed:
                     continue
 
                 # We may have installed a binNMU version locally so we need to
                 # strip these off when looking up against the JSON of results.
-                version = re.sub(r"\+b\d+$", "", y.version)
+                version = re.sub(r"\+b\d+$", "", pkg_ver.version)
 
-                result[(x.shortname, y.architecture, version)] = y.source_name
+                result[
+                    (pkg.shortname, pkg_ver.architecture, version)
+                ] = pkg_ver.source_name
 
         self.log.debug("Parsed %d installed binary packages", len(result))
 
@@ -212,9 +214,7 @@ class ReproducibleCheck:
         default_architecture = apt.apt_pkg.config.find("APT::Architecture")
         self.log.debug("Using %s as our 'Architecture: all' lookup")
 
-        for x, source in sorted(installed.items()):
-            binary, architecture, version = x
-
+        for (binary, architecture, version), source in sorted(installed.items()):
             if architecture == "all":
                 architecture = default_architecture
 
@@ -228,7 +228,7 @@ class ReproducibleCheck:
 
         num_unreproducible = 0
         for binary, source, version in self.iter_installed_unreproducible(
-                installed, reproducible
+            installed, reproducible
         ):
             by_source[(source, version)].add(binary)
             num_unreproducible += 1
@@ -239,7 +239,7 @@ class ReproducibleCheck:
             pkgs = ""
             if binaries != {source}:
                 src = "src:"
-                pkgs = " ({})".format(", ".join(binaries))
+                pkgs = f" ({', '.join(binaries)})"
 
             print(
                 f"{src}{source} ({version}){pkgs} is not reproducible "

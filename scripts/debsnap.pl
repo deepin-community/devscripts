@@ -21,7 +21,7 @@ use warnings;
 
 use Getopt::Long qw(:config bundling permute no_getopt_compat);
 use File::Basename;
-use Cwd qw/cwd abs_path/;
+use Cwd        qw/cwd abs_path/;
 use File::Path qw/make_path/;
 use Dpkg::Version;
 use JSON::PP;
@@ -85,7 +85,7 @@ The following options are supported:
                                         Default is ./source-<package name>
     -f, --force                         Force overwriting an existing
                                         destdir
-    --list                              Don't download but just list versions
+    -l, --list                          Don't download but just list versions
     --binary                            Download binary packages instead of
                                         source packages
     -a <architecture>,
@@ -215,7 +215,7 @@ Getopt::Long::Configure('no_ignore_case');
 GetOptions(
     \%opt,    'verbose|v', 'destdir|d=s', 'force|f',
     'help|h', 'version',   'first=s',     'last=s',
-    'list',   'binary',    'architecture|a=s@'
+    'list|l', 'binary',    'architecture|a=s@'
 ) || usage(1);
 
 usage(0)  if $opt{help};

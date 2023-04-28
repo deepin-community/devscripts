@@ -15,6 +15,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+# pylint: disable=invalid-name
+# pylint: enable=invalid-name
+
 import argparse
 import glob
 import operator
@@ -22,7 +25,18 @@ import os
 import re
 import sys
 
-from devscripts.control import Control
+from devscripts.control import (
+    HAS_FULL_RTS_FORMATTING,
+    HAS_RTS_PARSER,
+    Control,
+    wrap_and_sort_formatter,
+)
+
+try:
+    from debian._deb822_repro import LIST_COMMA_SEPARATED_INTERPRETATION
+except ImportError:
+    LIST_COMMA_SEPARATED_INTERPRETATION = object()
+
 
 CONTROL_LIST_FIELDS = (
     "Breaks",
@@ -79,8 +93,20 @@ def erase_and_write(file_ob, data):
 
 class WrapAndSortControl(Control):
     def __init__(self, filename, args):
-        super().__init__(filename)
+        # The Control module supports the RTS parser with python-debian 0.1.43.
+        # However, the `wrap_and_sort_formatter` requires 0.1.44.  The command line
+        # option check handles the compatibility check for now.
+        super().__init__(filename, use_rts_parser=args.rts_parser)
         self.args = args
+        self._formatter = None
+        if args.rts_parser and HAS_FULL_RTS_FORMATTING:
+            max_line_length = args.max_line_length
+            self._formatter = wrap_and_sort_formatter(
+                1 if args.short_indent else "FIELD_NAME_LENGTH",
+                trailing_separator=args.trailing_comma,
+                immediate_empty_line=args.short_indent,
+                max_line_length_one_liner=0 if args.wrap_always else max_line_length,
+            )
 
     def wrap_and_sort(self):
         for paragraph in self.paragraphs:
@@ -96,28 +122,51 @@ class WrapAndSortControl(Control):
                 paragraph["Architecture"] = " ".join(archs)
 
         if self.args.sort_binary_packages:
-            if self.filename.endswith('tests/control'):
+            if self.filename.endswith("tests/control"):
                 return
-            first = self.paragraphs[:1 + int(self.args.keep_first)]
-            sortable = self.paragraphs[1 + int(self.args.keep_first):]
+            first = self.paragraphs[: 1 + int(self.args.keep_first)]
+            sortable = self.paragraphs[1 + int(self.args.keep_first) :]
             sort_key = operator.itemgetter("Package")
             self.paragraphs = first + sorted(sortable, key=sort_key)
 
     def _wrap_field(self, control, entry, sort):
+        if self.is_roundtrip_safe:
+            self._wrap_field_rts(control, entry, sort)
+        else:
+            self._wrap_field_deb822(control, entry, sort)
+
+    def _wrap_field_rts(self, control, entry, sort):
+        view = control.as_interpreted_dict_view(LIST_COMMA_SEPARATED_INTERPRETATION)
+        with view[entry] as field_content:
+            seen = set()
+            for package_ref in field_content.iter_value_references():
+                value = package_ref.value
+                new_value = " | ".join(x.strip() for x in value.split("|"))
+                if not sort or new_value not in seen:
+                    package_ref.value = new_value
+                    seen.add(new_value)
+                else:
+                    package_ref.remove()
+            if sort:
+                field_content.sort(key=_sort_packages_key)
+            if self._formatter:
+                field_content.value_formatter(self._formatter)
+            field_content.reformat_when_finished()
+
+    def _wrap_field_deb822(self, control, entry, sort):
         # An empty element is not explicitly disallowed by Policy but known to
         # break QA tools, so remove any
         packages = [x.strip() for x in control[entry].split(",") if x.strip()]
 
         # Sanitize alternative packages. E.g. "a|b  |c" -> "a | b | c"
-        packages = [" | ".join([x.strip() for x in p.split("|")])
-                    for p in packages]
+        packages = [" | ".join(x.strip() for x in p.split("|")) for p in packages]
 
         if sort:
             # Remove duplicate entries
             packages = set(packages)
             packages = sort_list(packages)
 
-        length = len(entry) + sum([2 + len(package) for package in packages])
+        length = len(entry) + sum(2 + len(package) for package in packages)
         if self.args.wrap_always or length > self.args.max_line_length:
             indentation = " "
             if not self.args.short_indent:
@@ -125,21 +174,42 @@ class WrapAndSortControl(Control):
             packages_with_indention = [indentation + x for x in packages]
             packages_with_indention = ",\n".join(packages_with_indention)
             if self.args.trailing_comma:
-                packages_with_indention += ','
+                packages_with_indention += ","
             if self.args.short_indent:
                 control[entry] = "\n" + packages_with_indention
             else:
                 control[entry] = packages_with_indention.strip()
         else:
-            control[entry] = ", ".join(packages)
+            new_value = ", ".join(packages)
+            if self.args.trailing_comma:
+                new_value += ","
+            control[entry] = new_value
 
     def check_changed(self):
         """Checks if the content has changed in the control file"""
-        content = "\n".join([x.dump() for x in self.paragraphs])
+        content = self.dump()
         with open(self.filename, "r", encoding="utf8") as control_file:
             if content != control_file.read():
                 return True
         return False
+
+
+class InstallContent:
+    __slots__ = ("content", "comments")
+
+    def __init__(self, content, comments=None):
+        self.content = content
+        self.comments = comments
+
+    def __str__(self):
+        comments = "\n".join(self.comments) + "\n" if self.comments else ""
+        return comments + self.content
+
+    def __eq__(self, other):
+        return self.content == other.content
+
+    def __lt__(self, other):
+        return self.content < other.content
 
 
 class Install:
@@ -147,17 +217,43 @@ class Install:
         self.content = None
         self.filename = None
         self.args = args
+        self.leading_comments = None
+        self.trailing_comments = None
         self.open(filename)
 
     def open(self, filename):
-        assert os.path.isfile(filename), "%s does not exist." % (filename)
+        assert os.path.isfile(filename), f"{filename} does not exist."
         self.filename = filename
+        comments = []
+        content = []
         with open(filename, encoding="utf8") as f:
-            lines = f.readlines()
-        self.content = [line.strip() for line in lines if line.strip()]
+            # When reading a debhelper file, we want to preserve blocks of comments.
+            #
+            # For the purpose of wrap-and-sort, we generally associate comments with
+            # a line of (non-whitespace) content. Though as special cases, we also
+            # preserve a file starting with a comment (with an empty line before the
+            # first content to distinguish it from a comment to that comment line) as
+            # well as trailing comments (i.e. comments before EOF).
+            for line in f:
+                line = line.strip()
+                if not line:
+                    if comments and not content:
+                        self.leading_comments = InstallContent("", comments=comments)
+                        comments = []
+                    continue
+                if line[0] == "#":
+                    comments.append(line)
+                    continue
+                if comments:
+                    content.append(InstallContent(line, comments=comments))
+                    comments = []
+                else:
+                    content.append(InstallContent(line, comments=None))
+        self.trailing_comments = comments
+        self.content = content
 
     def save(self):
-        to_write = "\n".join(self.content) + "\n"
+        to_write = self._serialize_content()
 
         with open(self.filename, "r+", encoding="utf8") as install_file:
             content = install_file.read()
@@ -167,23 +263,29 @@ class Install:
                 return True
         return False
 
+    def _serialize_content(self):
+        elements = []
+        if self.leading_comments:
+            elements.append(str(self.leading_comments))
+        elements.extend(str(x) for x in self.content)
+        if self.trailing_comments:
+            # Add a space between the last content and the trailing comments
+            # for readability
+            elements.append("\n" + "\n".join(self.trailing_comments))
+        return "\n".join(elements) + "\n"
+
     def sort(self):
         self.content = sorted(self.content)
 
 
 def remove_trailing_whitespaces(filename, args):
-    assert os.path.isfile(filename), "%s does not exist." % (filename)
+    assert os.path.isfile(filename), f"{filename} does not exist."
     with open(filename, "br+") as file_object:
         content = file_object.read()
         if not content:
             return True
         new_content = content.strip() + b"\n"
-        new_content = b"\n".join(
-            [
-                line.rstrip()
-                for line in new_content.split(b'\n')
-            ],
-        )
+        new_content = b"\n".join([line.rstrip() for line in new_content.split(b"\n")])
         if new_content != content:
             if not args.dry_run:
                 erase_and_write(file_object, new_content)
@@ -192,9 +294,13 @@ def remove_trailing_whitespaces(filename, args):
 
 
 def sort_list(unsorted_list):
-    packages = [x for x in unsorted_list if re.match("[a-z0-9]", x)]
-    special = [x for x in unsorted_list if not re.match("[a-z0-9]", x)]
-    return sorted(packages) + sorted(special)
+    return sorted(unsorted_list, key=_sort_packages_key)
+
+
+def _sort_packages_key(package):
+    # Sort dependencies starting with a "real" package name before ones starting
+    # with a substvar
+    return 0 if re.match("[a-z0-9]", package) else 1, package
 
 
 def wrap_and_sort(args):
@@ -205,15 +311,14 @@ def wrap_and_sort(args):
             print(control_file)
         control = WrapAndSortControl(control_file, args)
         if args.cleanup:
-            control.strip_trailing_spaces()
+            control.strip_trailing_whitespace_on_save = True
         control.wrap_and_sort()
         if control.check_changed():
             if not args.dry_run:
                 control.save()
             modified_files.append(control_file)
 
-    copyright_files = [f for f in args.files
-                       if re.search("/copyright[^/]*$", f)]
+    copyright_files = [f for f in args.files if re.search("/copyright[^/]*$", f)]
     for copyright_file in copyright_files:
         if args.verbose:
             print(copyright_file)
@@ -238,64 +343,137 @@ def get_files(debian_directory):
     files = []
     for supported_files in SUPPORTED_FILES:
         file_pattern = os.path.join(debian_directory, supported_files)
-        files.extend(file_name for file_name in glob.glob(file_pattern)
-                     if not os.access(file_name, os.X_OK))
+        files.extend(
+            file_name
+            for file_name in glob.glob(file_pattern)
+            if not os.access(file_name, os.X_OK)
+        )
     return files
 
 
 def main():
     script_name = os.path.basename(sys.argv[0])
-    epilog = "See %s(1) for more info." % (script_name)
+    epilog = f"See {script_name}(1) for more info."
     parser = argparse.ArgumentParser(epilog=epilog)
 
     # Remember to keep doc/wrap-and-sort.1 updated!
-    parser.add_argument("-a", "--wrap-always", action="store_true", default=False,
-                        help="wrap lists even if they do not exceed the line length limit")
-    parser.add_argument("-s", "--short-indent", dest="short_indent",
-                        help="only indent wrapped lines by one space (default is "
-                             "in-line with the field name)",
-                        action="store_true", default=False)
-    parser.add_argument("-b", "--sort-binary-packages",
-                        help="Sort binary package paragraphs by name",
-                        dest="sort_binary_packages", action="store_true",
-                        default=False)
-    parser.add_argument("-k", "--keep-first",
-                        help="When sorting binary package paragraphs, leave the "
-                             "first one at the top. Unqualified debhelper "
-                             "configuration files are applied to the first "
-                             "package.",
-                        dest="keep_first", action="store_true", default=False)
-    parser.add_argument("-n", "--no-cleanup", help="do not remove trailing whitespaces",
-                        dest="cleanup", action="store_false", default=True)
-    parser.add_argument("-t", "--trailing-comma", help="add trailing comma",
-                        dest="trailing_comma", action="store_true",
-                        default=False)
-    parser.add_argument("-d", "--debian-directory", dest="debian_directory",
-                        help="location of the 'debian' directory (default: ./debian)",
-                        metavar="PATH", default="debian")
-    parser.add_argument("-f", "--file", metavar="FILE",
-                        dest="files", action="append", default=[],
-                        help="Wrap and sort only the specified file.")
-    parser.add_argument("-v", "--verbose",
-                        help="print all files that are touched",
-                        dest="verbose", action="store_true", default=False)
-    parser.add_argument("--max-line-length", type=int, default=79,
-                        help="set maximum allowed line length before wrapping "
-                             "(default: %(default)i)")
-    parser.add_argument("-N", "--dry-run", dest="dry_run", action="store_true",
-                        default=False,
-                        help="do not modify any file, instead only "
-                             "print the files that would be modified")
+    parser.add_argument(
+        "-a",
+        "--wrap-always",
+        action="store_true",
+        default=False,
+        help="wrap lists even if they do not exceed the line length limit",
+    )
+    parser.add_argument(
+        "-s",
+        "--short-indent",
+        dest="short_indent",
+        help="only indent wrapped lines by one space"
+        " (default is in-line with the field name)",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-b",
+        "--sort-binary-packages",
+        help="Sort binary package paragraphs by name",
+        dest="sort_binary_packages",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-k",
+        "--keep-first",
+        help="When sorting binary package paragraphs, leave the first one at the top."
+        " Unqualified debhelper configuration files are applied to the first package.",
+        dest="keep_first",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-n",
+        "--no-cleanup",
+        help="do not remove trailing whitespaces",
+        dest="cleanup",
+        action="store_false",
+        default=True,
+    )
+    parser.add_argument(
+        "-t",
+        "--trailing-comma",
+        help="add trailing comma",
+        dest="trailing_comma",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "-d",
+        "--debian-directory",
+        dest="debian_directory",
+        help="location of the 'debian' directory (default: ./debian)",
+        metavar="PATH",
+        default="debian",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        metavar="FILE",
+        dest="files",
+        action="append",
+        default=[],
+        help="Wrap and sort only the specified file.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="print all files that are touched",
+        dest="verbose",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--max-line-length",
+        type=int,
+        default=79,
+        help="set maximum allowed line length before wrapping (default: %(default)i)",
+    )
+    parser.add_argument(
+        "-N",
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        default=False,
+        help="do not modify any file, instead only print the files"
+        " that would be modified",
+    )
+    parser.add_argument(
+        "--experimental-rts-parser",
+        dest="rts_parser",
+        action="store_true",
+        default=False,
+        help="Use the round-safe parser, which can preserve most comments. The option"
+        " is here to opt-in to using while the feature matures. Some options are not"
+        " available with this feature. Note this option will eventually be removed."
+        " Please do not include it in scripts / functionality that requires backwards"
+        " compatibility",
+    )
 
     args = parser.parse_args()
+    use_rts_parser = HAS_RTS_PARSER
+    if use_rts_parser and not HAS_FULL_RTS_FORMATTING:
+        # Cases where we might have some but not full support.
+        if args.short_indent or not args.wrap_always or not args.trailing_comma:
+            use_rts_parser = False
+    setattr(args, "rts_parser", use_rts_parser)
 
     if not os.path.isdir(args.debian_directory):
-        parser.error('Debian directory not found, expecting "%s".' %
-                     args.debian_directory)
+        parser.error(
+            f'Debian directory not found, expecting "{args.debian_directory}".'
+        )
 
     not_found = [f for f in args.files if not os.path.isfile(f)]
     if not_found:
-        parser.error('Specified files not found: %s' % ", ".join(not_found))
+        parser.error(f"Specified files not found: {', '.join(not_found)}")
 
     if not args.files:
         args.files = get_files(args.debian_directory)

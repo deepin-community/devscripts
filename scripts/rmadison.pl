@@ -51,11 +51,14 @@ EOT
 }
 
 my %url_map = (
-    'debian' => "https://api.ftp-master.debian.org/madison",
-    'new'    => "https://api.ftp-master.debian.org/madison?s=new",
-    'qa'     => "https://qa.debian.org/madison.php",
-    'ubuntu' => "https://people.canonical.com/~ubuntu-archive/madison.cgi",
-    'udd'    => 'https://qa.debian.org/cgi-bin/madison.cgi',
+    'debian'  => "https://api.ftp-master.debian.org/madison",
+    'new'     => "https://api.ftp-master.debian.org/madison?s=new",
+    'qa'      => "https://qa.debian.org/madison.php",
+    'ubuntu'  => "https://people.canonical.com/~ubuntu-archive/madison.cgi",
+    'udd'     => 'https://qa.debian.org/cgi-bin/madison.cgi',
+    'archive' => 'https://qa.debian.org/cgi-bin/madison.cgi?table=archived',
+    'ports'   => 'https://qa.debian.org/cgi-bin/madison.cgi?table=ports',
+    'janitor' => 'https://janitor.debian.net/api/madison',
 );
 my $default_url = 'debian';
 if (system('dpkg-vendor', '--is', 'ubuntu') == 0) {
@@ -89,7 +92,7 @@ Display information about PACKAGE(s).
   --noconf, --no-conf        don\'t read devscripts configuration files
 
 ARCH, COMPONENT and SUITE can be comma (or space) separated lists, e.g.
-    --architecture=m68k,i386
+    --architecture=amd64,i386
 
 Aliases for URLs:
 EOT
@@ -330,6 +333,8 @@ use I<URL> for the query. Supported shorthands are
  B<qa> https://qa.debian.org/madison.php
  B<ubuntu> https://people.canonical.com/~ubuntu-archive/madison.cgi
  B<udd> https://qa.debian.org/cgi-bin/madison.cgi
+ B<archive> https://qa.debian.org/cgi-bin/madison.cgi?table=archived
+ B<ports> https://qa.debian.org/cgi-bin/madison.cgi?table=ports
 
 See the B<RMADISON_URL_MAP_> variable below for a method to add
 new shorthands.
@@ -345,7 +350,7 @@ don't read the devscripts configuration files
 =back
 
 ARCH, COMPONENT and SUITE can be comma (or space) separated lists, e.g.
---architecture=m68k,i386
+--architecture=amd64,i386
 
 =head1 CONFIGURATION VARIABLES
 

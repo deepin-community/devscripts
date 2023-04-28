@@ -36,6 +36,8 @@
 # If not only six but eight arguments are given, then the second mirror URL
 # (9.) will be added to the apt sources and the single package (10.) will be
 # upgraded to its version from (9.).
+#
+# shellcheck disable=SC2016
 
 set -exu
 
@@ -160,8 +162,24 @@ chroot "\$rootfs" chown 0:0 /root/.ssh/authorized_keys
 SCRIPT
 chmod +x "$TMPDIR/customize.sh"
 
-mmdebstrap --architecture=$architecture --verbose --variant=apt --components="$components" \
+# The following hacks are needed to go back as far as 2006-08-10:
+#
+#  - Acquire::Check-Valid-Until "false" allows Release files with an expired
+#    Valid-Until dates
+#  - Apt::Key::gpgvcommand allows expired GPG keys
+#  - Apt::Hashes::SHA1::Weak "yes" allows GPG keys with weak SHA1 signature
+#  - /usr/share/keyrings lets apt use debian-archive-removed-keys.gpg
+#  - /usr/share/mmdebstrap/hooks/jessie-or-older performs some setup that is
+#    only required for Debian Jessie or older
+#
+mmdebstrap --architecture="$architecture" --verbose --variant=apt --components="$components" \
 	--aptopt='Acquire::Check-Valid-Until "false"' \
+	--aptopt='Apt::Key::gpgvcommand "/usr/libexec/mmdebstrap/gpgvnoexpkeysig"' \
+	--aptopt='Apt::Hashes::SHA1::Weak "yes"' \
+	--keyring=/usr/share/keyrings \
+	--hook-dir=/usr/share/mmdebstrap/hooks/maybe-jessie-or-older \
+	--hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
+	--skip=check/signed-by \
 	--include='openssh-server,systemd-sysv,ifupdown,netbase,isc-dhcp-client,udev,policykit-1,linux-image-'"$linuxarch" \
 	--customize-hook="$TMPDIR/customize.sh" \
 	"$suite" debian-rootfs.tar "$mirror1"
@@ -177,7 +195,7 @@ mmdebstrap --architecture=$architecture --verbose --variant=apt --components="$c
 #   LIBGUESTFS_BACKEND_SETTINGS=force_tcg
 #   libguestfs-test-tool || true
 #   export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
-guestfish -N "debian-rootfs.img"=disk:$disksize -- \
+guestfish -N "debian-rootfs.img=disk:$disksize" -- \
 	part-disk /dev/sda mbr : \
 	mkfs ext4 /dev/sda1 : \
 	mount /dev/sda1 / : \
@@ -209,7 +227,7 @@ timeout --kill-after=60s 60m \
 	-M accel=kvm:tcg \
 	-no-user-config \
 	-object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
-	-m $memsize \
+	-m "$memsize" \
 	-net nic,model=virtio \
 	-nographic \
 	-serial mon:stdio \
@@ -226,7 +244,7 @@ showqemulog() {
 }
 
 # show the log and kill qemu in case the script exits first
-trap "showqemulog; cleantmp; kill $QEMUPID" EXIT
+trap 'showqemulog; cleantmp; kill $QEMUPID' EXIT
 
 # the default ssh command does not store known hosts and even ignores host keys
 # it identifies itself with the rsa key generated above
@@ -253,7 +271,7 @@ while true; do
 	ssh -F "$TMPDIR/config" -o ConnectTimeout=$TIMEOUT qemu echo success || rv=1
 	[ $rv -eq 0 ] && break
 	# if the command before took less than $TIMEOUT seconds, wait the remaining time
-	TIMESTAMP=$(sleepenh $TIMESTAMP $TIMEOUT || [ $? -eq 1 ]);
+	TIMESTAMP=$(sleepenh "$TIMESTAMP" "$TIMEOUT" || [ $? -eq 1 ]);
 	i=$((i+1))
 	if [ $i -ge $NUM_TRIES ]; then
 		break
@@ -278,8 +296,11 @@ SCRIPT
 
 # we install dependencies now and not with mmdebstrap --include in case some
 # dependencies require a full system present
-ssh -F "$TMPDIR/config" qemu apt-get update
-ssh -F "$TMPDIR/config" qemu env DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get --yes install --no-install-recommends $(echo $depends | tr ',' ' ')
+if [ -n "$depends" ]; then
+	ssh -F "$TMPDIR/config" qemu apt-get update
+	# shellcheck disable=SC2046,SC2086
+	ssh -F "$TMPDIR/config" qemu env DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get --yes install --no-install-recommends $(echo $depends | tr ',' ' ')
+fi
 
 # in its ten-argument form, a single package has to be upgraded to its
 # version from the first bad timestamp
@@ -302,20 +323,20 @@ else
 	ssh -F "$TMPDIR/config" qemu dpkg-query -W > "./debbisect.$DEBIAN_BISECT_TIMESTAMP.pkglist"
 fi
 
-ssh -F "$TMPDIR/config" qemu dpkg -l
+ssh -F "$TMPDIR/config" qemu dpkg-query --list -no-pager
 
 # explicitly export all necessary variables
 # because we use set -u this also makes sure that this script has these
 # variables set in the first place
-export DEBIAN_BISECT_EPOCH=$DEBIAN_BISECT_EPOCH
-export DEBIAN_BISECT_TIMESTAMP=$DEBIAN_BISECT_TIMESTAMP
+export DEBIAN_BISECT_EPOCH="$DEBIAN_BISECT_EPOCH"
+export DEBIAN_BISECT_TIMESTAMP="$DEBIAN_BISECT_TIMESTAMP"
 if [ -z ${DEBIAN_BISECT_MIRROR+x} ]; then
 	# DEBIAN_BISECT_MIRROR was unset (caching is disabled)
 	true
 else
 	# replace the localhost IP by the IP of the host as seen by qemu
 	DEBIAN_BISECT_MIRROR=$(echo "$DEBIAN_BISECT_MIRROR" | sed 's/http:\/\/127.0.0.1:/http:\/\/10.0.2.2:/')
-	export DEBIAN_BISECT_MIRROR=$DEBIAN_BISECT_MIRROR
+	export DEBIAN_BISECT_MIRROR="$DEBIAN_BISECT_MIRROR"
 fi
 
 

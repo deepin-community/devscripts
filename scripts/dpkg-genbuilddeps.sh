@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 
 if [ $# -gt 0 ]; then
     case $1 in
@@ -29,7 +29,7 @@ if ! [ -x debian/rules ]; then
     exit 1
 fi
 
-if ! dpkg -L build-essential >/dev/null 2>&1
+if ! dpkg -L build-essential > /dev/null 2>&1
 then
     echo "You must have the build-essential package installed to use $PROGNAME" >&2
     echo "You can try running the dpkg-depcheck program directly as:" >&2

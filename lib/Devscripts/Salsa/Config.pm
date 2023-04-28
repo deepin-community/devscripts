@@ -10,13 +10,18 @@ extends 'Devscripts::Config';
 # Declare accessors for each option
 foreach (qw(
     all api_url cache_file command desc desc_pattern dest_branch rename_head
-    disable_irker disable_issues disable_kgb disable_mr disable_tagpending
-    enable_issues enable_mr irc_channel git_server_url irker irker_server_url
+    disable_irker disable_kgb disable_tagpending irc_channel irker wiki
+    snippets pages releases auto_devops request_acc issues mr repo forks
+    lfs packages jobs container analytics requirements irker_server_url
     irker_host irker_port kgb kgb_server_url kgb_options mr_allow_squash
     mr_desc mr_dst_branch mr_dst_project mr_remove_source_branch mr_src_branch
     mr_src_project mr_title no_fail path private_token skip source_branch
     group group_id user user_id tagpending tagpending_server_url email
-    email_recipient disable_email ci_config_path archived
+    email_recipient disable_email ci_config_path archived build_timeout
+    enable_remove_branch disable_remove_branch all_archived git_server_url
+    schedule_desc schedule_ref schedule_cron schedule_tz
+    schedule_enable schedule_disable schedule_run schedule_delete
+    avatar_path request_access
     )
 ) {
     has $_ => (is => 'rw');
@@ -99,6 +104,7 @@ use constant keys => [
 
     # Update/create repo options
     ['all'],
+    ['all-archived'],
     ['skip=s', 'SALSA_SKIP', undef, sub { [] }],
     [
         'skip-file=s',
@@ -112,26 +118,103 @@ use constant keys => [
         }
     ],
     ['no-skip', undef, sub { $_[0]->skip([]); $_[0]->skip_file(undef); }],
+    ['build-timeout=s',  'SALSA_BUILD_TIMEOUT',  qr/^\d+$/, '3600'],
     ['ci-config-path=s', 'SALSA_CI_CONFIG_PATH', qr/\./],
     ['desc!',            'SALSA_DESC',           'bool'],
     ['desc-pattern=s',   'SALSA_DESC_PATTERN',   qr/\w/, 'Debian package %p'],
     [
-        'enable-issues!',
+        'enable-remove-source-branch!',
         undef,
         sub {
-            !$_[1] or $_[0]->enable('yes', 'enable_issues', 'disable_issues');
+            !$_[1]
+              or $_[0]
+              ->enable('yes', 'enable_remove_branch', 'disable_remove_branch');
         }
     ],
     [
-        'disable-issues!',
+        'disable-remove-source-branch!',
         undef,
         sub {
-            !$_[1] or $_[0]->enable('no', 'enable_issues', 'disable_issues');
+            !$_[1]
+              or $_[0]
+              ->enable('no', 'enable_remove_branch', 'disable_remove_branch');
         }
     ],
     [
-        undef, 'SALSA_ENABLE_ISSUES',
-        sub { $_[0]->enable($_[1], 'enable_issues', 'disable_issues'); }
+        undef,
+        'SALSA_REMOVE_SOURCE_BRANCH',
+        sub {
+            $_[0]
+              ->enable($_[1], 'enable_remove_branch', 'disable_remove_branch');
+        }
+    ],
+    [
+        'issues=s', 'SALSA_ENABLE_ISSUES',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'repo=s', 'SALSA_ENABLE_REPO',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'mr=s', 'SALSA_ENABLE_MR',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'forks=s', 'SALSA_ENABLE_FORKS',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'lfs=s', 'SALSA_ENABLE_LFS',
+        qr/y(es)?|true|enabled?|no?|false|disabled?/
+    ],
+    [
+        'packages=s',
+        'SALSA_ENABLE_PACKAGES',
+        qr/y(es)?|true|enabled?|no?|false|disabled?/
+    ],
+    [
+        'jobs=s', 'SALSA_ENABLE_JOBS',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'container=s', 'SALSA_ENABLE_CONTAINER',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'analytics=s', 'SALSA_ENABLE_ANALYTICS',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'requirements=s',
+        'SALSA_ENABLE_REQUIREMENTS',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'wiki=s', 'SALSA_ENABLE_WIKI',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'snippets=s', 'SALSA_ENABLE_SNIPPETS',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'pages=s', 'SALSA_ENABLE_PAGES',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'releases=s', 'SALSA_ENABLE_RELEASES',
+        qr/y(es)?|true|enabled?|private|no?|false|disabled?/
+    ],
+    [
+        'auto-devops=s',
+        'SALSA_ENABLE_AUTO_DEVOPS',
+        qr/y(es)?|true|enabled?|no?|false|disabled?/
+    ],
+    [
+        'request-acc=s',
+        'SALSA_ENABLE_REQUEST_ACC',
+        qr/y(es)?|true|enabled?|no?|false|disabled?/
     ],
     [
         'email!', undef,
@@ -146,19 +229,7 @@ use constant keys => [
         sub { $_[0]->enable($_[1], 'email', 'disable_email'); }
     ],
     ['email-recipient=s', 'SALSA_EMAIL_RECIPIENTS', undef, sub { [] },],
-    [
-        'enable-mr!', undef,
-        sub { !$_[1] or $_[0]->enable('yes', 'enable_mr', 'disable_mr'); }
-    ],
-    [
-        'disable-mr!', undef,
-        sub { !$_[1] or $_[0]->enable('no', 'enable_mr', 'disable_mr'); }
-    ],
-    [
-        undef, 'SALSA_ENABLE_MR',
-        sub { $_[0]->enable($_[1], 'enable_mr', 'disable_mr'); }
-    ],
-    ['irc-channel|irc=s', 'SALSA_IRC_CHANNEL', undef, sub { [] }],
+    ['irc-channel|irc=s', 'SALSA_IRC_CHANNEL',      undef, sub { [] }],
     [
         'irker!', undef,
         sub { !$_[1] or $_[0]->enable('yes', 'irker', 'disable_irker'); }
@@ -193,6 +264,7 @@ use constant keys => [
 
     ['no-fail',         'SALSA_NO_FAIL',       'bool'],
     ['rename-head!',    'SALSA_RENAME_HEAD',   'bool'],
+    ['avatar-path=s',   'SALSA_AVATAR_PATH',   undef],
     ['source-branch=s', 'SALSA_SOURCE_BRANCH', undef, 'master'],
     ['dest-branch=s',   'SALSA_DEST_BRANCH',   undef, 'debian/master'],
     [
@@ -214,6 +286,16 @@ use constant keys => [
         undef, 'SALSA_TAGPENDING',
         sub { $_[0]->enable($_[1], 'tagpending', 'disable_tagpending'); }
     ],
+
+    # Pipeline schedules options
+    ['schedule-desc=s',   'SALSA_SCHEDULE_DESC', qr/\w/],
+    ['schedule-ref=s',    'SALSA_SCHEDULE_REF'],
+    ['schedule-cron=s',   'SALSA_SCHEDULE_CRON'],
+    ['schedule-tz=s',     'SALSA_SCHEDULE_TZ'],
+    ['schedule-enable!',  'SALSA_SCHEDULE_ENABLE',  'bool'],
+    ['schedule-disable!', 'SALSA_SCHEDULE_DISABLE', 'bool'],
+    ['schedule-run!',     'SALSA_SCHEDULE_RUN',     'bool'],
+    ['schedule-delete!',  'SALSA_SCHEDULE_DELETE',  'bool'],
 
     # Merge requests options
     ['mr-allow-squash!', 'SALSA_MR_ALLOW_SQUASH', 'bool', 1],
@@ -247,6 +329,12 @@ use constant keys => [
         'SALSA_TAGPENDING_SERVER_URL',
         qr'^https?://',
         'https://webhook.salsa.debian.org/tagpending/'
+    ],
+
+    [
+        'request-access=s',
+        'SALSA_REQUEST_ACCESS',
+        qr/y(es)?|true|enabled?|1|no?|false|disabled?|0/
     ],
 
     # List/search options
@@ -333,11 +421,11 @@ sub usage {
 usage: salsa <command> <parameters> <options>
 
 Most used commands:
-  - whoami      : gives information on the token owner
   - checkout, co: clone repo in current dir
   - fork        : fork a project
   - mr          : create a merge request
   - push_repo   : push local git repo to upstream repository
+  - whoami      : gives information on the token owner
 
 See salsa(1) manpage for more.
 END

@@ -52,6 +52,11 @@ Make the output more verbose.
 Assume that the source tree is already built.
 This is equivalent to B<--ignore-restriction=build-needed>.
 
+=item B<--run-autodep8>, B<--no-run-autodep8>
+
+Control whether to run autodep8(1) to determine the tests to run.
+By default, autodep8 will be run.
+
 =item B<--ignore-restriction>=I<restriction>
 
 Don't skip tests that declare the I<restriction>.

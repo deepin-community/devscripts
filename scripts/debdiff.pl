@@ -97,7 +97,7 @@ Valid options are:
    --apply-patches        If either old or new package is in 3.0 (quilt)
                           format, apply the patch series and remove .pc
                           before comparison
-   --no-unpack-tarballs   Do not do so (default)
+   --no-apply-patches     Do not do so (default)
 
 Default settings modified by devscripts configuration files:
 $modified_conf_msg
@@ -981,9 +981,9 @@ if ($show_moved and $type ne 'deb') {
         for my $funny (@funny) {
             print $$funny[0], "\n";    # filename and details
             print "From package", (@{ $$funny[1] } > 1 ? "s" : ""), ": ";
-            print join(", ", @{ $$funny[1] }), "\n";
-            print "To package", (@{ $$funny[2] } > 1 ? "s" : ""), ": ";
-            print join(", ", @{ $$funny[2] }), "\n";
+            print join(", ", @{ $$funny[1] }),                      "\n";
+            print "To package", (@{ $$funny[2] } > 1 ? "s" : ""),   ": ";
+            print join(", ", @{ $$funny[2] }),                      "\n";
         }
         $changed = 1;
     }

@@ -80,7 +80,7 @@ for Git repositories hosted on Salsa this means that
 S<I<git@salsa.debian.org:...git>> will be used instead of
 S<I<https://salsa.debian.org/...git>>.
 
-There are built-in rules for salsa.debian.org, alioth.debian.org and github.com. Other hosts
+There are built-in rules for salsa.debian.org and github.com. Other hosts
 can be configured using B<DEBCHECKOUT_AUTH_URLS>.
 
 =item B<-d>, B<--details>
@@ -458,69 +458,18 @@ sub set_auth($$$$) {
     $user_local =~ s|(.*)(@)|$1|;
     my $user_url = $url;
 
-# Adjust alioth urls from new-style anonymous access to old-style and then deal
-# with adjusting for authentication on alioth
-    $url
-      =~ s@(?:alioth\.debian\.org/(?:anonscm/bzr|scm/loggerhead/bzr)|anonscm\.debian\.org/bzr(?:/bzr)?)@bzr.debian.org/bzr@;
-    $url
-      =~ s@(?:alioth\.debian\.org/anonscm/darcs|anonscm\.debian\.org/darcs)@darcs.debian.org/darcs@;
-    $url =~ s@git://anonscm\.debian\.org@git://git.debian.org@;
-    $url
-      =~ s@(?:alioth\.debian\.org/anonscm/c?git|anonscm\.debian\.org/c?git)@git.debian.org/git@;
-    $url
-      =~ s@(?:alioth\.debian\.org/anonscm/hg|anonscm\.debian\.org/hg)@hg.debian.org/hg@;
-    $url =~ s@svn://(?:scm\.alioth|anonscm)\.debian\.org@svn://svn.debian.org@;
-
     # other providers
     $url =~ s!(?:git|https?)://github\.com/!git\@github.com:!;
 
     given ($repo_type) {
         when ("bzr") {
             $url
-              =~ s|^[\w+]+://(bzr\.debian\.org)/(.*)|bzr+ssh://$user$1/bzr/$2|;
-            $url
               =~ s[^\w+://(?:(bazaar|code)\.)?(launchpad\.net/.*)][bzr+ssh://${user}bazaar.$2];
         }
-        when ("darcs") {
-            if ($url =~ m|(~)|) {
-                $user_url =~ s|^\w+://(darcs\.debian\.org)/(~)(.*?)/.*|$3|;
-                die
-"the local user '$user_local' doesn't own the personal repository '$url'\n"
-                  if $user_local ne $user_url and !$dont_act;
-                $url
-                  =~ s|^\w+://(darcs\.debian\.org)/(~)(.*?)/(.*)|$user$1:~/public_darcs/$4|;
-            } else {
-                $url
-                  =~ s|^\w+://(darcs\.debian\.org)/(?:darcs/)?(.*)|$user$1:/darcs/$2|;
-            }
-        }
         when ("git") {
-            if ($url =~ s!^https://salsa.debian.org/!git\@salsa.debian.org:!) {
-            } elsif ($url =~ m%(/users/|~)%) {
-                $user_url
-                  =~ s|^\w+://(git\.debian\.org)/git/users/(.*?)/.*|$2|;
-                $user_url =~ s|^\w+://(git\.debian\.org)/~(.*?)/.*|$2|;
-
-                die
-"the local user '$user_local' doesn't own the personal repository '$url'\n"
-                  if $user_local ne $user_url and !$dont_act;
-                $url
-                  =~ s|^\w+://(git\.debian\.org)/git/users/.*?/(.*)|git+ssh://$user$1/~/public_git/$2|;
-                $url
-                  =~ s|^\w+://(git\.debian\.org)/~.*?/(.*)|git+ssh://$user$1/~/public_git/$2|;
-            } else {
-                $url
-                  =~ s|^\w+://(git\.debian\.org)/(?:git/)?(.*)|git+ssh://$user$1/git/$2|;
-            }
+            $url =~ s!^https://salsa.debian.org/!git\@salsa.debian.org:!;
             $url
               =~ s[^\w+://(?:(git|code)\.)?(launchpad\.net/.*)][git+ssh://${user}git.$2];
-        }
-  # "hg ssh://" needs an extra slash so paths are not based in the user's $HOME
-        when ("hg") {
-            $url =~ s|^\w+://(hg\.debian\.org/)|ssh://$user$1/|;
-        }
-        when ("svn") {
-            $url =~ s|^\w+://(svn\.debian\.org)/(.*)|svn+ssh://$user$1/svn/$2|;
         }
         default {
             die
@@ -541,13 +490,6 @@ sub set_auth($$$$) {
 sub munge_url($$) {
     my ($repo_type, $repo_url) = @_;
 
-    given ($repo_type) {
-        when ('bzr') {
-          # bzr.d.o explicitly doesn't run a smart server.  Need to use nosmart
-            $repo_url
-              =~ s|^http://(bzr\.debian\.org)/(.*)|nosmart+http://$1/$2|;
-        }
-    }
     return $repo_url;
 }
 
@@ -1244,6 +1186,13 @@ EOF
             $rc = errorcode();
             print STDERR "TopGit population failed\n" if $rc != 0;
         }
+
+        if (exists $ENV{'DEBEMAIL'} and $ENV{'DEBEMAIL'} =~ /^(.*)\s+<(.*)>$/)
+        {
+            $ENV{'DEBFULLNAME'} = $1 unless exists $ENV{'DEBFULLNAME'};
+            $ENV{'DEBEMAIL'}    = $2;
+        }
+
         system("cd $wcdir && git config user.name \"$ENV{'DEBFULLNAME'}\"")
           if (defined($ENV{'DEBFULLNAME'}));
         system("cd $wcdir && git config user.email \"$ENV{'DEBEMAIL'}\"")

@@ -26,7 +26,7 @@ class LoggerTestCase(unittest.TestCase):
         Logger.stdout = io.StringIO()
         Logger.stderr = io.StringIO()
         self._script_name = Logger.script_name
-        Logger.script_name = 'test'
+        Logger.script_name = "test"
         self._verbose = Logger.verbose
 
     def tearDown(self):
@@ -35,23 +35,23 @@ class LoggerTestCase(unittest.TestCase):
         Logger.script_name = self._script_name
         Logger.verbose = self._verbose
 
-    def testCommand(self):
+    def test_command(self):
         # pylint: disable=no-member
-        Logger.command(('ls', 'a b'))
-        self.assertEqual(Logger.stdout.getvalue(), '')
+        Logger.command(("ls", "a b"))
+        self.assertEqual(Logger.stdout.getvalue(), "")
         Logger.set_verbosity(True)
-        Logger.command(('ls', 'a b'))
+        Logger.command(("ls", "a b"))
         self.assertEqual(Logger.stdout.getvalue(), 'test: I: ls "a b"\n')
-        self.assertEqual(Logger.stderr.getvalue(), '')
+        self.assertEqual(Logger.stderr.getvalue(), "")
 
-    def testNoArgs(self):
+    def test_no_args(self):
         # pylint: disable=no-member
-        Logger.normal('hello %s')
-        self.assertEqual(Logger.stdout.getvalue(), 'test: hello %s\n')
-        self.assertEqual(Logger.stderr.getvalue(), '')
+        Logger.normal("hello %s")
+        self.assertEqual(Logger.stdout.getvalue(), "test: hello %s\n")
+        self.assertEqual(Logger.stderr.getvalue(), "")
 
-    def testArgs(self):
+    def test_args(self):
         # pylint: disable=no-member
-        Logger.normal('hello %s', 'world')
-        self.assertEqual(Logger.stdout.getvalue(), 'test: hello world\n')
-        self.assertEqual(Logger.stderr.getvalue(), '')
+        Logger.normal("hello %s", "world")
+        self.assertEqual(Logger.stdout.getvalue(), "test: hello world\n")
+        self.assertEqual(Logger.stderr.getvalue(), "")

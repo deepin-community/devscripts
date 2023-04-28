@@ -44,6 +44,7 @@ PKGNAMES := \
 GEN_MAN1S += \
 	deb-why-removed.1 \
 	debbisect.1 \
+	debootsnap.1 \
 	debrebuild.1 \
 	debrepro.1 \
 	ltnu.1 \
@@ -62,8 +63,8 @@ $(VERSION_FILE):
 %: %.sh
 
 debchange: debchange.pl $(VERSION_FILE)
-	cp $< $@
-	sed -i "s/###VERSION###/$(VERSION)/" $@
+	sed "s/###VERSION###/$(VERSION)/" $< > $@
+	chmod --reference=$< $@
 ifeq ($(DEB_VENDOR),Ubuntu)
 # On Ubuntu always default to targeting the release that it's built on,
 # not the current devel release, since its primary use on stable releases
@@ -109,6 +110,14 @@ debbisect.1: debbisect
 		--no-discard-stderr \
 		./$< >$@
 
+debootsnap.1: debootsnap
+	help2man \
+		--name="create debian chroot using snapshot.debian.org" \
+		--version-string=$(VERSION) \
+		--no-info \
+		--no-discard-stderr \
+		./$< >$@
+
 debrebuild.1: debrebuild
 	help2man \
 		--name="use a buildinfo file and snapshot.d.o to recreate binary packages" \
@@ -131,7 +140,7 @@ $(COMPLETION): $(BC_BUILD_DIR)/% : %.bash_completion $(BC_BUILD_DIR)
 	cp $< $@
 
 clean:
-	python3 setup.py clean -a
+	rm -f devscripts/__init__.py
 	find -name '*.pyc' -delete
 	find -name __pycache__ -delete
 	rm -rf devscripts.egg-info $(BC_BUILD_DIR) .pylint.d

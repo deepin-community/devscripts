@@ -3,10 +3,10 @@ set -e
 
 # Subscribe to the PTS for a specified package for a limited length of time
 
-PROGNAME=`basename $0`
+PROGNAME=${0##*/}
 MODIFIED_CONF_MSG='Default settings modified by devscripts configuration files:'
 
-usage () {
+usage() {
     echo \
 "Usage: $PROGNAME [options] package
   Subscribe to the PTS (Package Tracking System) for the specified package
@@ -35,7 +35,7 @@ usage () {
 $MODIFIED_CONF_MSG"
 }
 
-version () {
+version() {
     echo \
 "This is $PROGNAME, from the Debian devscripts package, version ###VERSION###
 This code is copyright 2006 by Julian Gilbey, all rights reserved.
@@ -133,7 +133,7 @@ if [ $# -ne 1 ]; then
 fi
 
 # Check for a "mail" command
-if ! command -v mail >/dev/null 2>&1; then
+if ! command -v mail > /dev/null; then
     echo "$PROGNAME: Could not find the \"mail\" command; you must have the" >&2
     echo "bsd-mailx or mailutils package installed to run this script." >&2
     exit 1
@@ -156,7 +156,7 @@ if [ "$ACTION" = "unsubscribe" ]; then
 else
     # Check for an "at" command
     if [ "$PTS_UNTIL" != forever -a "$PTS_UNTIL" != 0 ]; then
-	if ! command -v at >/dev/null 2>&1; then
+	if ! command -v at  > /dev/null; then
 	    echo "$PROGNAME: Could not find the \"at\" command; you must have the" >&2
 	    echo "\"at\" package installed to run this script." >&2
 	    exit 1

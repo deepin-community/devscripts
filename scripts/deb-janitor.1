@@ -18,9 +18,16 @@
 deb-janitor \- interact with the Debian Janitor service
 
 .SH SYNOPSIS
-.B deb-janitor diff SOURCE SUITE
 .TP
-.B deb-janitor schedule SOURCE SUITE
+.B deb-janitor status CAMPAIGN SOURCE?
+.TP
+.B deb-janitor diff CAMPAIGN SOURCE?
+.TP
+.B deb-janitor schedule CAMPAIGN SOURCE?
+.TP
+.B deb-janitor merge [--force] CAMPAIGN
+.TP
+.B deb-janitor review CAMPAIGN [--source SOURCE] rejected|approved|reschedule COMMENT?
 
 .SH DESCRIPTION
 .B deb-janitor
@@ -28,11 +35,12 @@ is a command-line client for the Debian Janitor service, interacting
 with the API. It currently allows retrieving the diff for
 specific packages or scheduling new runs.
 .PP
-\fBSOURCE\fR is the name of a source package.
-.PP
-\fBSUITE\fR is the name of one of the suites supported by the janitor. Common values
+\fBCAMPAIGN\fR is the name of one of the campaigns supported by the janitor. Common values
 include \fIlintian-fixes\fR and \fImultiarch-fixes\fR. See the homepage for a
 full list.
+.PP
+\fBSOURCE\fR is the name of a source package. If no source package name is specified,
+the source name is retrieved from debian/changelog in the current directory.
 
 .SH OPTIONS
 .TP
@@ -63,6 +71,17 @@ $ deb-janitor diff fontmake lintian-fixes
 +Bug-Submit: https://github.com/googlei18n/fontmake/issues/new
 +Repository: https://github.com/googlei18n/fontmake.git
 +Repository-Browse: https://github.com/googlei18n/fontmake
+
+# Leave a review for a package
+$ deb-janitor review fontmake lintian-fixes rejected "Some fonts are no longer installed"
+
+# Merge lintian-fixes for a package
+$ debcheckout a56
+$ cd a56
+$ deb-janitor merge lintian-fixes
+Adding debian-janitor remote
+
+
 .EE
 
 .SH AUTHORS
