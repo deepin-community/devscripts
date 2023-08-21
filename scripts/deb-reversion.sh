@@ -130,12 +130,12 @@ make_temp_dir() {
 }
 
 extract_deb_file() {
-  dpkg-deb $DPKGDEB_DEBUG --extract $1 .
-  dpkg-deb $DPKGDEB_DEBUG --control $1 DEBIAN
+  dpkg-deb $DPKGDEB_DEBUG --extract "$1" .
+  dpkg-deb $DPKGDEB_DEBUG --control "$1" DEBIAN
 }
 
 get_version() {
-  dpkg --info $1 | sed -ne 's,^[[:space:]]Version: ,,p'
+  dpkg-deb -f "$1" Version
 }
 
 bump_version() {
@@ -167,15 +167,16 @@ change_version() {
       [ -f usr/share/doc/${PACKAGE}/$i ] \
         && LOGFILE=usr/share/doc/${PACKAGE}/$i
     done
-    [ -z "$LOGFILE" ] && { echo "changelog file not found"; return 1; }
-    mkdir -p debian
-    zcat "$LOGFILE" > debian/changelog
-    shift
-    dch $DCH_OPTIONS -v "$VERSION" -- "$@"
-    call_hook
-    gzip -9 -c debian/changelog >| "$LOGFILE"
-    MD5SUM=$(md5sum "$LOGFILE")
-    sed -i "s@^[^ ]*  $LOGFILE\$@$MD5SUM@" DEBIAN/md5sums
+    if [ -n "$LOGFILE" ]; then
+      mkdir -p debian
+      zcat "$LOGFILE" > debian/changelog
+      shift
+      dch $DCH_OPTIONS -v "$VERSION" -- "$@"
+      call_hook
+      gzip -9 -c debian/changelog >| "$LOGFILE"
+      MD5SUM=$(md5sum "$LOGFILE")
+      sed -i "s@^[^ ]*  $LOGFILE\$@$MD5SUM@" DEBIAN/md5sums
+    fi
   else
     call_hook
   fi
@@ -187,7 +188,7 @@ change_version() {
 repack_file() {
   cd ..
   dpkg-deb -b package >/dev/null
-  debfile=$(dpkg-name package.deb | sed -e "s,.*['\`]\(.*\).,\1,")
+  debfile=$(DPKG_COLORS=never DPKG_NLS=0 dpkg-name package.deb | sed -e "s,.*['\`]\(.*\).,\1,")
   # if Package-Type: udeb is absent, dpkg-name can't rename into *.udeb,
   # so we're left to an extra rename afterwards:
   if [ "$DEB_TYPE" = udeb ]; then
@@ -199,7 +200,7 @@ repack_file() {
   fi
 }
 
-[ -z "${OLD_VERSION:-}" ] && OLD_VERSION="$(get_version $DEB)"
+[ -z "${OLD_VERSION:-}" ] && OLD_VERSION="$(get_version "$DEB")"
 [ -z "${NEW_VERSION:-}" ] && NEW_VERSION="$(bump_version $OLD_VERSION)"
 
 if [ $CALCULATE -eq 1 ]; then

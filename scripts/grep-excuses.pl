@@ -404,7 +404,7 @@ if ($do_autopkgtests) {
             my $arches = $autopkgtests->{$k};
             foreach my $arch (sort keys %$arches) {
                 my $info = $arches->{$arch};
-                next if grep { $_ eq $info->[0] } qw(PASS RUNNING OLD_PASS);
+                next if grep { $_ eq $info->[0] } qw(PASS NEUTRAL RUNNING OLD_PASS);
                 printf "\nautopkgtest regression\n";
                 printf "    in %s (%s) on %s\n", $testpkg, $testvsn, $arch;
                 printf "    due to %s\n", migration_headline($source);

@@ -1,42 +1,27 @@
-#!/bin/bash
-# this script was downloaded from:
-# https://jeroen.a-eskwadraat.nl/sw/annotate
-# and is part of devscripts ###VERSION###
+#!/bin/sh
 
-# Executes a program annotating the output linewise with time and stream
-# Version 1.2
-
-# Copyright 2003, 2004 Jeroen van Wolffelaar <jeroen@wolffelaar.nl>
-
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; version 2 of the License
+# Copyright 2019-2023 Johannes Schauer Marin Rodrigues <josch@debian.org>
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+
+set -eu
 
 PROGNAME=${0##*/}
 
-addtime() {
+handler() {
 	while IFS= read -r line; do
-		printf "%s %s: %s\n" "$(date "${FMT}")" "$1" "$line"
+		printf "%s %s: %s\n" "$($1)" "$2" "$line"
 	done
-	if [ ! -z "$line" ]; then
-		printf "%s %s: %s" "$(date "${FMT}")" "$1" "$line"
-	fi
-}
-
-addprefix() {
-	while IFS= read -r line; do
-		printf "%s: %s\n" "$1" "$line"
-	done
-	if [ ! -z "$line" ]; then
-		printf "%s: %s" "$1" "$line"
+	if [ -n "$line" ]; then
+		printf "%s %s: %s" "$($1)" "$2" "$line"
 	fi
 }
 
@@ -51,7 +36,7 @@ usage() {
 }
 
 FMT="+%H:%M:%S"
-while [ "$1" ]; do
+while [ -n "${1-}" ]; do
 	case "$1" in
 	+*)
 		FMT="$1"
@@ -72,31 +57,36 @@ if [ $# -lt 1 ]; then
 	exit 1
 fi
 
-cleanup() { __st=$?; rm -rf "$tmp"; exit $__st; }
-trap cleanup 0
-trap 'exit $?' 1 2 13 15
+# shellcheck disable=SC2317
+plainfmt() { printf "%s" "$FMT"; }
+# shellcheck disable=SC2317
+datefmt() { date "$FMT"; }
+case "$FMT" in
+	*%*) formatter=datefmt;;
+	*) formatter=plainfmt; FMT="${FMT#+}";;
+esac
 
-tmp=$(mktemp -d --tmpdir annotate.XXXXXX) || exit 1
-OUT=$tmp/out
-ERR=$tmp/err
+echo Started "$@" | handler $formatter I
 
-mkfifo $OUT $ERR || exit 1
+# The following block redirects FD 2 (stderr) to FD 1 (stdout) which is then
+# processed by the stderr handler. It redirects FD 1 (stdout) to FD 4 such
+# that it can later be move to FD 1 (stdout) and handled by the stdout handler.
+# The exit status of the program gets written to FD 2 (stderr) which is then
+# captured to produce the correct exit status as the last step of the pipe.
+# Both the stdout and stderr handler output to FD 3 such that after exiting
+# with the correct exit code, FD 3 can be redirected to FD 1 (stdout).
+err=0
+{
+  {
+    {
+      {
+        {
+          "$@" 2>&1 1>&4 3>&- 4>&-; echo $? >&2;
+        } | handler $formatter E >&3;
+      } 4>&1 | handler $formatter O >&3;
+    } 2>&1;
+  } | { read -r xs; exit "$xs"; };
+} 3>&1 || err=$?
 
-if [ "${FMT/\%}" != "${FMT}" ] ; then
-	addtime O < $OUT &
-	addtime E < $ERR &
-else
-	# If FMT does not contain a %, use the optimized version that
-	# does not call 'date'.
-	addprefix "${FMT#+} O" < $OUT &
-	addprefix "${FMT#+} E" < $ERR &
-fi
-
-echo "Started $@" | addtime I
-"$@" > $OUT 2> $ERR ; EXIT=$?
-rm -f $OUT $ERR
-wait
-
-echo "Finished with exitcode $EXIT" | addtime I
-
-exit $EXIT
+echo "Finished with exitcode $err" | handler $formatter I
+exit $err

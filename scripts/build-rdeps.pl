@@ -61,11 +61,11 @@ Select another distribution, which is searched for build-depends.
 
 =item B<--only-main>
 
-Ignore contrib and non-free
+Ignore contrib, non-free and non-free-firmware.
 
 =item B<--exclude-component>
 
-Ignore the given component (e.g. main, contrib, non-free).
+Ignore the given component (e.g. main, contrib, non-free, non-free-firmware).
 
 =item B<--origin>
 
@@ -125,12 +125,12 @@ Show the version information.
 
 The tool requires apt Sources files to be around for the checked components.
 In the default case this means that in /var/lib/apt/lists files need to be
-around for main, contrib and non-free.
+around for main, contrib, non-free and non-free-firmware.
 
 In practice this means one needs to add one deb-src line for each component,
 e.g.
 
-deb-src http://<mirror>/debian <dist> main contrib non-free
+deb-src http://<mirror>/debian <dist> main contrib non-free non-free-firmware
 
 and run apt-get update afterwards or use the update option of this tool.
 
@@ -193,7 +193,7 @@ Options:
                                   (Default: unstable)
    --origin origin                Select an origin to search for build-depends
                                   (Default: Debian)
-   --only-main                    Ignore contrib and non-free
+   --only-main                    Ignore contrib, non-free and non-free-firmware
    --exclude-component COMPONENT  Ignore the specified component (can be given multiple times)
    --host-arch                    Set the host architecture (requires dose-extra >= 4.0)
    --build-arch                   Set the build architecture (requires dose-extra >= 4.0)
@@ -523,7 +523,7 @@ if (!%{$file_info}) {
 
 foreach my $site (sort keys %{$file_info}) {
     foreach my $suite (sort keys %{ $file_info->{$site} }) {
-        foreach my $comp (qw(main contrib non-free)) {
+        foreach my $comp (qw(main contrib non-free non-free-firmware)) {
             if (exists $file_info->{$site}{$suite}{$comp}) {
                 if (!$opt_quiet) {
                     print "Reverse Build-depends in ${comp}:\n";

@@ -76,10 +76,9 @@ $SIG{'__WARN__'} = sub {
       =~ /^Parsing of undecoded UTF-8 will give garbage when decoding entities/;
 };
 
-my $it           = undef;
-my $last_user    = '';
-my $lwp_broken   = undef;
-my $smtps_broken = undef;
+my $it         = undef;
+my $last_user  = '';
+my $lwp_broken = undef;
 my $authen_sasl_broken;
 my $ua;
 
@@ -102,22 +101,6 @@ sub have_lwp() {
         $lwp_broken = '';
     }
     return $lwp_broken ? 0 : 1;
-}
-
-sub have_smtps() {
-    return ($smtps_broken ? 0 : 1) if defined $smtps_broken;
-    eval { require Net::SMTPS; };
-
-    if ($@) {
-        if ($@ =~ m%^Can\'t locate Net/SMTPS%) {
-            $smtps_broken = "the libnet-smtps-perl package is not installed";
-        } else {
-            $smtps_broken = "couldn't load Net::SMTPS: $@";
-        }
-    } else {
-        $smtps_broken = '';
-    }
-    return $smtps_broken ? 0 : 1;
 }
 
 sub have_authen_sasl() {
@@ -2698,38 +2681,25 @@ sub send_mail {
             my ($host, $port) = split(/:/, $1);
             $port ||= '465';
 
-            if (have_smtps) {
-                $smtp = Net::SMTPS->new(
-                    $host,
-                    Port  => $port,
-                    Hello => $smtphelo,
-                    doSSL => 'ssl'
-                  )
-                  or die
-"$progname: failed to open SMTPS connection to $smtphost\n($@)\n";
-            } else {
-                die
-"$progname: Unable to establish SMTPS connection: $smtps_broken\n";
-            }
+            $smtp = Net::SMTP->new(
+                $host,
+                Port  => $port,
+                Hello => $smtphelo,
+                SSL   => 1,
+              )
+              or die
+"$progname: failed to open SMTP connection with TLS to $smtphost\n($@)\n";
         } else {
             my ($host, $port) = split(/:/, $smtphost);
             $port ||= '25';
 
-            if (have_smtps) {
-                $smtp = Net::SMTPS->new(
-                    $host,
-                    Port  => $port,
-                    Hello => $smtphelo,
-                    doSSL => 'starttls'
-                  )
-                  or die
-"$progname: failed to open SMTP connection to $smtphost\n($@)\n";
-            } else {
-                $smtp
-                  = Net::SMTP->new($host, Port => $port, Hello => $smtphelo)
-                  or die
-"$progname: failed to open SMTP connection to $smtphost\n($@)\n";
-            }
+            $smtp = Net::SMTP->new(
+                $host,
+                Port  => $port,
+                Hello => $smtphelo,
+              )
+              or die
+              "$progname: failed to open SMTP connection to $smtphost\n($@)\n";
         }
         if ($smtpuser) {
             if (have_authen_sasl) {
