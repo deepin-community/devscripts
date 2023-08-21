@@ -87,7 +87,10 @@ has headers => (
     default => sub { {} });
 
 sub download ($$$$$$$$) {
-    my ($self, $url, $fname, $optref, $base, $pkg_dir, $pkg, $mode) = @_;
+    my (
+        $self,    $url, $fname, $optref, $base,
+        $pkg_dir, $pkg, $mode,  $gitrepo_dir
+    ) = @_;
     my ($request, $response);
     $mode ||= $optref->mode;
     if ($mode eq 'http') {
@@ -145,8 +148,6 @@ sub download ($$$$$$$$) {
         my $abs_dst = abs_path($dst);
         my $ver     = $2;
         my $suffix  = $3;
-        my $gitrepo_dir
-          = "$pkg-temporary.$$.git";    # same as outside of downloader
         my ($gitrepo, $gitref) = split /[[:space:]]+/, $url, 2;
         my $clean = sub {
             uscan_exec_no_fail('rm', '-fr', $gitrepo_dir);

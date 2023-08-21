@@ -26,6 +26,17 @@ fi
 
 WORKDIR="$(readlink -f "${0%/*}")"
 
+testExitCode() {
+  $COMMAND +%% sh -c 'exit 42'>/dev/null 2>&1
+  assertEquals 'unexpected exit code' "42" "$?"
+}
+
+testStdErr() {
+  expected='% E: stderr'
+  actual="$($COMMAND +%% sh -c 'echo stderr >&2' | grep E:)"
+  assertEquals 'captured stderr' "${expected}" "${actual}"
+}
+
 testSwallowedNewline() {
   expected="% O: foo% I: Finished with exitcode 0"
   actual="$($COMMAND +%% echo -n foo | grep O:)"

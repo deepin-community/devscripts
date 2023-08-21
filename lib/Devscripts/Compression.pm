@@ -16,23 +16,44 @@
 
 package Devscripts::Compression;
 
-use Dpkg::Compression qw(!compression_get_property);
+use Dpkg::Compression qw(
+  !compression_get_file_extension
+  !compression_get_cmdline_compress
+  !compression_get_cmdline_decompress
+);
 use Dpkg::IPC;
 use Exporter qw(import);
 
 our @EXPORT = (
     @Dpkg::Compression::EXPORT,
-    qw(compression_get_file_extension_regex compression_guess_from_file),
+    qw(
+      compression_get_file_extension
+      compression_get_cmdline_compress
+      compression_get_cmdline_decompress
+      compression_guess_from_file
+    ),
 );
 
 eval {
-    Dpkg::Compression->VERSION(1.02);
+    Dpkg::Compression->VERSION(2.01);
     1;
 } or do {
-    # Ensure we have compression_get_file_extension_regex, regardless of the
-    # version of Dpkg::Compression to ease backporting.
-    *{'Devscripts::Compression::compression_get_file_extension_regex'} = sub {
-        return $compression_re_file_ext;
+    # Ensure we have the compression getters, regardless of the version of
+    # Dpkg::Compression to ease backporting.
+    *{'Dpkg::Compression::compression_get_file_extension'} = sub {
+        my $comp = shift;
+        return compression_get_property($comp, 'file_ext');
+    };
+    *{'Dpkg::Compression::compression_get_cmdline_compress'} = sub {
+        my $comp = shift;
+        my @prog = @{ compression_get_property($comp, 'comp_prog') };
+        push @prog, '-' . compression_get_property($comp, 'default_level');
+        return @prog;
+    };
+    *{'Dpkg::Compression::compression_get_cmdline_decompress'} = sub {
+        my $comp = shift;
+        my @prog = @{ compression_get_property($comp, 'decomp_prog') };
+        return @prog;
     };
 };
 
@@ -88,17 +109,28 @@ my %comp_properties = (
         default_level => 3,
     });
 
-sub compression_get_property {
-    my ($compression, $property) = @_;
-    if (!exists $comp_properties{$compression}) {
-        return Dpkg::Compression::compression_get_property($compression,
-            $property);
+sub compression_get_file_extension {
+    my $comp = shift;
+    if (!exists $comp_properties{$comp}) {
+        return Dpkg::Compression::compression_get_file_extension($comp);
     }
+    return $comp_properties{$comp}{file_ext};
+}
 
-    if (exists $comp_properties{$compression}{$property}) {
-        return $comp_properties{$compression}{$property};
+sub compression_get_cmdline_compress {
+    my $comp = shift;
+    if (!exists $comp_properties{$comp}) {
+        return Dpkg::Compression::compression_get_cmdline_compress($comp);
     }
-    return;
+    return @{ $comp_properties{$comp}{comp_prog} };
+}
+
+sub compression_get_cmdline_decompress {
+    my $comp = shift;
+    if (!exists $comp_properties{$comp}) {
+        return Dpkg::Compression::compression_get_cmdline_decompress($comp);
+    }
+    return @{ $comp_properties{$comp}{decomp_prog} };
 }
 
 1;

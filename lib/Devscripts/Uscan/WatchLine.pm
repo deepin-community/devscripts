@@ -193,8 +193,10 @@ has pretty => (
 has gitrepo_dir => (    # Working repository used only within uscan.
     is      => 'ro',
     lazy    => 1,
-    default => sub {
-        $_[0]->{pkg} . "-temporary.$$.git";
+    builder => sub {
+        $_[0]->{component}
+          ? $_[0]->{pkg} . "-temporary.$$." . $_[0]->{component} . '.git'
+          : $_[0]->{pkg} . "-temporary.$$.git";
     });
 has headers => (
     is      => 'ro',
@@ -1277,6 +1279,7 @@ sub download_file_and_sig {
                 $self->pkg_dir,
                 $self->pkg,
                 $self->mode,
+                $self->gitrepo_dir,
             );
             if ($download_available) {
                 dehs_verbose

@@ -670,7 +670,7 @@ tarball URL.
 
 Generate the version string I<< <oversion> >> of the source tarball I<<
 <spkg>_<oversion>.orig.tar.gz >> from I<< <uversion> >>.  This should be used
-to add a suffix such as B<+dfsg1> to a MUT package.
+to add a suffix such as B<+dfsg> to a MUT package.
 
 =back
 
@@ -714,20 +714,20 @@ For example, if the first entry of F<debian/changelog> is:
 
 =over
 
-=item * I<< bar >> (B<3:2.03+dfsg1-4>) unstable; urgency=low
+=item * I<< bar >> (B<3:2.03+dfsg-4>) unstable; urgency=low
 
 =back
 
 then, the source package name is I<< bar >> and the last Debian package version
-is B<3:2.03+dfsg1-4>.
+is B<3:2.03+dfsg-4>.
 
-The last upstream version is normalized to B<2.03+dfsg1> by removing the epoch
+The last upstream version is normalized to B<2.03+dfsg> by removing the epoch
 and the Debian revision.
 
 If the B<dversionmangle> rule exists, the last upstream version is further
 normalized by applying this rule to it.  For example, if the last upstream
-version is B<2.03+dfsg1> indicating the source tarball is repackaged, the
-suffix B<+dfsg1> is removed by the string substitution B<s/\+dfsg\d*$//> to
+version is B<2.03+dfsg> indicating the source tarball is repackaged, the
+suffix B<+dfsg> is removed by the string substitution B<s/\+dfsg\d*$//> to
 make the (dversionmangled) last upstream version B<2.03> and it is compared to
 the candidate upstream tarball versions such as B<2.03>, B<2.04>, ... found in
 the remote site.  Thus, set this rule as:
@@ -872,7 +872,7 @@ report an error.
 
 If the B<oversionmangle> rule exists, the source tarball version I<oversion> is
 generated from the downloaded upstream version I<uversion> by applying this
-rule. This rule is useful to add suffix such as B<+dfsg1> to the version of all
+rule. This rule is useful to add suffix such as B<+dfsg> to the version of all
 the source packages of the MUT package for which the repacksuffix mechanism
 doesn't work.
 
@@ -907,16 +907,16 @@ the B<repacksuffix> option for the single upstream package.    Here I<< <oversio
 is updated to be I<< <oversion><suffix> >>.
 
 The removal of files is required if files are not DFSG-compliant.  For such
-case, B<+dfsg1> is used as I<suffix>.
+case, B<+dfsg> is used as I<suffix>.
 
 So the combined options are set as
-B<opts="dversionmangle=s/\+dfsg\d*$// ,repacksuffix=+dfsg1">, instead.
+B<opts="dversionmangle=s/\+dfsg\d*$// ,repacksuffix=+dfsg">, instead.
 
 For example, the repacked upstream tarball may be:
 
 =over
 
-=item * F<../bar_2.04+dfsg1.orig.tar.gz> (repackaged)
+=item * F<../bar_2.04+dfsg.orig.tar.gz> (repackaged)
 
 =back
 
@@ -1104,7 +1104,7 @@ The upstream part of the Debian version number can be mangled to indicate the
 source package was repackaged to clean up non-DFSG files:
 
   version=4
-  opts="dversionmangle=s/\+dfsg\d*$//,repacksuffix=+dfsg1" \
+  opts="dversionmangle=s/\+dfsg\d*$//,repacksuffix=+dfsg" \
   http://some.site.org/some/path/foobar-@ANY_VERSION@@ARCHIVE_EXT@
 
 See L<COPYRIGHT FILE EXAMPLES>.
@@ -1151,11 +1151,11 @@ some way into one which will work automatically, for example:
 =head2 HTTP site (oversionmangle, MUT)
 
 The option B<oversionmangle> can be used to mangle the version of the source
-tarball (B<.orig.tar.gz> and B<.orig-bar.tar.gz>).  For example, B<+dfsg1> can
+tarball (B<.orig.tar.gz> and B<.orig-bar.tar.gz>).  For example, B<+dfsg> can
 be added to the upstream version as:
 
   version=4
-  opts=oversionmangle=s/(.*)/$1+dfsg1/ \
+  opts=oversionmangle=s/(.*)/$1+dfsg/ \
   http://example.com/~user/release/foo.html \
   files/foo-@ANY_VERSION@@ARCHIVE_EXT@ debian
   opts="component=bar" \

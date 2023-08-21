@@ -30,6 +30,7 @@ setUp() {
     CHANGELOG="${SHUNIT_TMPDIR}/changelog"
     DEBFULLNAME="Raphaël Hertzog"
     DEBEMAIL="hertzog@debian.org"
+    unset UBUMAIL
     export DEBFULLNAME DEBEMAIL
 }
 
@@ -95,16 +96,15 @@ checkUbuntuVersion() {
 }
 
 testDebianDistributions() {
+    checkDebianDistribution "trixie"
+    checkDebianDistribution "trixie-security"
+    checkDebianDistribution "bookworm"
+    checkDebianDistribution "bookworm-proposed-updates"
+    checkDebianDistribution "bookworm-security"
     checkDebianDistribution "bullseye"
     checkDebianDistribution "bullseye-security"
     checkDebianDistribution "buster"
     checkDebianDistribution "buster-security"
-    checkDebianDistribution "stretch"
-    checkDebianDistribution "stretch-security"
-    checkDebianDistribution "jessie"
-    checkDebianDistribution "jessie-proposed-updates"
-    checkDebianDistribution "jessie-security"
-    checkDebianDistribution "wheezy-security"
     checkDebianDistribution "experimental"
     checkDebianDistribution "oldstable"
     checkDebianDistribution "oldstable-proposed-updates"
@@ -236,10 +236,10 @@ verifyGuessedDistribution() {
 testGuessedDistribution() {
     verifyGuessedDistribution unstable -i unstable
     verifyGuessedDistribution experimental -i experimental
-    verifyGuessedDistribution buster-backports -i buster-backports
-    verifyGuessedDistribution stretch -i stretch
-    verifyGuessedDistribution unstable --bpo bullseye-backports
-    verifyGuessedDistribution unstable --stable bullseye
+    verifyGuessedDistribution bookworm-backports -i bookworm-backports
+    verifyGuessedDistribution trixie -i trixie
+    verifyGuessedDistribution unstable --bpo bookworm-backports
+    verifyGuessedDistribution unstable --stable bookworm
 }
 
 testSpecialCharacterMaintainer() {
