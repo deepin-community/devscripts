@@ -395,8 +395,8 @@ EOF
         }
         # Fill in sources.list with example contents
         print FH <<EOF;
-#deb http://deb.debian.org/debian/ unstable main contrib non-free
-#deb-src http://deb.debian.org/debian/ unstable main contrib non-free
+#deb http://deb.debian.org/debian/ unstable main contrib non-free non-free-firmware
+#deb-src http://deb.debian.org/debian/ unstable main contrib non-free non-free-firmware
 
 #deb http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse
 #deb-src http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse

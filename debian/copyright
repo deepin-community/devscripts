@@ -84,9 +84,13 @@ Copyright: 2004-2009, Nicolas François <nicolas.francois@centraliens.net>
  2017-2018, Jean-Pierre Giraud <jean-pierregiraud@neuf.fr>
 License: GPL-2+
 
-Files: scripts/annotate-output*
+Files: scripts/annotate-output.1
 Copyright: 2003-2004, Jeroen van Wolffelaar <jeroen@wolffelaar.nl>
 License: GPL-2
+
+Files: scripts/annotate-output.sh
+Copyright: 2019 Johannes Schauer Marin Rodrigues <josch@debian.org>
+License: Expat
 
 Files: scripts/archpath*
 Copyright: 2005, Colin Watson <cjwatson@debian.org>
