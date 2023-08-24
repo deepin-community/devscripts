@@ -3,8 +3,7 @@ package Devscripts::MkOrigtargz::Config;
 use strict;
 
 use Devscripts::Compression qw'compression_is_supported
-  compression_guess_from_file
-  compression_get_property';
+  compression_guess_from_file';
 use Devscripts::Uscan::Output;
 use Exporter 'import';
 use File::Which;

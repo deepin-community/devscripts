@@ -423,7 +423,7 @@ if ($progname eq 'debi') {
             }
 
             spawn(
-                exec       => ['debpkg', @upgrade, '--unpack', @debs],
+                exec       => ['dpkg', @upgrade, '--unpack', @debs],
                 wait_child => 1
             );
             spawn(
@@ -442,7 +442,7 @@ if ($progname eq 'debi') {
                 wait_child => 1
             );
         } else {
-            spawn(exec => ['debpkg', @upgrade, '-i', @debs], wait_child => 1);
+            spawn(exec => ['dpkg', @upgrade, '-i', @debs], wait_child => 1);
         }
     }
 } else {

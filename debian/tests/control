@@ -9,6 +9,7 @@ Depends:
  libdistro-info-perl,
  libgitlab-api-v4-perl,
  libipc-run-perl,
+ libjson-perl,
  libtest-output-perl,
  libwww-perl,
  mozilla-devscripts,
