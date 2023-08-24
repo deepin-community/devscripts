@@ -31,8 +31,7 @@ And now, in alphabetical order, the scripts:
 - bts: A command-line tool for accessing the Debian Bug Tracking System, both
   to send mails to control@bts.debian.org and to access the web pages and
   SOAP interface of the BTS. [www-browser, libauthen-sasl-perl,
-  libnet-smtps-perl, libsoap-lite-perl, liburi-perl, libwww-perl,
-  bsd-mailx | mailx]
+  libsoap-lite-perl, liburi-perl, libwww-perl, bsd-mailx | mailx]
 
 - build-rdeps: Searches for all packages that build-depend on a given package.
   [dctrl-tools, dose-extra, libdpkg-perl]
@@ -101,11 +100,10 @@ And now, in alphabetical order, the scripts:
   that old patches still apply to newer versions of those packages.
   [python3-debian, python3-unidiff, quilt]
 
-- debi: Installs the current package by using the setuid root debpkg
-  script described below.  It assumes that the current package has
-  just been built (for example by debuild), and the .deb lives in the
-  parent directory, and will effectively run dpkg -i on the .deb.  The
-  ability to install the package with a very short command is very
+- debi: Installs the current package by using dpkg.  It assumes that the
+  current package has just been built (for example by debuild), and the .deb
+  lives in the parent directory, and will effectively run dpkg -i on the .deb.
+  The ability to install the package with a very short command is very
   useful when troubleshooting packages.
 
 - debootsnap: Combines debootstrap and snapshot.debian.org to create a chroot
@@ -114,17 +112,6 @@ And now, in alphabetical order, the scripts:
   tool is also used by debrebuild to build a package in a chroot with build
   dependencies in the same version as recorded in the buildinfo file.
   [apt-utils, dpkg-dev, equivs, mmdebstrap, python3-pycurl]
-
-- debpkg: A wrapper for dpkg used by debi to allow convenient testing
-  of packages.  For debpkg to work, it needs to be made setuid root,
-  and this needs to be performed by the sysadmin -- it is not
-  installed as setuid root by default.  (Note that being able to run a
-  setuid root debpkg is effectively the same as having root access to
-  the system, so this should be done with caution.)  Having debpkg as
-  a wrapper for dpkg can be a Good Thing (TM), as it decreases the
-  potential for damage by accidental wrong use of commands in
-  superuser mode (e.g., an inadvertent rm -rf * in the wrong directory
-  is disastrous as many can attest to).
 
 - debrelease: A wrapper around dupload or dput which figures out which
   version to upload, and then calls dupload or dput to actually perform

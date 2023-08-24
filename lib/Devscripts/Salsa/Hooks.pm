@@ -190,15 +190,24 @@ sub _check_config {
     my ($config, $key_name, $config_name, $can_be_private, $res_ref) = @_;
     if (!$config) { return undef; }
     for ($config) {
-        if ($can_be_private && ($_ eq "private")) { push @$res_ref, $key_name => "private"; }
-        elsif (qr/y(es)?|true|enabled?/) {
-            push @$res_ref, $key_name => "enabled";
-        }
-        elsif (qr/no?|false|disabled?/) {
-            push @$res_ref, $key_name => "disabled";
-        }
-        else {
-            print "error with SALSA_$config_name";
+        if ($can_be_private) {
+            if ($_ eq "private") {
+                push @$res_ref, $key_name => "private";
+            } elsif (qr/y(es)?|true|enabled?/) {
+                push @$res_ref, $key_name => "enabled";
+            } elsif (qr/no?|false|disabled?/) {
+                push @$res_ref, $key_name => "disabled";
+            } else {
+                print "error with SALSA_$config_name";
+            }
+        } else {
+            if (qr/y(es)?|true|enabled?/) {
+                push @$res_ref, $key_name => 1;
+            } elsif (qr/no?|false|disabled?/) {
+                push @$res_ref, $key_name => 0;
+            } else {
+                print "error with SALSA_$config_name";
+            }
         }
     }
 }
@@ -217,23 +226,41 @@ sub desc {
         push @res, build_timeout => $self->config->build_timeout;
     }
 
-    #              config value                 key name                           config name      has private
-    _check_config( $self->config->issues,       "issues_access_level",             "ENABLE_ISSUES",       1, \@res );
-    _check_config( $self->config->repo,         "repository_access_level",         "ENABLE_REPO",         1, \@res );
-    _check_config( $self->config->mr,           "merge_requests_access_level",     "ENABLE_MR",           1, \@res );
-    _check_config( $self->config->forks,        "forking_access_level",            "ENABLE_FORKS",        1, \@res );
-    _check_config( $self->config->lfs,          "lfs_enabled",                     "ENABLE_LFS",          0, \@res );
-    _check_config( $self->config->packages,     "packages_enabled",                "ENABLE_PACKAGES",     0, \@res );
-    _check_config( $self->config->jobs,         "builds_access_level",             "ENABLE_JOBS",         1, \@res );
-    _check_config( $self->config->container,    "container_registry_access_level", "ENABLE_CONTAINER",    1, \@res );
-    _check_config( $self->config->analytics,    "analytics_access_level",          "ENABLE_ANALYTICS",    1, \@res );
-    _check_config( $self->config->requirements, "requirements_access_level",       "ENABLE_REQUIREMENTS", 1, \@res );
-    _check_config( $self->config->wiki,         "wiki_access_level",               "ENABLE_WIKI",         1, \@res );
-    _check_config( $self->config->snippets,     "snippets_access_level",           "ENABLE_SNIPPETS",     1, \@res );
-    _check_config( $self->config->pages,        "pages_access_level",              "ENABLE_PAGES",        1, \@res );
-    _check_config( $self->config->releases,     "releases_access_level",           "ENABLE_RELEASES",     1, \@res );
-    _check_config( $self->config->auto_devops,  "auto_devops_enabled",             "ENABLE_AUTO_DEVOPS",  0, \@res );
-    _check_config( $self->config->request_acc,  "request_access_enabled",          "ENABLE_REQUEST_ACC",  0, \@res );
+    # Parameter: config value, key name, config name, has private
+    _check_config($self->config->issues, "issues_access_level",
+        "ENABLE_ISSUES", 1, \@res);
+    _check_config($self->config->repo, "repository_access_level",
+        "ENABLE_REPO", 1, \@res);
+    _check_config($self->config->mr, "merge_requests_access_level",
+        "ENABLE_MR", 1, \@res);
+    _check_config($self->config->forks, "forking_access_level",
+        "ENABLE_FORKS", 1, \@res);
+    _check_config($self->config->lfs, "lfs_enabled", "ENABLE_LFS", 0, \@res);
+    _check_config($self->config->packages,
+        "packages_enabled", "ENABLE_PACKAGES", 0, \@res);
+    _check_config($self->config->jobs, "builds_access_level", "ENABLE_JOBS",
+        1, \@res);
+    _check_config(
+        $self->config->container,
+        "container_registry_access_level",
+        "ENABLE_CONTAINER", 1, \@res
+    );
+    _check_config($self->config->analytics,
+        "analytics_access_level", "ENABLE_ANALYTICS", 1, \@res);
+    _check_config($self->config->requirements,
+        "requirements_access_level", "ENABLE_REQUIREMENTS", 1, \@res);
+    _check_config($self->config->wiki, "wiki_access_level", "ENABLE_WIKI", 1,
+        \@res);
+    _check_config($self->config->snippets,
+        "snippets_access_level", "ENABLE_SNIPPETS", 1, \@res);
+    _check_config($self->config->pages, "pages_access_level", "ENABLE_PAGES",
+        1, \@res);
+    _check_config($self->config->releases,
+        "releases_access_level", "ENABLE_RELEASES", 1, \@res);
+    _check_config($self->config->auto_devops,
+        "auto_devops_enabled", "ENABLE_AUTO_DEVOPS", 0, \@res);
+    _check_config($self->config->request_acc,
+        "request_access_enabled", "ENABLE_REQUEST_ACC", 0, \@res);
 
     if ($self->config->disable_remove_branch) {
         push @res, remove_source_branch_after_merge => 0;

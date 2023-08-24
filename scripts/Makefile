@@ -13,7 +13,6 @@ VERSION = $(shell cat $(VERSION_FILE))
 
 PL_FILES := $(wildcard *.pl)
 SH_FILES = $(wildcard *.sh)
-CWRAPPERS = debpkg-wrapper
 SCRIPTS = $(patsubst %.pl,%,$(PL_FILES)) $(patsubst %.sh,%,$(SH_FILES))
 PL_CHECKS = $(patsubst %.pl,%.pl_check,$(PL_FILES))
 SH_CHECKS = $(patsubst %.sh,%.sh_check,$(SH_FILES))
@@ -53,7 +52,7 @@ GEN_MAN1S += \
 	reproducible-check.1 \
 	uscan.1 \
 
-all: $(SCRIPTS) $(GEN_MAN1S) $(CWRAPPERS) $(COMPLETION)
+all: $(SCRIPTS) $(GEN_MAN1S) $(COMPLETION)
 
 scripts: $(SCRIPTS)
 
@@ -145,7 +144,7 @@ clean:
 	find -name __pycache__ -delete
 	rm -rf devscripts.egg-info $(BC_BUILD_DIR) .pylint.d
 	rm -f $(SCRIPTS) $(patsubst %,%.tmp,$(SCRIPTS)) \
-		$(GEN_MAN1S) $(SCRIPT_LIBS) $(CWRAPPERS)
+		$(GEN_MAN1S) $(SCRIPT_LIBS)
 
 
 test: test_pl test_sh test_py
@@ -161,10 +160,7 @@ install: all
 	done
 	ln -sf debchange $(DESTDIR)$(COMPL_DIR)/dch
 	ln -sf debi $(DESTDIR)$(COMPL_DIR)/debc
-	# Special treatment for debpkg and run_bisect
-	install -d $(DESTDIR)$(DATA_DIR)
-	mv $(DESTDIR)$(BINDIR)/debpkg $(DESTDIR)$(DATA_DIR)
-	cp debpkg-wrapper $(DESTDIR)$(BINDIR)/debpkg
+	# Special treatment for run_bisect
 	install -d $(DESTDIR)$(DATA_DIR)/scripts
 	mv $(DESTDIR)$(BINDIR)/run_bisect $(DESTDIR)$(DATA_DIR)/scripts
 	mv $(DESTDIR)$(BINDIR)/run_bisect_qemu $(DESTDIR)$(DATA_DIR)/scripts
