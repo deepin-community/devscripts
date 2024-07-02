@@ -2,8 +2,12 @@ package Devscripts::MkOrigtargz;
 
 use strict;
 use Cwd 'abs_path';
-use Devscripts::Compression
-  qw/compression_guess_from_file compression_get_property/;
+use Devscripts::Compression qw/
+  compression_guess_from_file
+  compression_get_file_extension
+  compression_get_cmdline_compress
+  compression_get_cmdline_decompress
+  /;
 use Devscripts::MkOrigtargz::Config;
 use Devscripts::Output;
 use Devscripts::Uscan::Output;
@@ -57,7 +61,7 @@ sub make_orig_targz {
     my $destext
       = $self->config->compression eq 'default'
       ? 'default'
-      : compression_get_property($self->config->compression, "file_ext");
+      : compression_get_file_extension($self->config->compression);
     my $destfile;
 
     # $upstream_tar is $upstream, unless the latter was a zip file.
@@ -77,25 +81,18 @@ sub make_orig_targz {
         # Parent of the target directory should be under our control
         $tempdir .= '/repack';
         my @cmd;
-        if ($self->config->upstream_comp eq 'xpi') {
-            @cmd = ('xpi-unpack', $upstream_tar, $tempdir);
-            unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
-                ds_die("Repacking from xpi failed (could not xpi-unpack)\n");
-                return $self->status(1);
-            }
-        } else {
-            unless (mkdir $tempdir) {
-                ds_die("Unable to mkdir($tempdir): $!\n");
-                return $self->status(1);
-            }
-            @cmd = ('unzip', '-q');
-            push @cmd, split ' ', $self->config->unzipopt
-              if defined $self->config->unzipopt;
-            push @cmd, ('-d', $tempdir, $upstream_tar);
-            unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
-                ds_die("Repacking from zip or jar failed (could not unzip)\n");
-                return $self->status(1);
-            }
+        unless (mkdir $tempdir) {
+            ds_die("Unable to mkdir($tempdir): $!\n");
+            return $self->status(1);
+        }
+        @cmd = ('unzip', '-q');
+        push @cmd, split ' ', $self->config->unzipopt
+          if defined $self->config->unzipopt;
+        push @cmd, ('-d', $tempdir, $upstream_tar);
+        unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
+            ds_die(
+                "Repacking from zip, jar, or xpi failed (could not unzip)\n");
+            return $self->status(1);
         }
 
         # Figure out the top-level contents of the tarball.
@@ -473,7 +470,7 @@ sub make_orig_targz {
     if ($zipfile_deleted) {
         uscan_msg_raw ", and removed the original file";
     }
-    print ".\n";
+    uscan_msg_raw ".\n";
     return 0;
 }
 
@@ -484,9 +481,9 @@ sub decompress_archive {
         die("Cannot determine compression method of $from_file");
     }
 
-    my $cmd = compression_get_property($comp, 'decomp_prog');
+    my @cmd = compression_get_cmdline_decompress($comp);
     spawn(
-        exec       => $cmd,
+        exec       => \@cmd,
         from_file  => $from_file,
         to_file    => $to_file,
         wait_child => 1
@@ -496,10 +493,9 @@ sub decompress_archive {
 sub compress_archive {
     my ($from_file, $to_file, $comp) = @_;
 
-    my $cmd = compression_get_property($comp, 'comp_prog');
-    push(@{$cmd}, '-' . compression_get_property($comp, 'default_level'));
+    my @cmd = compression_get_cmdline_compress($comp);
     spawn(
-        exec       => $cmd,
+        exec       => \@cmd,
         from_file  => $from_file,
         to_file    => $to_file,
         wait_child => 1
@@ -623,7 +619,7 @@ sub fix_dest_file {
         $self->config->compression($comp
               || &Devscripts::MkOrigtargz::Config::default_compression);
     }
-    $comp = compression_get_property($self->config->compression, "file_ext");
+    $comp = compression_get_file_extension($self->config->compression);
     $found_comp ||= $self->config->compression;
     return sprintf "%s.%s", $destfiletar, $comp;
 }

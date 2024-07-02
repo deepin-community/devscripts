@@ -263,11 +263,11 @@ sub parse_conf_files {
                     next;
                 } elsif (ref $check eq 'Regexp') {
                     unless ($config_vars{$name} =~ $check) {
-                        ds_warn("Bad $name value $config_vars{$name}");
+                        ds_warn "Bad $name value $config_vars{$name}";
                         next;
                     }
                 } else {
-                    ds_die("Unknown check type for $name");
+                    ds_die "Unknown check type for $name";
                     return undef;
                 }
             }
@@ -337,10 +337,10 @@ sub parse_command_line {
                     if ($opts->{$name} =~ $check) {
                         $self->{$kname} = $opts->{$name};
                     } else {
-                        ds_die("Bad $name value in command line");
+                        ds_die "Bad $name value in command line";
                     }
                 } else {
-                    ds_die("Unknown check type for $name");
+                    ds_die "Unknown check type for $name";
                 }
             } else {
                 $self->{$kname} = $opts->{$name};

@@ -1,5 +1,5 @@
-# Updates repositories
-package Devscripts::Salsa::update_repo;
+# Updates projects
+package Devscripts::Salsa::update_repo;    # update_projects
 
 use strict;
 use Devscripts::Output;
@@ -14,19 +14,19 @@ sub update_repo {
     my ($self, @reponames) = @_;
     if ($ds_yes < 0 and $self->config->command eq 'update_repo') {
         ds_warn
-          "update_repo can't be launched when -i is set, use update_safe";
+"update_projects can't be launched when --info is set, use update_safe";
         return 1;
     }
     unless (@reponames or $self->config->all or $self->config->all_archived) {
-        ds_warn "Usage $0 update_repo <--all|--all-archived|names>";
+        ds_warn "Usage $0 update_projects <--all|--all-archived|names>";
         return 1;
     }
     if (@reponames and $self->config->all) {
-        ds_warn "--all with a reponame makes no sense";
+        ds_warn "--all with a project name makes no sense";
         return 1;
     }
     if (@reponames and $self->config->all_archived) {
-        ds_warn "--all-archived with a reponame makes no sense";
+        ds_warn "--all-archived with a project name makes no sense";
         return 1;
     }
     return $self->_update_repo(@reponames);
@@ -40,36 +40,34 @@ sub _update_repo {
     # visibility can be modified only by group owners
     $configparams->{visibility} = 'public'
       if $self->access_level >= $GITLAB_ACCESS_LEVEL_OWNER;
-    # get repo list using Devscripts::Salsa::Repo
+    # get project list using Devscripts::Salsa::Repo
     my @repos = $self->get_repo($prompt, @reponames);
     return @repos unless (ref $repos[0]);    # get_repo returns 1 when fails
     foreach my $repo (@repos) {
-        ds_verbose "Configuring $repo->[1]";
         my $id  = $repo->[0];
         my $str = $repo->[1];
+        ds_verbose "Configuring $str";
         eval {
             # apply new parameters
-            $self->api->edit_project(
-                $id,
-                {
-                    %$configparams,
-                    $self->desc($repo->[1]),
-                    $self->desc_multipart($repo->[1]) });
+            $self->api->edit_project($id,
+                { %$configparams, $self->desc($str) });
+            # Set project avatar
+            my @avatar_file = $self->desc_multipart($str);
+            $self->api->edit_project_multipart($id, {@avatar_file})
+              if (@avatar_file and $self->config->avatar_path);
             # add hooks if needed
             $str =~ s#^.*/##;
             $self->add_hooks($id, $str);
         };
         if ($@) {
+            ds_warn "update_projects has failed for $str\n";
+            ds_verbose $@;
             $res++;
-            if ($self->config->no_fail) {
-                ds_verbose $@;
-                ds_warn
-"update_repo has failed for $repo->[1]. Use --verbose to see errors\n";
-                next;
-            } else {
-                ds_warn $@;
+            unless ($self->config->no_fail) {
+                ds_verbose "Use --no-fail to continue";
                 return 1;
             }
+            next;
         } elsif ($self->config->rename_head) {
             # 1 - creates new branch if --rename-head
             my $project = $self->api->project($id);
@@ -97,16 +95,14 @@ sub _update_repo {
                     }
                 };
                 if ($@) {
+                    ds_warn "Branch rename has failed for $str\n";
+                    ds_verbose $@;
                     $res++;
-                    if ($self->config->no_fail) {
-                        ds_verbose $@;
-                        ds_warn
-"Branch rename has failed for $repo->[1]. Use --verbose to see errors\n";
-                        next;
-                    } else {
-                        ds_warn $@;
+                    unless ($self->config->no_fail) {
+                        ds_verbose "Use --no-fail to continue";
                         return 1;
                     }
+                    next;
                 }
             } else {
                 ds_verbose "Head already renamed for $str";
@@ -121,7 +117,8 @@ sub access_level {
     my ($self) = @_;
     my $user_id = $self->api->current_user()->{id};
     if ($self->group_id) {
-        my $tmp = $self->api->group_member($self->group_id, $user_id);
+        my $tmp = $self->api->all_group_members($self->group_id,
+            { user_ids => $user_id });
         unless ($tmp) {
             my $members
               = $self->api->paginator('all_group_members', $self->group_id,
@@ -132,7 +129,7 @@ sub access_level {
             ds_warn "You're not member of this group";
             return 0;
         }
-        return $tmp->{access_level};
+        return $tmp->[0]->{access_level};
     }
     return $GITLAB_ACCESS_LEVEL_OWNER;
 }

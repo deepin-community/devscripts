@@ -10,30 +10,82 @@ _salsa_completion () {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    local opts="--help --skip --skip-file -C --chdir --debug"
-    opts+=" --all --conf-file --no-conf --desc --no-desc --desc-pattern"
-    opts+=" --disable-kgb --disable-tagpending --group --group-id"
-    opts+=" --enable-remove-source-branch --disable-remove-source-branch"
-    opts+=" --issues --mr --repo --forks --lfs --packages --jobs  --pages"
-    opts+=" --container --analytics --requirements --wiki --snippets
-    opts+=" --releases --auto-devops --request-acc --ci-config-path"
-    opts+=" --mr-allow-squash --no-mr-allow-squash --mr-desc --mr-title"
-    opts+=" --mr-dst-branch --mr-dst-project --mr-remove-source-branch"
+    local opts=""
+# Source: ./lib/Devscripts/Config.pm:sub parse_command_line
+    opts+=" --help"
+# Source: ./lib/Devscripts/Output.pm:sub ds_prompt
+    opts+=" --info"
+# Source: ./lib/Devscripts/Config.pm:[...]$ARGV[0]
+    opts+=" --conf-file --no-conf"
+# Source: ./lib/Devscripts/Salsa/Config.pm:use constant keys
+# Note: '<VALUE>!' == '--<VALUE> --no-<VALUE>', '<SHORT>|<LONG>'
+# Headings: $ grep '^    #' ./lib/Devscripts/Salsa/Config.pm
+    # General salsa
+    opts+=" --chdir --cache-file --no-cache --path"
+    # Responses
+    opts+=" --yes --no-yes --no-fail"
+    # Output
+    opts+=" --verbose --no-verbose --debug --info"
+    # General GitLab
+    opts+=" --user --user-id --group --group-id --token --token-file"
+    # List/search
+    opts+=" --all --all-archived --archived --no-archived"
+    opts+=" --skip --skip-file --no-skip"
+    # Features
+    opts+=" --analytics --auto-devops --container --environments"
+    opts+=" --feature-flags --forks --infrastructure --issues --jobs --lfs"
+    opts+=" --monitor --mr --packages --pages --releases --repo --service-desk"
+    opts+=" --request-access --requirements --security-compliance "
+    opts+=" --snippets --wiki"
+    # Branding
+    opts+=" --avatar-path --desc --no-desc --desc-pattern"
+    # Notification
+    opts+=" --email --no-email --disable-email --no-disable-email"
+    opts+=" --email-recipient --irc-channel --irker --no-irker --disable-irker"
+    opts+=" --no-disable-irker --irker-host --irker-port --kgb --no-kgb"
+    opts+=" --disable-kgb --no-disable-kgb --kgb-options --tagpending"
+    opts+=" --no-tagpending --disable-tagpending --no-disable-tagpending"
+    # Branch
+    opts+=" --rename-head --no-rename-head --source-branch --dest-branch"
+    opts+=" --enable-remove-source-branch --no-enable-remove-source-branch"
+    opts+=" --disable-remove-source-branch --no-disable-remove-source-branch"
+    # Merge requests
+    opts+=" --mr-allow-squash --no-mr-allow-squash --mr-desc --mr-dst-branch"
+    opts+=" --mr-dst-project --mr-remove-source-branch"
+    opts+=" --no-mr-remove-source-branch --mr-src-branch --mr-src-project"
+    opts+=" --mr-title"
+    # CI
+    opts+=" --build-timeout --ci-config-path"
+    # Pipeline schedules
     opts+=" --schedule-desc --schedule-ref --schedule-cron --schedule-tz"
-    opts+=" --schedule-enable --schedule-disable --schedule-run --schedule-delete"
-    opts+=" --no-remove-source-branch --mr-src-branch --mr-src-project"
-    opts+=" --kgb --no-kgb --kgb-options --irc-channel --path --tagpending"
-    opts+=" --irker --no-irker --disable-irker --no-disable-irker"
-    opts+=" --no-tagpending --no-fail --rename-head --token --token-file"
-    opts+=" --user --user-id --verbose --archived --build-timeout --avatar-path"
-    opts+=" --request-access"
-    local commands=" add_user check_repo checkout co create_repo del_repo"
-    commands+=" del_user group list_groups list_repos ls join push"
-    commands+=" fork forks merge_request merge_requests mr mrs"
-    commands+=" protect_branch protected_branches purge_cache push_repo"
-    commands+=" search search_group search_project search_user"
-    commands+=" update_repo update_safe update_user whoami last_ci_status ci"
-    commands+=" pipes pipelines schedules pipe pipeline schedule"
+    opts+=" --schedule-enable --no-schedule-enable --schedule-disable"
+    opts+=" --no-schedule-disable --schedule-run --no-schedule-run"
+    opts+=" --schedule-delete --no-schedule-delete"
+    # Manage other GitLab instances
+    opts+=" --api-url --git-server-url --irker-server-url --kgb-server-url"
+    opts+=" --tagpending-server-url
+
+# Source: ./lib/Devscripts/Salsa.pm:sub run -> $ ls ./lib/Devscripts/Salsa/*.pm
+# Skipping: Config Hooks Repo -> `with "Devscripts::Salsa::<VALUE>";`
+#           Then filter from: ./lib/Devscripts/Salsa.pm:use constant cmd_aliases -> Preferred terminology
+    local commands=""
+# Headings: $ grep '^=head' ./scripts/salsa.pl
+    # Managing users and groups
+    commands+=" add_user join list_groups update_user whoami"
+    # Managing projects
+    commands+=" checkout fork forks last_ci_status merge_request"
+    commands+=" merge_requests pipeline_schedule pipeline_schedules"
+    commands+=" protect_branch protected_branches push push_repo"
+    commands+=" rename_branch update_safe"
+    # Other
+    commands+=" purge_cache"
+
+# Aliases source: ./lib/Devscripts/Salsa.pm:use constant cmd_aliases -> Preferred terminology
+    commands+=" check_projects create_project delete_project delete_user"
+    commands+=" list_projects list_users search_groups search_projects "
+    commands+=" search_users update_projects"
+
+    # Disable completion for the arguments which require variables afterwards
     case "${prev}" in
       --api-url) ;&
       --desc-pattern) ;&
@@ -41,7 +93,7 @@ _salsa_completion () {
       --path) ;&
       --group-id) ;&
       --user-id)
-	  COMPREPLY=()
+      COMPREPLY=()
         ;;
       *)
         if [[ "$cur" == -* ]]; then
@@ -49,7 +101,7 @@ _salsa_completion () {
         else
             COMPREPLY=( $( compgen -W "$commands" -- $cur ) )
         fi
-	;;
+    ;;
     esac
     return 0
 }

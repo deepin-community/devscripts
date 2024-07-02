@@ -1,8 +1,10 @@
 {
 
     package MockRESTClient;
+    use JSON;
     use URI;
     use Moo;
+    use JSON;
     extends 'GitLab::API::v4::RESTClient';
 
     has _mocks => (

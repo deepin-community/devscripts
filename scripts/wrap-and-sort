@@ -121,13 +121,24 @@ class WrapAndSortControl(Control):
                 archs = sorted(archs, key=lambda x: ("any" not in x, x))
                 paragraph["Architecture"] = " ".join(archs)
 
-        if self.args.sort_binary_packages:
-            if self.filename.endswith("tests/control"):
-                return
-            first = self.paragraphs[: 1 + int(self.args.keep_first)]
-            sortable = self.paragraphs[1 + int(self.args.keep_first) :]
-            sort_key = operator.itemgetter("Package")
-            self.paragraphs = first + sorted(sortable, key=sort_key)
+        if not self.args.sort_binary_packages or self.filename.endswith(
+            "tests/control"
+        ):
+            return
+
+        if self.had_parse_errors:
+            if not self.args.dry_run:
+                print(
+                    f"Skipping sorting of binary packages in {self.filename}:"
+                    " It had parse errors or used template language and the"
+                    " sorting could risk changing the semantics the file."
+                )
+            return
+
+        first = self.paragraphs[: 1 + int(self.args.keep_first)]
+        sortable = self.paragraphs[1 + int(self.args.keep_first) :]
+        sort_key = operator.itemgetter("Package")
+        self.paragraphs = first + sorted(sortable, key=sort_key)
 
     def _wrap_field(self, control, entry, sort):
         if self.is_roundtrip_safe:
@@ -309,7 +320,14 @@ def wrap_and_sort(args):
     for control_file in control_files:
         if args.verbose:
             print(control_file)
-        control = WrapAndSortControl(control_file, args)
+        try:
+            control = WrapAndSortControl(control_file, args)
+        except ValueError as e:
+            print(
+                f"W: Could not parse {control_file} as a Deb822 file: {str(e.args[0])}",
+                file=sys.stderr,
+            )
+            continue
         if args.cleanup:
             control.strip_trailing_whitespace_on_save = True
         control.wrap_and_sort()
@@ -388,7 +406,17 @@ def main():
         " Unqualified debhelper configuration files are applied to the first package.",
         dest="keep_first",
         action="store_true",
-        default=False,
+        default=True,
+    )
+    parser.add_argument(
+        "--no-keep-first",
+        help="When sorting binary package paragraphs, do not treat the first"
+        " binary package specially. This may cause Unqualified debhelper"
+        " configuration files to be applied to a different package than"
+        " originally intended",
+        dest="keep_first",
+        action="store_false",
+        default=True,
     )
     parser.add_argument(
         "-n",

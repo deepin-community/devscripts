@@ -1,0 +1,7 @@
+Source: foo
+
+Package: bar
+@TEMPLATE_AS_A_FIELD@
+Description: foo
+
+

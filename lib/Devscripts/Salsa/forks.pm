@@ -9,7 +9,7 @@ sub forks {
     my ($self, @reponames) = @_;
     my $res = 0;
     unless (@reponames) {
-        ds_warn "Repository name is missing";
+        ds_warn "Project name is missing";
         return 1;
     }
     foreach my $p (@reponames) {

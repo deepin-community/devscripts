@@ -31,8 +31,7 @@ And now, in alphabetical order, the scripts:
 - bts: A command-line tool for accessing the Debian Bug Tracking System, both
   to send mails to control@bts.debian.org and to access the web pages and
   SOAP interface of the BTS. [www-browser, libauthen-sasl-perl,
-  libnet-smtps-perl, libsoap-lite-perl, liburi-perl, libwww-perl,
-  bsd-mailx | mailx]
+  libsoap-lite-perl, liburi-perl, libwww-perl, bsd-mailx | mailx]
 
 - build-rdeps: Searches for all packages that build-depend on a given package.
   [dctrl-tools, dose-extra, libdpkg-perl]
@@ -55,7 +54,7 @@ And now, in alphabetical order, the scripts:
   ssh-client]
 
 - cvs-debuild: A wrapper for cvs-buildpackage to use debuild as its package
-  building program. [cvs-buildpackage, fakeroot, lintian, gnupg |gnupg2]
+  building program. [cvs-buildpackage, lintian, gnupg |gnupg2]
 
 - dcmd: run a given command replacing the name of a .changes or .dsc file
   with each of the files referenced therein. *
@@ -79,8 +78,7 @@ And now, in alphabetical order, the scripts:
   source trees below the current directory, and if requested, also remove
   all files that were generated from these source trees (that is .deb, .dsc
   and .changes files).  It will keep the .diffs and original files, though,
-  so that the binaries and other files can be rebuilt if necessary.
-  [fakeroot]*
+  so that the binaries and other files can be rebuilt if necessary. *
 
 - debcommit: Commits changes to cvs, darcs, svn, svk, tla, bzr, git, or hg,
   using new entries in debian/changelog as the commit message. Also supports
@@ -101,11 +99,10 @@ And now, in alphabetical order, the scripts:
   that old patches still apply to newer versions of those packages.
   [python3-debian, python3-unidiff, quilt]
 
-- debi: Installs the current package by using the setuid root debpkg
-  script described below.  It assumes that the current package has
-  just been built (for example by debuild), and the .deb lives in the
-  parent directory, and will effectively run dpkg -i on the .deb.  The
-  ability to install the package with a very short command is very
+- debi: Installs the current package by using dpkg.  It assumes that the
+  current package has just been built (for example by debuild), and the .deb
+  lives in the parent directory, and will effectively run dpkg -i on the .deb.
+  The ability to install the package with a very short command is very
   useful when troubleshooting packages.
 
 - debootsnap: Combines debootstrap and snapshot.debian.org to create a chroot
@@ -114,17 +111,6 @@ And now, in alphabetical order, the scripts:
   tool is also used by debrebuild to build a package in a chroot with build
   dependencies in the same version as recorded in the buildinfo file.
   [apt-utils, dpkg-dev, equivs, mmdebstrap, python3-pycurl]
-
-- debpkg: A wrapper for dpkg used by debi to allow convenient testing
-  of packages.  For debpkg to work, it needs to be made setuid root,
-  and this needs to be performed by the sysadmin -- it is not
-  installed as setuid root by default.  (Note that being able to run a
-  setuid root debpkg is effectively the same as having root access to
-  the system, so this should be done with caution.)  Having debpkg as
-  a wrapper for dpkg can be a Good Thing (TM), as it decreases the
-  potential for damage by accidental wrong use of commands in
-  superuser mode (e.g., an inadvertent rm -rf * in the wrong directory
-  is disastrous as many can attest to).
 
 - debrelease: A wrapper around dupload or dput which figures out which
   version to upload, and then calls dupload or dput to actually perform
@@ -159,12 +145,8 @@ And now, in alphabetical order, the scripts:
 - debuild: A wrapper for building a package (i.e., dpkg-buildpackage) to
   avoid problems with insufficient permissions and wrong paths etc.
   Debuild will set up the proper environment for building a package.
-  Debuild will use the fakeroot program to build the package by default, but
-  can be instructed to use any other gain-root command, or can even be
-  installed setuid root.  Debuild can also be used to run various of
-  the debian/rules operations with the same root-gaining procedure.
   Debuild will also run lintian to check that the package does not
-  have any major policy violations. [fakeroot, lintian, gnupg | gnupg2]*
+  have any major policy violations. [lintian, gnupg | gnupg2]*
 
 - deb-janitor: command-line client for interacting with the Debian Janitor.
 
@@ -340,54 +322,6 @@ Typical Maintenance cycle with devscripts
 8. Optionally, use debcommit --release to commit and tag the release
    in revision control.
 
-
-Wrapper scripts
----------------
-
-Devscripts includes two wrappers (the above mentioned "debuild" and
-"debpkg") that are intended to make life easier for Debian developers.
-These wrappers unset most environment variables for security reasons,
-set a secure PATH and then run the appropriate program (such as dpkg).
-Processing Makefiles is inherently dangerous though, since any UNIX
-command can be executed.  The fakeroot command makes it possible to
-build a package in a secure way: it does not require any genuine root
-access, but rather pretends that it has it.  It is strongly
-recommended that you install the "fakeroot" package!  Installation of
-a package with dpkg always requires superuser mode and is therefore
-inherently dangerous.  Debi aims to reduce the possibility of typos
-by only performing a dpkg -i as root.  This does not, however, do
-anything for security, as there is no problem creating a package with
-a setuid-root shell using fakeroot and then installing it with debpkg.
-So only allow trusted users access to a setuid root debpkg, if at all!
-
-The wrappers have to be manually equipped to gain the necessary
-privileges to do their jobs because of security concerns.  You have to
-equip "debpkg" with superuser privileges.  "debuild" needs superuser
-privileges only if fakeroot or another gain-root command is not
-available.
-
-You can either:
-
-(a) invoke these wrappers from "sudo" or "super" or any other way you
-    have to control superuser access, or
-
-(b) you can set them up to be accessible only to a group of users.
-    (Some people suggest that this is highly dangerous since it
-    creates another executable that runs with the setuid root bit set
-    and which won't ever ask you for a password!)  If you choose this
-    method, it can be done by issuing the following command:
-
-      dpkg-statoverride --update --add root root_group 4754 /usr/bin/debpkg
-
-    once (and similarly for debuild if you really need it).  This will
-    enable access to debpkg for all users who are members of the group
-    "root_group".  Remember that you are in effect giving those users
-    superuser access to your system!  This information will be stored
-    in the dpkg database and remembered across upgrades.
-
-    Because of the security implications, only do this on your home
-    Linux box, NOT on a busy internet server (and possibly not even
-    there).
 
 Originally by Christoph Lameter <clameter@waterf.org>
 Modified extensively by Julian Gilbey <jdg@debian.org>

@@ -1,3 +1,157 @@
+devscripts (2.23.7) unstable; urgency=medium
+
+  [ Nicholas D Steeves ]
+  * debsign: Override the gpg2 default to update trustdb at what may be an
+    inconvenient time, because an up-to-date trustdb is not needed for this
+    operation (Closes: Bug#1050387)
+
+  [ Niels Thykier ]
+  * wrap-and-sort:
+    + Add a --no-keep-first option
+    + Make --keep-first the default
+    + Support wrap-and-sort'ing d/control.in template files
+    + Cope better with deb822 parse errors
+  * README:
+    + Remove obsolete section about setuid wrappers
+    + Remove `fakeroot` from `debclean` and `debuild` dependencies
+  * debuild.pl: Clarify that the `fakeroot` default comes from dpkg-buildpackage
+  * dpkg-genbuilddeps.sh: Remove explicit `-rfakeroot` from error message
+  * d/control: Remove `fakeroot` from Depends. (Closes: #1041150)
+
+  [ g0t mi1k ]
+  * salsa:
+    + Split edit_project -> edit_project_multipart
+    + Only set avatar if told too
+    + Check if project is public for remote avatar
+    + Set user-agent when remotely checking md5
+    + List members including inherited
+    + Improve some salsa messages
+    + Drop --request-acc, duplicate of --request-access
+    + Update doc and comments
+    + Add ENVIRONMENTS, FEATURE_FLAGS, INFRASTRUCTURE, MONITOR
+      and SECURITY_COMPLIANCE
+    + Add ENABLE_SERVICE_DESK
+
+  [ Sean Whitton ]
+  * debchange: For --lts uploads, use urgency=high.
+
+  [ Damyan Ivanov ]
+  * new default KGB webhook URL (https)
+
+  [ Yadd ]
+  * Update French translation
+
+  [ Jochen Sprickerhof ]
+  * uscan: support zstd in more cases
+
+  [ Danilo Egea Gondolfo ]
+  * Move libgitlab-api-v4-perl to Suggests on Ubuntu (LP: #2046242)
+
+  [ Carlos Henrique Lima Melara ]
+  * uscan: add optional V prefix in @ANY_VERSION@ (Closes: #1037173)
+
+  [ Gioele Barabucci ]
+  * build-rdeps: Use all available distros by default. Restrict to unstable/sid
+    only if explicitly requested via the new parameter --only-devel.
+    (Closes: #1032396)
+
+  [ Diego Escalante Urrelo ]
+  * mk-build-deps: Actually use MKBUILDDEPS_ROOTCMD
+
+  [ Christian Göttsche ]
+  * MkOrigtargz.pm: dump newline to same output as messages
+
+  [ Benjamin Drung ]
+  * mk-origtargz/uscan: replace xpi-unpack by unzip to drop mozilla-devscripts
+  * uscan: Update GitHub documentation to use api.github.com
+    (Closes: #931091, #950880, #1019696, #1040314)
+
+  [ Athos Ribeiro ]
+  * uscan: remove duplicated example from docs
+
+ -- Benjamin Drung <bdrung@debian.org>  Tue, 12 Dec 2023 21:54:20 +0100
+
+devscripts (2.23.6) unstable; urgency=medium
+
+  * Team upload
+
+  [ Yadd ]
+  * fix salsa test (Closes: #1038486)
+  * add dependency to libjson-perl
+
+  [ gregor herrmann ]
+  * test/t/salsa.pm: use JSON (Closes: #1038486)
+
+ -- Yadd <yadd@debian.org>  Wed, 23 Aug 2023 07:51:13 +0400
+
+devscripts (2.23.5) unstable; urgency=medium
+
+  [ Benjamin Drung ]
+  * debchange: Update to current Debian distributions (Add bookworm and trixie
+    and drop stretch, jessie, and wheezy) (Closes: #1037336)
+  * test: Unset UBUMAIL for testEncoding
+  * Drop debpkg to make devscripts architecture all. Instead of debpkg please
+    use sudo for debi (or, highly dangerous, make dpkg setuid root).
+
+  [ Guillem Jover ]
+  * Devscripts::Compression: Switch to new Dpkg::Compression getters
+    (Closes: #1027718)
+
+  [ Cyril Brulebois ]
+  * build-rdeps: Add support for non-free-firmware
+  * chdist: Update sources.list examples with non-free-firmware
+
+  [ Jussi Hakala ]
+  * dget: download binary packages that only come from the requested source
+    package (Closes: #1027962)
+
+  [ Ian Jackson ]
+  * grep-excuses: --autopkgtests: do not report NEUTRAL
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * rewrite annotate-output to avoid needing temporary directory/fifos
+    (Closes: #919563)
+
+ -- Benjamin Drung <bdrung@debian.org>  Mon, 12 Jun 2023 17:33:27 +0200
+
+devscripts (2.23.4) unstable; urgency=medium
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * uscan: s/+dfsg1/+dfsg/ repack suffix to avoid lintian
+    anticipated-repack-count.  MR: !340
+
+  [ Arnaud Rebillout ]
+  * Salsa/Hooks: fix _check_config for boolean.  MR: !339
+
+  [ Jakub Kuczys ]
+  * deb-reversion:
+    + Fix issues with paths that have spaces in them.  MR: !341
+    + Allow reversioning of debs without changelog.  MR: !342
+    + Make deb-reversion not dependent on system locale
+
+  [ Dominique Dumont ]
+  * bts:
+    + drop obsolete Net::SMTPS (Closes: 1029588)  MR: !343
+    + clean up usage of obsolete Net::SMTPS
+
+  [ Roland Mas ]
+  * uscan: Fix uscan for multiple mode=git sources, thanks to Jonas Smedegaard
+    for the patch. Closes: #1004213.  MR: !300
+
+  [ Tobias Frost ]
+  * mk-build-deps: remove buildinfo and changes file (Closes: #989696)
+
+  [ Nelson A. de Oliveira ]
+  * dget: Make dget understand -k option (Closes: #597988)
+
+  [ Benjamin Drung ]
+  * Fix or drop several wrong fuzzy German and Portuguese translations
+
+  [ Jakub Wilk ]
+  * Fix syntax error in salsa bash completion (Closes: #1033973)
+
+ -- Benjamin Drung <bdrung@debian.org>  Wed, 05 Apr 2023 12:40:28 +0200
+
 devscripts (2.23.3) unstable; urgency=medium
 
   [ Samuel Henrique ]

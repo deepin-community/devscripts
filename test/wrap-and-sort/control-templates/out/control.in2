@@ -1,0 +1,11 @@
+Source: foo
+
+{% for x in something; do %}
+
+Package: {% x %}
+
+{% end %}
+
+Package: foo-doc
+Description: foo docs
+

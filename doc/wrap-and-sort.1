@@ -55,10 +55,15 @@ Unqualified
 .BR debhelper (7)
 configuration files are applied to the first package.
 .TP
+
+\fB\-\-no\-keep\-first\fR
+When sorting binary package paragraphs, do not treat the first package
+specially (opposite of \-\-keep\-first)
+.TP
 \fB\-n\fR, \fB\-\-no\-cleanup\fR
 Do not remove trailing whitespaces.
 .TP
-\fB\-t\fR, \fB\-\-trailing-comma\fR
+\fB\-t\fR, \fB\-\-trailing\-comma\fR
 Add a trailing comma at the end of the sorted fields.
 This minimizes future differences in the VCS commits when additional
 dependencies are appended or removed.
@@ -85,15 +90,8 @@ Do not modify any file, instead only print the files that would be modified.
 
 .TP
 \fB\-\-experimental\-rts\-parser\fR
-Enable the experimental round\-trip safe parser.  When enabled, most comments
-in deb822 control will be preserved.
-
-The option is a temporary means to enable users to opt-in to this new experimental
-feature. The option will be removed once the new parser is mature enough and is
-ready to unconditionally replace the previous parser.
-
-This option requires python\-debian version 0.1.43 or later to work.  However, some
-features will require 0.1.44 or later.
+Temporary option accepted for compatibility with an experiment. It no longer
+does anything. Please remove any use of it.
 
 .SH AUTHORS
 \fBwrap\-and\-sort\fP and this manpage have been written by

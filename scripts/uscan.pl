@@ -286,7 +286,7 @@ F<debian/changelog> file.
 
 This is substituted by the legal upstream version regex (capturing).
 
-  [-_]?v?(\d[\-+\.:\~\da-zA-Z]*)
+  [-_]?[Vv]?(\d[\-+\.:\~\da-zA-Z]*)
 
 =item B<@ARCHIVE_EXT@>
 
@@ -462,9 +462,9 @@ the "B<git describe --tags | sed s/-/./g>" command instead. For example, if the
 commit is the B<5>-th after the last tag B<v2.17.12> and its short hash is
 B<ged992511>, then the string is B<v2.17.12.5.ged992511> .  For this case, it is
 good idea to add B<uversionmangle=s/^/0.0~/> or B<uversionmangle=s/^v//> to make
-the upstream version string compatible with Debian.  B<uversionmangle=s/^v//>
-may work as well.  Please note that in order for B<pretty=describe> to function
-well, upstream need to avoid tagging with random alphabetic tags.
+the upstream version string compatible with Debian.  Please note that in order
+for B<pretty=describe> to function well, upstream need to avoid tagging with
+random alphabetic tags.
 
 The B<pretty=describe> forces to set B<gitmode=full> to make a full local clone
 of the repository automatically.
@@ -670,7 +670,7 @@ tarball URL.
 
 Generate the version string I<< <oversion> >> of the source tarball I<<
 <spkg>_<oversion>.orig.tar.gz >> from I<< <uversion> >>.  This should be used
-to add a suffix such as B<+dfsg1> to a MUT package.
+to add a suffix such as B<+dfsg> to a MUT package.
 
 =back
 
@@ -714,20 +714,20 @@ For example, if the first entry of F<debian/changelog> is:
 
 =over
 
-=item * I<< bar >> (B<3:2.03+dfsg1-4>) unstable; urgency=low
+=item * I<< bar >> (B<3:2.03+dfsg-4>) unstable; urgency=low
 
 =back
 
 then, the source package name is I<< bar >> and the last Debian package version
-is B<3:2.03+dfsg1-4>.
+is B<3:2.03+dfsg-4>.
 
-The last upstream version is normalized to B<2.03+dfsg1> by removing the epoch
+The last upstream version is normalized to B<2.03+dfsg> by removing the epoch
 and the Debian revision.
 
 If the B<dversionmangle> rule exists, the last upstream version is further
 normalized by applying this rule to it.  For example, if the last upstream
-version is B<2.03+dfsg1> indicating the source tarball is repackaged, the
-suffix B<+dfsg1> is removed by the string substitution B<s/\+dfsg\d*$//> to
+version is B<2.03+dfsg> indicating the source tarball is repackaged, the
+suffix B<+dfsg> is removed by the string substitution B<s/\+dfsg\d*$//> to
 make the (dversionmangled) last upstream version B<2.03> and it is compared to
 the candidate upstream tarball versions such as B<2.03>, B<2.04>, ... found in
 the remote site.  Thus, set this rule as:
@@ -872,7 +872,7 @@ report an error.
 
 If the B<oversionmangle> rule exists, the source tarball version I<oversion> is
 generated from the downloaded upstream version I<uversion> by applying this
-rule. This rule is useful to add suffix such as B<+dfsg1> to the version of all
+rule. This rule is useful to add suffix such as B<+dfsg> to the version of all
 the source packages of the MUT package for which the repacksuffix mechanism
 doesn't work.
 
@@ -907,16 +907,16 @@ the B<repacksuffix> option for the single upstream package.    Here I<< <oversio
 is updated to be I<< <oversion><suffix> >>.
 
 The removal of files is required if files are not DFSG-compliant.  For such
-case, B<+dfsg1> is used as I<suffix>.
+case, B<+dfsg> is used as I<suffix>.
 
 So the combined options are set as
-B<opts="dversionmangle=s/\+dfsg\d*$// ,repacksuffix=+dfsg1">, instead.
+B<opts="dversionmangle=s/\+dfsg\d*$// ,repacksuffix=+dfsg">, instead.
 
 For example, the repacked upstream tarball may be:
 
 =over
 
-=item * F<../bar_2.04+dfsg1.orig.tar.gz> (repackaged)
+=item * F<../bar_2.04+dfsg.orig.tar.gz> (repackaged)
 
 =back
 
@@ -1104,7 +1104,7 @@ The upstream part of the Debian version number can be mangled to indicate the
 source package was repackaged to clean up non-DFSG files:
 
   version=4
-  opts="dversionmangle=s/\+dfsg\d*$//,repacksuffix=+dfsg1" \
+  opts="dversionmangle=s/\+dfsg\d*$//,repacksuffix=+dfsg" \
   http://some.site.org/some/path/foobar-@ANY_VERSION@@ARCHIVE_EXT@
 
 See L<COPYRIGHT FILE EXAMPLES>.
@@ -1151,11 +1151,11 @@ some way into one which will work automatically, for example:
 =head2 HTTP site (oversionmangle, MUT)
 
 The option B<oversionmangle> can be used to mangle the version of the source
-tarball (B<.orig.tar.gz> and B<.orig-bar.tar.gz>).  For example, B<+dfsg1> can
+tarball (B<.orig.tar.gz> and B<.orig-bar.tar.gz>).  For example, B<+dfsg> can
 be added to the upstream version as:
 
   version=4
-  opts=oversionmangle=s/(.*)/$1+dfsg1/ \
+  opts=oversionmangle=s/(.*)/$1+dfsg/ \
   http://example.com/~user/release/foo.html \
   files/foo-@ANY_VERSION@@ARCHIVE_EXT@ debian
   opts="component=bar" \
@@ -1243,15 +1243,34 @@ Here, B<%> is used as the separator instead of the standard B</>.
 
 =head2 github.com
 
-For GitHub based projects, you can use the tags or releases page.  The archive
-URL uses only the version as the filename.  You can rename the downloaded
-upstream tarball from into the standard F<< <project>-<version>.tar.gz >> using
-B<filenamemangle>:
+For GitHub based projects, you can use the releases or tags API page.  If
+upstream releases properly named tarballs on their releases page, you can
+search for the browser download URL (API key F<browser_download_url>):
 
   version=4
-  opts="filenamemangle=s%(?:.*?)?v?@ANY_VERSION@(@ARCHIVE_EXT@)%@PACKAGE@-$1$2%" \
-      https://github.com/<user>/<project>/tags \
-      (?:.*?/)?v?@ANY_VERSION@@ARCHIVE_EXT@
+  opts="searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
+      https://github.com/<user>/<project>/releases/download/[^/]+/@PACKAGE@-@ANY_VERSION@@ARCHIVE_EXT@
+
+If the release page only contains the auto-generated tar.gz source code tarball,
+search for the tarball URL (API key F<tarball_url>). The tarball URL uses only
+the version as the filename.  You can rename the downloaded upstream tarball
+into the standard F<< <project>-<version>.tar.gz >> using B<filenamemangle>:
+
+  version=4
+  opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
+      https://api.github.com/repos/<user>/<project>/tarball/@ANY_VERSION@
+
+If there are no upstream releases, you can query the equivalent tags page:
+
+  version=4
+  opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/tags?per_page=100 \
+      https://api.github.com/repos/<user>/<project>/tarball/refs/tags/@ANY_VERSION@
+
+If upstream releases alpha/beta tarballs, you will need to make use of the
+B<uversionmangle> option: F<uversionmangle=s/(a|alpha|b|beta|c|dev|pre|rc)/~$1/>
 
 =head2 PyPI
 
@@ -1800,10 +1819,9 @@ Instead of symlinking as described above, rename the downloaded files.
 After having downloaded an lzma tar, xz tar, bzip tar, gz tar, zip, jar, xpi,
 zstd archive, repack it to the specified compression (see B<--compression>).
 
-The unzip package must be installed in order to repack zip and jar archives,
-the mozilla-devscripts package must be installed to repack xpi archives,
-the xz-utils package must be installed to repack lzma or xz tar archives, and
-zstd must be installed to repack zstd archives.
+The unzip package must be installed in order to repack zip, jar, and xpi
+archives, the xz-utils package must be installed to repack lzma or xz tar
+archives, and zstd must be installed to repack zstd archives.
 
 =item B<--compression> [ B<gzip> | B<bzip2> | B<lzma> | B<xz> ]
 
@@ -2200,4 +2218,3 @@ sub process_watchfile {
 #######################################################################
 # }}} code 2: process watchfile by looping over watchline
 #######################################################################
-

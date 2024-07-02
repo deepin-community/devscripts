@@ -204,6 +204,7 @@ $config_vars{'MKBUILDDEPS_ROOTCMD'} =~ /./
   = $config_default{'MKBUILDDEPS_ROOTCMD'};
 
 $install_tool = $config_vars{'MKBUILDDEPS_TOOL'};
+$root_cmd     = $config_vars{'MKBUILDDEPS_ROOTCMD'};
 
 if ($config_vars{'MKBUILDDEPS_REMOVE_AFTER_INSTALL'} =~ /yes/) {
     $opt_remove = 1;
@@ -422,11 +423,13 @@ if ($opt_install) {
         push(@root, shellwords($root_cmd));
     }
 
-    my (@pkg_names, @deb_files, %uniq);
+    my (@pkg_names, @deb_files, @buildinfo_files, @changes_files, %uniq);
     for my $package (@packages) {
         if ($uniq{ $package->{deb_file} }++ == 0) {
-            push @pkg_names, $package->{package};
-            push @deb_files, $package->{deb_file};
+            push @pkg_names,       $package->{package};
+            push @deb_files,       $package->{deb_file};
+            push @buildinfo_files, $package->{buildinfo_file};
+            push @changes_files,   $package->{changes_file};
         }
     }
 
@@ -458,6 +461,8 @@ if ($opt_install) {
                 $err = 1;
             } elsif ($opt_remove) {
                 unlink $deb_files[$i];
+                unlink $buildinfo_files[$i];
+                unlink $changes_files[$i];
             }
         }
         if ($err) {
@@ -599,9 +604,13 @@ sub build_equiv {
     my $v = Dpkg::Version->new($version);
     # The version in the .deb filename will not contain the epoch
     $version = $v->as_string(omit_epoch => 1);
-    my $deb_file = "${pkgname}_${version}_${packagearch}.deb";
+    my $deb_file       = "${pkgname}_${version}_${packagearch}.deb";
+    my $buildinfo_file = "${pkgname}_${version}_${hostarch}.buildinfo";
+    my $changes_file   = "${pkgname}_${version}_${hostarch}.changes";
     return {
-        package  => $pkgname,
-        deb_file => $deb_file
+        package        => $pkgname,
+        deb_file       => $deb_file,
+        buildinfo_file => $buildinfo_file,
+        changes_file   => $changes_file,
     };
 }

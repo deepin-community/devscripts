@@ -104,7 +104,7 @@ use List::Util qw/first/;
 use Moo;
 
 use constant {
-    ANY_VERSION => '(?:[-_]?v?(\d[\-+\.:\~\da-zA-Z]*))',
+    ANY_VERSION => '(?:[-_]?[Vv]?(\d[\-+\.:\~\da-zA-Z]*))',
     ARCHIVE_EXT =>
       '(?i)(?:\.(?:tar\.xz|tar\.bz2|tar\.gz|tar\.zstd?|zip|tgz|tbz|txz))',
     DEB_EXT => '(?:[\+~](debian|dfsg|ds|deb)(\.)?(\d+)?$)',

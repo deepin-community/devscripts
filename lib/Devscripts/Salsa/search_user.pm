@@ -1,5 +1,5 @@
 # Searches users using given string
-package Devscripts::Salsa::search_user;
+package Devscripts::Salsa::search_user;    # search_users
 
 use strict;
 use Devscripts::Output;
