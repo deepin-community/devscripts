@@ -15,9 +15,10 @@ unstable:
   <<: *test
   image: debian:unstable
 
-testing:
-  <<: *test
-  image: debian:testing
+# python-flake8 >= 6.1.0-1 needs to migrate to testing
+#testing:
+#  <<: *test
+#  image: debian:testing
 
 ubuntu-devel:
   <<: *test

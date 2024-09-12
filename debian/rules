@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 
-UBU_SUGGESTS=debian-keyring, equivs, liblwp-protocol-https-perl, libsoap-lite-perl, pristine-tar
+UBU_SUGGESTS=debian-keyring, equivs, libgitlab-api-v4-perl, liblwp-protocol-https-perl, libsoap-lite-perl, pristine-tar
 ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo ubuntu),ubuntu)
  SUBSTVARS=-V'vendor:Suggests=$(UBU_SUGGESTS)' -V'vendor:Recommends='
 else

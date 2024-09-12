@@ -1,4 +1,4 @@
-# Clones or updates a repository using gbp
+# Clones or updates a project's repository using gbp
 # TODO: git-dpm ?
 package Devscripts::Salsa::checkout;
 
@@ -17,11 +17,11 @@ sub checkout {
         return 1;
     }
     if (@repos and $self->config->all) {
-        ds_warn "--all with a reponame makes no sense";
+        ds_warn "--all with a project name makes no sense";
         return 1;
     }
     if (@repos and $self->config->all_archived) {
-        ds_warn "--all-archived with a reponame makes no sense";
+        ds_warn "--all-archived with a project name makes no sense";
         return 1;
     }
     # If --all is asked, launch all projects
@@ -41,12 +41,12 @@ sub checkout {
                 nocheck    => 1,
             );
             if ($?) {
+                $res++;
                 if ($self->config->no_fail) {
-                    print STDERR "gbp pull fails in $_, "
-                      . "continuing since --no-fail is set\n";
-                    $res++;
+                    print STDERR "gbp pull fails in $_\n";
                 } else {
                     ds_warn "gbp pull failed in $_\n";
+                    ds_verbose "Use --no-fail to continue";
                     return 1;
                 }
             }
@@ -61,12 +61,12 @@ sub checkout {
                 nocheck    => 1,
             );
             if ($?) {
+                $res++;
                 if ($self->config->no_fail) {
-                    print STDERR "gbp clone fails in $_, "
-                      . "continuing since --no-fail is set\n";
-                    $res++;
+                    print STDERR "gbp clone fails in $_\n";
                 } else {
                     ds_warn "gbp clone failed for $_\n";
+                    ds_verbose "Use --no-fail to continue";
                     return 1;
                 }
             }

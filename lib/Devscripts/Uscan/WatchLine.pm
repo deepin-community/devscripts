@@ -1364,7 +1364,7 @@ sub download_file_and_sig {
                     uscan_warn "Please install xz-utils or lzma.";
                     return $self->status(1);
                 }
-            } elsif ($suffix_gz =~ /^zstd?$/) {
+            } elsif ($suffix_gz =~ /.zstd?/) {
                 if (-x '/usr/bin/unzstd') {
                     uscan_exec('/usr/bin/unzstd', "--keep",
                         "$self->{config}->{destdir}/$sigfile_base");

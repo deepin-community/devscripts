@@ -286,7 +286,7 @@ F<debian/changelog> file.
 
 This is substituted by the legal upstream version regex (capturing).
 
-  [-_]?v?(\d[\-+\.:\~\da-zA-Z]*)
+  [-_]?[Vv]?(\d[\-+\.:\~\da-zA-Z]*)
 
 =item B<@ARCHIVE_EXT@>
 
@@ -462,9 +462,9 @@ the "B<git describe --tags | sed s/-/./g>" command instead. For example, if the
 commit is the B<5>-th after the last tag B<v2.17.12> and its short hash is
 B<ged992511>, then the string is B<v2.17.12.5.ged992511> .  For this case, it is
 good idea to add B<uversionmangle=s/^/0.0~/> or B<uversionmangle=s/^v//> to make
-the upstream version string compatible with Debian.  B<uversionmangle=s/^v//>
-may work as well.  Please note that in order for B<pretty=describe> to function
-well, upstream need to avoid tagging with random alphabetic tags.
+the upstream version string compatible with Debian.  Please note that in order
+for B<pretty=describe> to function well, upstream need to avoid tagging with
+random alphabetic tags.
 
 The B<pretty=describe> forces to set B<gitmode=full> to make a full local clone
 of the repository automatically.
@@ -1243,15 +1243,34 @@ Here, B<%> is used as the separator instead of the standard B</>.
 
 =head2 github.com
 
-For GitHub based projects, you can use the tags or releases page.  The archive
-URL uses only the version as the filename.  You can rename the downloaded
-upstream tarball from into the standard F<< <project>-<version>.tar.gz >> using
-B<filenamemangle>:
+For GitHub based projects, you can use the releases or tags API page.  If
+upstream releases properly named tarballs on their releases page, you can
+search for the browser download URL (API key F<browser_download_url>):
 
   version=4
-  opts="filenamemangle=s%(?:.*?)?v?@ANY_VERSION@(@ARCHIVE_EXT@)%@PACKAGE@-$1$2%" \
-      https://github.com/<user>/<project>/tags \
-      (?:.*?/)?v?@ANY_VERSION@@ARCHIVE_EXT@
+  opts="searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
+      https://github.com/<user>/<project>/releases/download/[^/]+/@PACKAGE@-@ANY_VERSION@@ARCHIVE_EXT@
+
+If the release page only contains the auto-generated tar.gz source code tarball,
+search for the tarball URL (API key F<tarball_url>). The tarball URL uses only
+the version as the filename.  You can rename the downloaded upstream tarball
+into the standard F<< <project>-<version>.tar.gz >> using B<filenamemangle>:
+
+  version=4
+  opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
+      https://api.github.com/repos/<user>/<project>/tarball/@ANY_VERSION@
+
+If there are no upstream releases, you can query the equivalent tags page:
+
+  version=4
+  opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
+      https://api.github.com/repos/<user>/<project>/tags?per_page=100 \
+      https://api.github.com/repos/<user>/<project>/tarball/refs/tags/@ANY_VERSION@
+
+If upstream releases alpha/beta tarballs, you will need to make use of the
+B<uversionmangle> option: F<uversionmangle=s/(a|alpha|b|beta|c|dev|pre|rc)/~$1/>
 
 =head2 PyPI
 
@@ -1800,10 +1819,9 @@ Instead of symlinking as described above, rename the downloaded files.
 After having downloaded an lzma tar, xz tar, bzip tar, gz tar, zip, jar, xpi,
 zstd archive, repack it to the specified compression (see B<--compression>).
 
-The unzip package must be installed in order to repack zip and jar archives,
-the mozilla-devscripts package must be installed to repack xpi archives,
-the xz-utils package must be installed to repack lzma or xz tar archives, and
-zstd must be installed to repack zstd archives.
+The unzip package must be installed in order to repack zip, jar, and xpi
+archives, the xz-utils package must be installed to repack lzma or xz tar
+archives, and zstd must be installed to repack zstd archives.
 
 =item B<--compression> [ B<gzip> | B<bzip2> | B<lzma> | B<xz> ]
 
@@ -2200,4 +2218,3 @@ sub process_watchfile {
 #######################################################################
 # }}} code 2: process watchfile by looping over watchline
 #######################################################################
-

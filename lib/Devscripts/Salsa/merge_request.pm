@@ -6,7 +6,7 @@ use Devscripts::Output;
 use Dpkg::IPC;
 use Moo::Role;
 
-with 'Devscripts::Salsa::search_project';
+with 'Devscripts::Salsa::search_project';    # search_projects
 
 sub merge_request {
     my ($self, $dst_project, $dst_branch) = @_;
@@ -30,7 +30,7 @@ sub merge_request {
         ds_verbose "using current branch as source";
         my $out;
         unless ($src_project) {
-            # 1. Verify that repo is ready
+            # 1. Verify that project is ready
             spawn(
                 exec       => [qw(git status -s -b -uno)],
                 wait_child => 1,

@@ -1,5 +1,5 @@
-# Creates repo using name or path
-package Devscripts::Salsa::create_repo;
+# Creates project using name or path
+package Devscripts::Salsa::create_repo;    # create_project
 
 use strict;
 use Devscripts::Output;
@@ -11,7 +11,7 @@ with "Devscripts::Salsa::Hooks";
 sub create_repo {
     my ($self, $reponame) = @_;
     unless ($reponame) {
-        ds_warn "Repository name is missing";
+        ds_warn "Project name is missing";
         return 1;
     }
     # Get parameters from Devscripts::Salsa::Repo

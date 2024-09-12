@@ -8,7 +8,7 @@ use Moo::Role;
 sub protected_branches {
     my ($self, $reponame) = @_;
     unless ($reponame) {
-        ds_warn "Repository name is missing";
+        ds_warn "Project name is missing";
         return 1;
     }
     my $branches

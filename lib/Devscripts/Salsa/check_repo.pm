@@ -17,7 +17,9 @@ sub check_repo {
 }
 
 sub _url_md5_hex {
-    my $res = LWP::UserAgent->new->get(shift());
+    my $url = shift;
+    my $ua  = LWP::UserAgent->new;
+    my $res = $ua->get($url, "User-Agent" => "Devscripts/2.22.3",);
     if (!$res->is_success) {
         return undef;
     }
@@ -44,15 +46,15 @@ sub _check_repo {
     my @repos = $self->get_repo(0, @reponames);
     return @repos unless (ref $repos[0]);
     foreach my $repo (@repos) {
-        my ($id, $name) = @$repo;
-        ds_debug "Checking $name ($id)";
         my @err;
+        my ($id, $name) = @$repo;
         my $project = eval { $self->api->project($id) };
         unless ($project) {
             ds_debug $@;
             ds_warn "Project $name not found";
             next;
         }
+        ds_debug "Checking $name ($id)";
         # check description
         my %prms           = $self->desc($name);
         my %prms_multipart = $self->desc_multipart($name);
@@ -68,36 +70,48 @@ sub _check_repo {
               if ($prms{build_timeout} ne $project->{build_timeout});
         }
         # check features (w/permission) & ci config
-        foreach (
-            qw(analytics_access_level
+        foreach (qw(
+            analytics_access_level
             auto_devops_enabled
             builds_access_level
+            ci_config_path
             container_registry_access_level
+            environments_access_level
+            feature_flags_access_level
             forking_access_level
+            infrastructure_access_level
             issues_access_level
             lfs_enabled
             merge_requests_access_level
+            monitor_access_level
             packages_enabled
             pages_access_level
             releases_access_level
+            remove_source_branch_after_merge
             repository_access_level
             request_access_enabled
             requirements_access_level
+            security_and_compliance_access_level
+            service_desk_enabled
             snippets_access_level
             wiki_access_level
-            remove_source_branch_after_merge
-            ci_config_path
-            request_access_enabled)
+            )
         ) {
-            push @err, "$_ should be $prms{$_}"
+            my $helptext = '';
+            $helptext = ' (enabled)'
+              if (defined $prms{$_} and $prms{$_} eq 1);
+            $helptext = ' (disabled)'
+              if (defined $prms{$_} and $prms{$_} eq 0);
+            push @err, "$_ should be $prms{$_}$helptext"
               if (defined $prms{$_}
                 and (!defined($project->{$_}) or $project->{$_} ne $prms{$_}));
         }
         # only public projects are accepted
-        push @err, "private" unless ($project->{visibility} eq "public");
+        push @err, "Project visibility: $project->{visibility}"
+          unless ($project->{visibility} eq "public");
         # Default branch
         if ($self->config->rename_head) {
-            push @err, "Default branch is $project->{default_branch}"
+            push @err, "Default branch: $project->{default_branch}"
               if ($project->{default_branch} ne $self->config->dest_branch);
         }
         # Webhooks (from Devscripts::Salsa::Hooks)
@@ -110,16 +124,21 @@ sub _check_repo {
         if ($self->config->avatar_path) {
             my ($md5_file, $md5_url) = "";
             if ($prms_multipart{avatar}) {
-                ds_verbose "Calculating local checksum";
+                ds_verbose "Calculating local avatar checksum";
                 $md5_file = digest_file_hex($prms_multipart{avatar}, "MD5")
                   or die "$prms_multipart{avatar} failed md5: $!";
-                if ($project->{avatar_url}) {
-                    ds_verbose "Calculating remote checksum";
+                if (    $project->{avatar_url}
+                    and $project->{visibility} eq "public") {
+                    ds_verbose "Calculating remote avatar checksum";
                     $md5_url = _url_md5_hex($project->{avatar_url})
                       or die "$project->{avatar_url} failed md5: $!";
+                    # Will always force avatar if it can't detect
+                } elsif ($project->{avatar_url}) {
+                    ds_warn
+"$name has an avatar, but is set to $project->{visibility} project visibility thus unable to remotely check checksum";
                 }
                 push @err, "Will set the avatar to be: $prms_multipart{avatar}"
-                  if ($md5_file ne $md5_url);
+                  if (not length $md5_url or $md5_file ne $md5_url);
             }
         }
         # KGB

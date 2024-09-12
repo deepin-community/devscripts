@@ -33,7 +33,7 @@ if ! dpkg -L build-essential > /dev/null 2>&1
 then
     echo "You must have the build-essential package installed to use $PROGNAME" >&2
     echo "You can try running the dpkg-depcheck program directly as:" >&2
-    echo "dpkg-depcheck --all dpkg-buildpackage -us -uc -b -rfakeroot $*" >&2
+    echo "dpkg-depcheck --all dpkg-buildpackage -us -uc -b $*" >&2
     exit 1
 fi
 

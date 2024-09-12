@@ -465,7 +465,9 @@ fatal
   + ($opt_stable ? 1 : 0)
   + ($opt_l ? 1 : 0) > 1;
 
-if ($opt_s) {
+# FIXME shouldn't this be later so that the user can override the urgency,
+# e.g. "-s -ulow" ?
+if ($opt_s || $opt_lts) {
     $opt_u = "high";
 }
 

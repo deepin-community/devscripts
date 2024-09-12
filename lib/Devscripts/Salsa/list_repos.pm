@@ -1,5 +1,5 @@
-# Lists repositories of group/user
-package Devscripts::Salsa::list_repos;
+# Lists projects of group/user
+package Devscripts::Salsa::list_repos;    # list_projects
 
 use strict;
 use Devscripts::Output;

@@ -78,7 +78,9 @@ First usage method:
                                  must be the first option given
         --rootcmd=<gain-root-command>, -r<gain-root-command>
                                  Command used to become root if $progname
-                                 not setuid root; default=fakeroot
+                                 not setuid root and the package needs (fake)root
+                                 (dpkg-buildpackage uses fakeroot by default if
+                                  not provided)
 
         --preserve-envvar=<envvar>, -e<envvar>
                                  Preserve environment variable <envvar>

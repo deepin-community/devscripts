@@ -1,5 +1,5 @@
 # Removes a user from a group
-package Devscripts::Salsa::del_user;
+package Devscripts::Salsa::del_user;    # delete_user
 
 use strict;
 use Devscripts::Output;
@@ -8,11 +8,11 @@ use Moo::Role;
 sub del_user {
     my ($self, $user) = @_;
     unless ($user) {
-        ds_warn "Usage $0 del_user <user>";
+        ds_warn "Usage $0 delete_user <user>";
         return 1;
     }
     unless ($self->group_id) {
-        ds_warn "Unable to del user without --group-id";
+        ds_warn "Unable to remove user without --group-id";
         return 1;
     }
 

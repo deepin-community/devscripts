@@ -47,4 +47,8 @@ test_install_comments() {
   prepare_and_run_wrap_and_sort 'install-comments'
 }
 
+test_control_templates() {
+  prepare_and_run_wrap_and_sort 'control-templates'
+}
+
 . shunit2

@@ -176,7 +176,8 @@ signfile() {
 
     if [ $gpgmajorversion -gt 1 -o $gpgminorversion -ge 4 ]
     then
-	    $signcommand --local-user "$signas" --clearsign \
+	    $signcommand --no-auto-check-trustdb \
+		--local-user "$signas" --clearsign \
 		--list-options no-show-policy-urls \
 		--armor --textmode --output "$ASCII_SIGNED_FILE"\
 		"$UNSIGNED_FILE" || \

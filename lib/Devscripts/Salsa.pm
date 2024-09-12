@@ -34,19 +34,36 @@ use File::Path qw(make_path);
 
 # Command aliases
 use constant cmd_aliases => {
-    ci          => 'last_ci_status',
-    co          => 'checkout',
-    ls          => 'list_repos',
+    # Alias => Filename -> ./lib/Devscripts/Salsa/*.pm
+    # Preferred terminology
+    check_projects  => 'check_repo',
+    create_project  => 'create_repo',
+    delete_project  => 'del_repo',
+    delete_user     => 'del_user',
+    list_projects   => 'list_repos',
+    list_users      => 'group',
+    search_groups   => 'search_group',
+    search_projects => 'search_project',
+    search_users    => 'search_user',
+    update_projects => 'update_repo',
+
+    # Catch possible typo (As able to-do multiple items at once)
+    list_user      => 'group',
+    check_project  => 'check_repo',
+    list_project   => 'list_repos',
+    update_project => 'update_repo',
+
+    # Abbreviation
+    co        => 'checkout',
+    ls        => 'list_repos',
+    mr        => 'merge_request',
+    mrs       => 'merge_requests',
+    schedule  => 'pipeline_schedule',
+    schedules => 'pipeline_schedules',
+
+    # Legacy
     search      => 'search_project',
     search_repo => 'search_project',
-    mr          => 'merge_request',
-    mrs         => 'merge_requests',
-    pipe        => 'pipeline_schedule',
-    pipeline    => 'pipeline_schedule',     # preferred name
-    schedule    => 'pipeline_schedule',
-    pipes       => 'pipeline_schedules',
-    pipelines   => 'pipeline_schedules',    # preferred name
-    schedules   => 'pipeline_schedules',
 };
 
 =head1 ACCESSORS
@@ -66,7 +83,7 @@ has config => (
 
 =cut
 
-# File cache to avoid polling Gitlab too much
+# File cache to avoid polling GitLab too much
 # (used to store ids, paths and names)
 has _cache => (
     is      => 'rw',
@@ -346,7 +363,7 @@ sub project2id {
         eval { $res = $self->api->project($project)->{id}; };
         if ($@) {
             ds_debug $@;
-            ds_warn "Project $project not found:";
+            ds_warn "Project $project not found";
             return undef;
         }
     }

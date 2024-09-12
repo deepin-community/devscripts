@@ -204,6 +204,7 @@ $config_vars{'MKBUILDDEPS_ROOTCMD'} =~ /./
   = $config_default{'MKBUILDDEPS_ROOTCMD'};
 
 $install_tool = $config_vars{'MKBUILDDEPS_TOOL'};
+$root_cmd     = $config_vars{'MKBUILDDEPS_ROOTCMD'};
 
 if ($config_vars{'MKBUILDDEPS_REMOVE_AFTER_INSTALL'} =~ /yes/) {
     $opt_remove = 1;

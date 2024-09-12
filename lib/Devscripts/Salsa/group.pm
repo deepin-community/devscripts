@@ -1,5 +1,5 @@
 # Lists members of a group
-package Devscripts::Salsa::group;
+package Devscripts::Salsa::group;    # list_users
 
 use strict;
 use Devscripts::Output;
@@ -9,7 +9,7 @@ sub group {
     my ($self) = @_;
     my $count = 0;
     unless ($self->group_id) {
-        ds_warn "Usage $0 --group-id 1234 group";
+        ds_warn "Usage $0 --group-id 1234 list_users";
         return 1;
     }
     my $users = $self->api->paginator('group_members', $self->group_id);
