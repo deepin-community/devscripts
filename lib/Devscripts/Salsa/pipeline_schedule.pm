@@ -46,7 +46,10 @@ sub pipeline_schedule {
         unless ($id) {
 #ds_warn "Project $repo not found";   # $self->project2id($repo) shows this error
             $ret++;
-            return 1 unless $self->config->no_fail;
+            unless ($self->config->no_fail) {
+                ds_verbose "Use --no-fail to continue";
+                return 1;
+            }
         } else {
             my @pipe_id = ();
             $desc =~ s/%p/$repo/g;

@@ -51,9 +51,8 @@ parts of subdirectories specified by the B<Files-Excluded> stanza See
 B<uscan>(1) "COPYRIGHT FILE EXAMPLE".)
 
 The archive type for B<zip> is detected by "B<file --dereference --brief
---mime-type>" command.  So any B<zip> type archives such as B<jar> are treated
-in the same way.  The B<xpi> archive is detected by its extension and is
-handled properly using the B<xpi-unpack> command.
+--mime-type>" command.  So any B<zip> type archives such as B<jar> and B<xpi>
+are treated in the same way.
 
 If the package name is given via the B<--package> option, no information is
 read from F<debian/>, and the result file is placed in the current directory.

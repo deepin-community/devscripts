@@ -17,11 +17,11 @@ sub last_ci_status {
         return 1;
     }
     if (@repos and $self->config->all) {
-        ds_warn "--all with a reponame makes no sense";
+        ds_warn "--all with a project name makes no sense";
         return 1;
     }
     if (@repos and $self->config->all_archived) {
-        ds_warn "--all-archived with a reponame makes no sense";
+        ds_warn "--all-archived with a project name makes no sense";
         return 1;
     }
     # If --all is asked, launch all projects
@@ -33,7 +33,10 @@ sub last_ci_status {
         unless ($pipelines and @$pipelines) {
             ds_warn "No pipelines for $repo";
             $ret++;
-            return 1 unless $self->config->no_fail;
+            unless ($self->config->no_fail) {
+                ds_verbose "Use --no-fail to continue";
+                return 1;
+            }
         } else {
             my $status = $pipelines->[0]->{status};
             if ($status eq OK) {

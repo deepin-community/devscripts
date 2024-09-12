@@ -81,25 +81,18 @@ sub make_orig_targz {
         # Parent of the target directory should be under our control
         $tempdir .= '/repack';
         my @cmd;
-        if ($self->config->upstream_comp eq 'xpi') {
-            @cmd = ('xpi-unpack', $upstream_tar, $tempdir);
-            unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
-                ds_die("Repacking from xpi failed (could not xpi-unpack)\n");
-                return $self->status(1);
-            }
-        } else {
-            unless (mkdir $tempdir) {
-                ds_die("Unable to mkdir($tempdir): $!\n");
-                return $self->status(1);
-            }
-            @cmd = ('unzip', '-q');
-            push @cmd, split ' ', $self->config->unzipopt
-              if defined $self->config->unzipopt;
-            push @cmd, ('-d', $tempdir, $upstream_tar);
-            unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
-                ds_die("Repacking from zip or jar failed (could not unzip)\n");
-                return $self->status(1);
-            }
+        unless (mkdir $tempdir) {
+            ds_die("Unable to mkdir($tempdir): $!\n");
+            return $self->status(1);
+        }
+        @cmd = ('unzip', '-q');
+        push @cmd, split ' ', $self->config->unzipopt
+          if defined $self->config->unzipopt;
+        push @cmd, ('-d', $tempdir, $upstream_tar);
+        unless (ds_exec_no_fail(@cmd) >> 8 == 0) {
+            ds_die(
+                "Repacking from zip, jar, or xpi failed (could not unzip)\n");
+            return $self->status(1);
         }
 
         # Figure out the top-level contents of the tarball.
@@ -477,7 +470,7 @@ sub make_orig_targz {
     if ($zipfile_deleted) {
         uscan_msg_raw ", and removed the original file";
     }
-    print ".\n";
+    uscan_msg_raw ".\n";
     return 0;
 }
 

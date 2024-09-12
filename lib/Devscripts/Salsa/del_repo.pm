@@ -1,5 +1,5 @@
-# Deletes a repository
-package Devscripts::Salsa::del_repo;
+# Deletes a project
+package Devscripts::Salsa::del_repo;    # delete_project
 
 use strict;
 use Devscripts::Output;
@@ -9,7 +9,7 @@ use Moo::Role;
 sub del_repo {
     my ($self, $reponame) = @_;
     unless ($reponame) {
-        ds_warn "Repository name or path is missing";
+        ds_warn "Project name or path is missing";
         return 1;
     }
     my $id   = $self->project2id($reponame) or return 1;

@@ -1,4 +1,4 @@
-# Creates GitLab repo from local path
+# Creates GitLab project from local repository path
 package Devscripts::Salsa::push_repo;
 
 use strict;
@@ -6,7 +6,7 @@ use Devscripts::Output;
 use Dpkg::IPC;
 use Moo::Role;
 
-with "Devscripts::Salsa::create_repo";
+with "Devscripts::Salsa::create_repo";    # create_project
 
 sub push_repo {
     my ($self, $reponame) = @_;
@@ -52,7 +52,7 @@ sub push_repo {
         return 1
           unless (
             ds_prompt(
-"Project already exists, do you want to try to push local repo? (y/N) "
+"Project already exists, do you want to try to push local repository? (y/N) "
             ) =~ accept
           );
     }

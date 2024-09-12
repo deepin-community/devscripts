@@ -63,6 +63,10 @@ Select another distribution, which is searched for build-depends.
 
 Ignore contrib, non-free and non-free-firmware.
 
+=item B<--only-devel>
+
+Consider only development distributions (e.g. unstable, sid).
+
 =item B<--exclude-component>
 
 Ignore the given component (e.g. main, contrib, non-free, non-free-firmware).
@@ -153,6 +157,7 @@ my $opt_update;
 my $opt_sudo;
 my $opt_maintainer;
 my $opt_mainonly;
+my $opt_develonly = 0;
 my $opt_distribution;
 my $opt_origin = 'Debian';
 my @opt_exclude_components;
@@ -190,10 +195,10 @@ Options:
    -d, --debug                    Enable the debug mode
    -m, --print-maintainer         Print the maintainer information (experimental)
    --distribution distribution    Select a distribution to search for build-depends
-                                  (Default: unstable)
    --origin origin                Select an origin to search for build-depends
                                   (Default: Debian)
    --only-main                    Ignore contrib, non-free and non-free-firmware
+   --only-devel                   Consider only development distributions
    --exclude-component COMPONENT  Ignore the specified component (can be given multiple times)
    --host-arch                    Set the host architecture (requires dose-extra >= 4.0)
    --build-arch                   Set the build architecture (requires dose-extra >= 4.0)
@@ -300,7 +305,7 @@ sub collect_files {
                 && $ctrl->{Codename} !~ m/\Q$opt_distribution\E/) {
                 next;
             }
-        } elsif (!is_devel_release($ctrl)) {
+        } elsif ($opt_develonly && !is_devel_release($ctrl)) {
             next;
         }
 
@@ -422,6 +427,7 @@ GetOptions(
     "m|print-maintainer"  => \$opt_maintainer,
     "distribution=s"      => \$opt_distribution,
     "only-main"           => \$opt_mainonly,
+    "only-devel"          => \$opt_develonly,
     "exclude-component=s" => \@opt_exclude_components,
     "origin=s"            => \$opt_origin,
     "host-arch=s"         => \$opt_hostarch,
@@ -526,8 +532,9 @@ foreach my $site (sort keys %{$file_info}) {
         foreach my $comp (qw(main contrib non-free non-free-firmware)) {
             if (exists $file_info->{$site}{$suite}{$comp}) {
                 if (!$opt_quiet) {
-                    print "Reverse Build-depends in ${comp}:\n";
-                    print "------------------------------\n\n";
+                    my $msg = "Reverse Build-depends in $suite/$comp:";
+                    print "$msg\n";
+                    print "-" x length($msg) . "\n\n";
                 }
                 findreversebuilddeps($package,
                     $file_info->{$site}{$suite}{$comp});

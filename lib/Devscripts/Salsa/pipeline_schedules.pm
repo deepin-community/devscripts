@@ -30,7 +30,10 @@ sub pipeline_schedules {
         unless ($id) {
     #ds_warn "Project $p not found";   # $self->project2id($p) shows this error
             $ret++;
-            return 1 unless $self->config->no_fail;
+            unless ($self->config->no_fail) {
+                ds_verbose "Use --no-fail to continue";
+                return 1;
+            }
         } else {
             my $projects = $self->api->project($id);
             if ($projects->{jobs_enabled} == 0) {

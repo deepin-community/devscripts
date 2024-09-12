@@ -1,5 +1,5 @@
 # Searches groups using given string
-package Devscripts::Salsa::search_group;
+package Devscripts::Salsa::search_group;    # search_groups
 
 use strict;
 use Devscripts::Output;

@@ -21,7 +21,7 @@ use constant levels => {
 sub protect_branch {
     my ($self, $reponame, $branch, $merge, $push) = @_;
     unless ($reponame and $branch) {
-        ds_warn "usage: $0 protect_branch repo branch merge push";
+        ds_warn "usage: $0 protect_branch project branch merge push";
         return 1;
     }
     if (defined $merge and $merge =~ /^(?:no|0)$/i) {
@@ -30,7 +30,7 @@ sub protect_branch {
     }
     unless (levels->{$merge} and levels->{$push}) {
         ds_warn
-          "usage: $0 protect_branch repo branch <merge level> <push level>";
+          "usage: $0 protect_branch project branch <merge level> <push level>";
         return 1;
     }
     my $opts = { name => $branch };

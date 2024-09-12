@@ -1,5 +1,5 @@
 # Searches projects using given string
-package Devscripts::Salsa::search_project;
+package Devscripts::Salsa::search_project;    # search_projects
 
 use strict;
 use Devscripts::Output;

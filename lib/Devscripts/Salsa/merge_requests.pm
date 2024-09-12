@@ -9,7 +9,7 @@ sub merge_requests {
     my ($self, @reponames) = @_;
     my $res = 1;
     unless (@reponames) {
-        ds_warn "Repository name is missing";
+        ds_warn "project name is missing";
         return 1;
     }
     foreach my $p (@reponames) {

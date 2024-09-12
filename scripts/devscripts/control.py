@@ -195,6 +195,7 @@ class Control:
         self.filename = filename
         self._is_roundtrip_safe = use_rts_parser
         self.strip_trailing_whitespace_on_save = False
+        self.had_parse_errors = False
 
         if self._is_roundtrip_safe:
             # Note: wrap-and-sort does not trigger this code path without python-debian
@@ -206,9 +207,23 @@ class Control:
                 raise ValueError(
                     "The use_rts_parser option requires python-debian 0.1.43 or later"
                 )
+
+            # We allow parse errors in control-like files such as control.in as people
+            # might use template languages or placeholders in them.  When there are
+            # parse errors, we cannot provide all features. However, most of them
+            # still work.
+            allow_parse_errors = (
+                not filename.endswith("/control") and filename != "control"
+            )
+
             with _open(filename, fd=fd, encoding="utf8") as sequence:
-                self._deb822_file = parse_deb822_file(sequence)
+                self._deb822_file = parse_deb822_file(
+                    sequence,
+                    accept_files_with_error_tokens=allow_parse_errors,
+                )
+
             self.paragraphs = list(self._deb822_file)
+            self.had_parse_errors = bool(self._deb822_file.find_first_error_element())
         else:
             self._deb822_file = None
             self.paragraphs = []
@@ -263,6 +278,7 @@ class Control:
             else:
                 part_content = part.convert_to_text()
             if pending_newline:
+                pending_newline = False
                 new_content += "\n"
             new_content += part_content
         return new_content

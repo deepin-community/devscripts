@@ -2,35 +2,33 @@
 
 =head1 NAME
 
-salsa - tool to manipulate salsa repositories and group members
+salsa - tool to manipulate salsa projects, repositories and group members
 
 =head1 SYNOPSIS
 
-  # salsa <command> <args>
-  salsa whoami
-  salsa search_project devscripts
-  salsa search_project qa/qa
-  salsa search_group js-team
-  salsa search_group perl-team/modules
-  salsa search_user yadd
-  salsa push_repo . --group js-team --kgb --irc devscripts --tagpending
-  salsa update_repo node-mongodb --group js-team --disable-kgb --desc \
-        --desc-pattern "Package %p"
-  salsa update_repo js-team/node-mongodb --kgb --irc debian-js
-  salsa update_safe --all --desc --desc-pattern "Debian package %p" \
-        --group js-team
-  salsa checkout node-mongodb --group js-team
-  salsa checkout js-team/node-mongodb
+  # salsa <command> <parameters> <options>
   salsa add_user developer foobar --group-id 2665
+  salsa delete_user foobar --group js-team
+  salsa search_groups perl-team/modules
+  salsa search_projects qa/qa
+  salsa search_users yadd
   salsa update_user maintainer foobar --group js-team
-  salsa del_user foobar --group js-team
+  salsa whoami
+  salsa checkout node-mongodb --group js-team
+  salsa fork salsa fork --group js-team user/node-foo
   salsa last_ci_status js-team/nodejs
   salsa pipelines js-team/nodejs
+  salsa mr debian/foo debian/master
+  salsa push_repo . --group js-team --kgb --irc devscripts --tagpending
+  salsa update_projects node-mongodb --group js-team --disable-kgb --desc \
+        --desc-pattern "Package %p"
+  salsa update_safe --all --desc --desc-pattern "Debian package %p" \
+        --group js-team
 
 =head1 DESCRIPTION
 
-B<salsa> is designed to create and configure repositories on
-L<https://salsa.debian.org> and manage users of groups.
+B<salsa> is designed to create and configure projects and repositories on
+L<https://salsa.debian.org> as well as to manage group members.
 
 A Salsa token is required, except for search* commands, and must be set in
 command line I<(see below)>, or in your configuration file I<(~/.devscripts)>:
@@ -62,14 +60,6 @@ contains:
 
 =over
 
-=item B<join>
-
-Request access to a group.
-
-  salsa join js-team
-  salsa join --group js-team
-  salsa join --group-id 1234
-
 =item B<add_user>
 
 Add a user to a group.
@@ -81,43 +71,52 @@ Add a user to a group.
 First argument is the GitLab's access levels: guest, reporter, developer,
 maintainer, owner.
 
-=item B<del_user>
+=item B<delete_user> or B<del_user>
 
-Remove a user from a group
+Remove a user from a group.
 
-  salsa --group js-team del_user foouser
-  salsa --group-id=1234 del_user foouser
+  salsa --group js-team delete_user foouser
+  salsa --group-id=1234 delete_user foouser
+
+=item B<join>
+
+Request access to a group.
+
+  salsa join js-team
+  salsa join --group js-team
+  salsa join --group-id 1234
 
 =item B<list_groups>
 
-List sub groups of current one if group is set, groups of current user
-else.
+List the subgroups for current group if group is set, otherwise
+will do the current user.
 
-=item B<group>
+=item B<list_users> or B<group>
 
-Show group members.
+List users in a subgroup.
+Note, this does not include inherited or invited.
 
-  salsa --group js-team group
-  salsa --group-id 1234 group
+  salsa --group js-team list_users
+  salsa --group-id 1234 list_users
 
-=item B<search_group>
+=item B<search_groups>
 
-Search for a group using given string. Shows group id and other
+Search for a group using given string. Shows group ID and other
 information.
 
-  salsa search_group perl-team
-  salsa search_group perl-team/modules
-  salsa search_group 2666
+  salsa search_groups perl-team
+  salsa search_groups perl-team/modules
+  salsa search_groups 2666
 
-=item B<search_user>
+=item B<search_users>
 
-Search for a user using given string. Shows user id and other information.
+Search for a user using given string. Shows user ID and other information.
 
-  salsa search_user yadd
+  salsa search_users yadd
 
 =item B<update_user>
 
-Update user role in a group.
+Update a user's role in a group.
 
   salsa --group-id 1234 update_user guest foouser
   salsa --group js-team update_user maintainer 1245
@@ -127,59 +126,59 @@ maintainer, owner.
 
 =item B<whoami>
 
-Gives information on the token owner
+Gives information on the token owner.
 
   salsa whoami
 
 =back
 
-=head2 Managing repositories
+=head2 Managing projects
 
 One of C<--group>, C<--group-id>, C<--user> or C<--user-id> is required to
-manage repositories. If both are set, salsa warns and only
-C<--user>/C<--user-id> is used. If none is given, salsa uses current user id
+manage projects. If both are set, salsa warns and only
+C<--user>/C<--user-id> is used. If none is given, salsa uses current user ID
 I<(token owner)>.
 
 =over
 
-=item B<check_repo>
+=item B<check_projects> or B<check_repo>
 
-Verify that repo(s) are well configured. It works exactly like B<update_repo>
+Verify that projects are configured as expected. It works exactly like B<update_projects>
 except that it does not modify anything but just lists projects not well
 configured with found errors.
 
-  salsa --user yadd --tagpending --kgb --irc=devscripts check_repo test
-  salsa --group js-team check_repo --all
-  salsa --group js-team --rename-head check_repo test1 test2 test3
+  salsa --user yadd --tagpending --kgb --irc=devscripts check_projects test
+  salsa --group js-team check_projects --all
+  salsa --group js-team --rename-head check_projects test1 test2 test3
 
 =item B<checkout> or B<co>
 
-Clone repo in current dir. If directory already
-exists, update local repo.
+Clone a project's repository in current directory. If the directory already
+exists, update local repository.
 
-  salsa --user yadd co devscripts
-  salsa --group js-team co node-mongodb
-  salsa co js-team/node-mongodb
+  salsa --user yadd checkout devscripts
+  salsa --group js-team checkout node-mongodb
+  salsa checkout js-team/node-mongodb
 
 You can clone more than one repository or all repositories of a group or a
 user:
 
-  salsa --user yadd co devscripts autodep8
-  salsa co yadd/devscripts js-team/npm
-  salsa --group js-team co --all           # All js-team active repos
-  salsa co --all-archived                  # All your repos including archived
+  salsa --user yadd checkout devscripts autodep8
+  salsa checkout yadd/devscripts js-team/npm
+  salsa --group js-team checkout --all           # All js-team active repositories
+  salsa checkout --all-archived                  # All your repositories, including archived
 
-=item B<create_repo>
+=item B<create_project> or B<create_repo>
 
 Create public empty project. If C<--group>/C<--group-id> is set, project is
 created in group directory, else in user directory.
 
-  salsa --user yadd create_repo test
-  salsa --group js-team --kgb --irc-channel=devscripts create_repo test
+  salsa --user yadd create_project test
+  salsa --group js-team --kgb --irc-channel=devscripts create_project test
 
-=item B<del_repo>
+=item B<delete_project> or B<del_repo>
 
-Delete a repository.
+Delete a project.
 
 =item B<fork>
 
@@ -235,17 +234,17 @@ falling back, to the "origin" remote:
 
 =back
 
-=item B<ls> or B<list_repos>
+=item B<list_projects> or B<list_repos> or B<ls>
 
 Shows projects owned by user or group. If second
-argument exists, search only matching projects
+argument exists, search only matching projects.
 
-  salsa --group js-team list_repos
-  salsa --user yadd list_repos foo*
+  salsa --group js-team list_projects
+  salsa --user yadd list_projects foo*
 
-=item B<last_ci_status> or B<ci>
+=item B<last_ci_status>
 
-Displays last continuous integration result. Use B<--verbose> to see
+Displays the last continuous integration result. Use B<--verbose> to see
 URL of pipeline when result isn't B<success>. Unless B<--no-fail> is set,
 B<salsa last_ci_status> will stop on first "failed" status.
 
@@ -259,17 +258,17 @@ STDERR. Then you can easily see only failures using:
 
   salsa --group js-team last_ci_status --all --no-fail >/dev/null
 
-=item B<pipeline>, B<schedule>
+=item B<pipeline_schedule> or B<schedule>
 
-Control pipeline schedule
+Control pipeline schedule.
 
-=item B<pipelines>, B<schedules>
+=item B<pipeline_schedules> or B<schedules>
 
 Lists current pipeline schedule items.
 
 You can use B<--no-fail> and B<--all> options here.
 
-=item B<merge_request>, B<mr>
+=item B<merge_request> or B<mr>
 
 Creates a merge request.
 
@@ -277,15 +276,15 @@ Suppose you created a fork using B<salsa fork>, modify some things in a new
 branch using one commit and want to propose it to original project
 I<(branch "master")>. You just have to launch this in source directory:
 
-  salsa mr
+  salsa merge_request
 
-Other example:
+Another example:
 
-  salsa mr --mr-dst-project debian/foo --mr-dst-branch debian/master
+  salsa merge_request --mr-dst-project debian/foo --mr-dst-branch debian/master
 
-or simply
+Or simply:
 
-  salsa mr debian/foo debian/master
+  salsa merge_request debian/foo debian/master
 
 Note that unless destination project has been set using command line,
 B<salsa merge_request> will search it in the following order:
@@ -303,19 +302,19 @@ B<salsa merge_request> will search it in the following order:
 To force salsa to use source project as destination project, you can use
 "same":
 
-  salsa mr --mr-dst-project same
+  salsa merge_request --mr-dst-project same
   # or
-  salsa mr same
+  salsa merge_request same
 
 New merge request will be created using last commit title and description.
 
 See B<--mr-*> options for more.
 
-=item B<merge_requests>, B<mrs>
+=item B<merge_requests> or B<mrs>
 
-List opened merge requests for project(s)
+List opened merge requests for project(s).
 
-  salsa mrs qa/qa debian/devscripts
+  salsa merge_requests qa/qa debian/devscripts
 
 Project can be set using full path or using B<--group>/B<--group-id> or
 B<--user>/B<--user-id>, else it is searched in current user namespace.
@@ -326,7 +325,7 @@ Protect/unprotect a branch.
 
 =over
 
-=item Set protection
+=item Protect
 
   #                                    project      branch merge push
   salsa --group js-team protect_branch node-mongodb master m     d
@@ -355,7 +354,7 @@ Protect/unprotect a branch.
 
 =item B<protected_branches>
 
-List protected branches
+List protected branches:
 
   salsa --group js-team protected_branches node-mongodb
 
@@ -372,9 +371,9 @@ B<push_repo> executes the following steps:
 
 =item launches B<git remote add upstream ...>;
 
-=item launches B<create_repo>;
+=item launches B<create_project>;
 
-=item pushes local repo.
+=item pushes local repository.
 
 =back
 
@@ -388,25 +387,25 @@ Examples:
 Rename branch given in B<--source-branch> with name given in B<--dest-branch>.
 You can use B<--no-fail>, B<--all> and B<--all-archived> options here.
 
-=item B<search>, B<search_project>, B<search_repo>
+=item B<search_projects> or B<search_repo> or B<search>
 
-Search for a project using given string. Shows name, owner id and other
+Search for a project using given string. Shows name, owner ID and other
 information.
 
-  salsa search devscripts
-  salsa search debian/devscripts
-  salsa search 18475
+  salsa search_projects devscripts
+  salsa search_projects debian/devscripts
+  salsa search_projects 18475
 
-=item B<update_repo>
+=item B<update_projects> or B<update_repo>
 
-Configure repo(s) using parameters given to command line.
-A repo name has to be given unless B<--all> or B<--all-archived> is set. Prefer to use
+Configure projects using parameters given to command line.
+A project name has to be given unless B<--all> or B<--all-archived> is set. Prefer to use
 B<update_safe>.
 
-  salsa --user yadd --tagpending --kgb --irc=devscripts update_repo test
-  salsa --group js-team update_repo --all
-  salsa --group js-team --rename-head update_repo test1 test2 test3
-  salsa update_repo js-team/node-mongodb --kgb --irc debian-js
+  salsa --user yadd --tagpending --kgb --irc=devscripts update_projects test
+  salsa --group js-team update_projects --all
+  salsa --group js-team --rename-head update_projects test1 test2 test3
+  salsa update_projects js-team/node-mongodb --kgb --irc debian-js
 
 By default when using B<--all>, salsa will fail on first error. If you want
 to continue, set B<--no-fail>. In this case, salsa will display a warning for
@@ -415,7 +414,7 @@ errors, set B<--verbose>.
 
 =item B<update_safe>
 
-Launch B<check_repo> and ask before launching B<update_repo> (unless B<--yes>).
+Launch B<check_projects> and ask before launching B<update_projects> (unless B<--yes>).
 
   salsa --user yadd --tagpending --kgb --irc=devscripts update_safe test
   salsa --group js-team update_safe --all
@@ -440,16 +439,16 @@ Empty local cache.
 
 =over
 
-=item B<-C>, B<--chdir>
+=item B<--chdir> or B<-C>
 
-Change directory before launching command
+Change directory before launching command:
 
-  salsa -C ~/debian co debian/libapache2-mod-fcgid
+  salsa --chdir ~/debian checkout debian/libapache2-mod-fcgid
 
 =item B<--cache-file>
 
-File to store cached values. Default to B<~/.cache/salsa.json>. An empty value
-disables cache.
+File to store cached values. An empty value disables cache.
+Default: C<~/.cache/salsa.json>.
 
 C<.devscripts> value: B<SALSA_CACHE_FILE>
 
@@ -457,11 +456,12 @@ C<.devscripts> value: B<SALSA_CACHE_FILE>
 
 Disable cache usage. Same as B<--cache-file ''>
 
-=item B<--conffile>, B<--conf-file>
+=item B<--conf-file> or B<--conffile>
 
-Add or replace default configuration files (C</etc/devscripts.conf> and
-C<~/.devscripts>). This can only be used as the first option given on the
+Add or replace default configuration files.
+This can only be used as the first option given on the
 command-line.
+Default: C</etc/devscripts.conf> and C<~/.devscripts>.
 
 =over
 
@@ -479,28 +479,28 @@ If one B<--conf-file> has no C<+>, default configuration files are ignored.
 
 =back
 
-=item B<--no-conf>, B<--noconf>
+=item B<--no-conf> or B<--noconf>
 
 Don't read any configuration files. This can only be used as the first option
 given on the command-line.
 
 =item B<--debug>
 
-Enable debugging output
+Enable debugging output.
 
 =item B<--group>
 
-Team to use. Use C<salsa search_group name> to find it.
+Team to use. Use C<salsa search_groups name> to find it.
 
 If you want to use a subgroup, you have to set its full path:
 
-  salsa --group perl-team/modules/packages check_repo lemonldap-ng
+  salsa --group perl-team/modules/packages check_projects lemonldap-ng
 
 C<.devscripts> value: B<SALSA_GROUP>
 
 Be careful when you use B<SALSA_GROUP> in your C<.devscripts> file. Every
 B<salsa> command will be executed in group space, for example if you want to
-propose a little change in a project using B<salsa fork> + B<salsa mr>, this
+propose a little change in a project using B<salsa fork> + B<salsa merge_request>, this
 "fork" will be done in group space unless you set a B<--user>/B<--user-id>.
 Prefer to use an alias in your C<.bashrc> file. Example:
 
@@ -523,13 +523,13 @@ To enable bash completion for your alias, add this in your .bashrc file:
 
 =item B<--group-id>
 
-Group id to use. Use C<salsa search_group name> to find it.
+Group ID to use. Use C<salsa search_groups name> to find it.
 
 C<.devscripts> value: B<SALSA_GROUP_ID>
 
 Be careful when you use B<SALSA_GROUP_ID> in your C<.devscripts> file. Every
 B<salsa> command will be executed in group space, for example if you want to
-propose a little change in a project using B<salsa fork> + B<salsa mr>, this
+propose a little change in a project using B<salsa fork> + B<salsa merge_request>, this
 "fork" will be done in group space unless you set a B<--user>/B<--user-id>.
 Prefer to use an alias in your C<.bashrc> file. Example:
 
@@ -539,11 +539,13 @@ or
 
   alias jsteam_admin="salsa --conf-file ~/.js.conf
 
-then you can fix B<SALSA_GROUP_ID> in C<~/.js.conf>
+then you can fix B<SALSA_GROUP_ID> in C<~/.js.conf>.
 
-=item B<--help>: displays this manpage
+=item B<--help>
 
-=item B<-i>, B<--info>
+Displays this manpage.
+
+=item B<--info> or B<-i>
 
 Prompt before sensible changes.
 
@@ -551,7 +553,8 @@ C<.devscripts> value: B<SALSA_INFO> (yes/no)
 
 =item B<--path>
 
-Repo path. Default to group or user path.
+Repository path.
+Default to group or user path.
 
 C<.devscripts> value: B<SALSA_REPO_PATH>
 
@@ -566,13 +569,13 @@ File to find token (see above).
 =item B<--user>
 
 Username to use. If neither B<--group>, B<--group-id>, B<--user> or B<--user-id>
-is set, salsa uses current user id (corresponding to salsa private token).
+is set, salsa uses current user ID (corresponding to salsa private token).
 
 =item B<--user-id>
 
-User id to use. Use C<salsa search_user name> to find one. If neither
+User ID to use. Use C<salsa search_users name> to find one. If neither
 B<--group>, B<--group-id>, B<--user> or B<--user-id> is set, salsa uses current
-user id (corresponding to salsa private token).
+user ID (corresponding to salsa private token).
 
 C<.devscripts> value: B<SALSA_USER_ID>
 
@@ -588,7 +591,7 @@ C<.devscripts> value: B<SALSA_YES> (yes/no)
 
 =back
 
-=head2 List/search repo options
+=head2 List/search project options
 
 =over
 
@@ -596,13 +599,14 @@ C<.devscripts> value: B<SALSA_YES> (yes/no)
 
 Instead of looking to active projects, list or search in archived projects.
 Note that you can't have both archived and unarchived projects in the same
-request. Default: no I<(ie --no-archived)>.
+request.
+Default: no I<(ie --no-archived)>.
 
 C<.devscripts> value: B<SALSA_ARCHIVED> (yes/no)
 
 =back
 
-=head2 Update/create repo options
+=head2 Update/create project options
 
 =over
 
@@ -614,18 +618,25 @@ include active and archived projects.
 
 =over
 
-=item B<--skip>: ignore project with B<--all> or B<--all-achived>. Example:
+=item B<--skip>, B<--no-skip>
 
-  salsa update_repo --tagpending --all --skip qa --skip devscripts
+Ignore project with B<--all> or B<--all-achived>. Example:
 
-C<.devscripts> value: B<SALSA_SKIP>. To set multiples values, use spaces.
-Example
+  salsa update_projects --tagpending --all --skip qa --skip devscripts
+
+To set multiples values, use spaces. Example:
 
   SALSA_SKIP=qa devscripts
 
-=item B<--skip-file>: ignore projects in this file (1 project per line)
+Using B<--no-skip> will ignore any projects to be skipped and include them.
 
-  salsa update_repo --tagpending --all --skip-file ~/.skip
+C<.devscripts> value: B<SALSA_SKIP>
+
+=item B<--skip-file>
+
+Ignore projects in this file (1 project per line).
+
+  salsa update_projects --tagpending --all --skip-file ~/.skip
 
 C<.devscripts> value: B<SALSA_SKIP_FILE>
 
@@ -634,8 +645,7 @@ C<.devscripts> value: B<SALSA_SKIP_FILE>
 =item B<--build-timeout>
 
 The maximum amount of time, in seconds, that a job can run.
-
-Default: 3600 (60 minutes)
+Default: 3600 (60 minutes).
 
   salsa update_safe myrepo --build-timeout 3600
 
@@ -650,7 +660,9 @@ C<.devscripts> value: B<SALSA_AVATAR_PATH>
 
 =item B<--ci-config-path>
 
-Configure configuration file path of GitLab CI. Default: empty. Example:
+Configure configuration file path of GitLab CI.
+Default: empty.
+Example:
 
   salsa update_safe --ci-config-path recipes/debian.yml@salsa-ci-team/pipeline debian/devscripts
 
@@ -658,15 +670,16 @@ C<.devscripts> value: B<SALSA_CI_CONFIG_PATH>
 
 =item B<--desc>, B<--no-desc>
 
-Configure repo description using pattern given in B<desc-pattern>
+Configure a project's description using pattern given in B<desc-pattern>.
 
 C<.devscripts> value: B<SALSA_DESC> (yes/no)
 
 =item B<--desc-pattern>
 
-Repo description pattern. Default to "Debian package %p". "%p" is replaced by
-repo name, while "%P" is replaced by repo name given in command (may contains
-full path).
+Project's description pattern. "%p" is replaced by project's name,
+while "%P" is replaced by project's name given in command
+(may contains full path).
+Default: "Debian package %p".
 
 C<.devscripts> value: B<SALSA_DESC_PATTERN>
 
@@ -689,108 +702,144 @@ If recipient value contains "%p", it is replaced by project name.
 C<.devscripts> value: B<SALSA_EMAIL_RECIPIENTS> (use spaces to separate
 multiples recipients)
 
-=item B<--issues>
-
-Set issues feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_ISSUES> (yes/private/no, default: yes)
-
-=item B<--repo>
-
-Set repository feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_REPO> (yes/private/no, default: yes)
-
-=item B<--mr>
-
-Set merge requests feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_MR> (yes/private/no, default: yes)
-
-=item B<--forks>, B<--forks-mr>
-
-Set forking a repository feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_FORKS> (yes/private/no, default: yes)
-
-=item B<--lfs>
-
-Set Large File Storage (LFS) feature.
-
-C<.devscripts> values: B<SALSA_ENABLE_LFS> (yes/no, default: yes)
-
-=item B<--packages>
-
-Set packages feature.
-
-C<.devscripts> values: B<SALSA_ENABLE_PACKAGING> (yes/no, default: yes)
-
-=item B<--jobs>
-
-Set jobs feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_JOBS> (yes/private/no, default: yes)
-
-=item B<--container>
-
-Set container feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_CONTAINER> (yes/private/no, default: yes)
-
 =item B<--analytics>
 
 Set analytics feature with permissions.
 
-C<.devscripts> values: B<SALSA_ENABLE_ANALYTICS> (yes/private/no, default: yes)
-
-=item B<--requirements>
-
-Set requirements feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_REQUIREMENTS> (yes/private/no, default: yes)
-
-=item B<--wiki>
-
-Set wiki feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_WIKI> (yes/private/no, default: yes)
-
-=item B<--snippets>
-
-Set snippets feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_SNIPPETS> (yes/private/no, default: yes)
-
-=item B<--pages>
-
-Set pages feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_PAGES> (yes/private/no, default: yes)
-
-=item B<--releases>
-
-Set releases feature with permissions.
-
-C<.devscripts> values: B<SALSA_ENABLE_RELEASES> (yes/private/no, default: yes)
+C<.devscripts> value: B<SALSA_ENABLE_ANALYTICS> (yes/private/no, default: yes)
 
 =item B<--auto-devops>
 
 Set auto devops feature.
 
-C<.devscripts> values: B<SALSA_ENABLE_AUTO_DEVOPS> (yes/no, default: yes)
+C<.devscripts> value: B<SALSA_ENABLE_AUTO_DEVOPS> (yes/no, default: yes)
 
-=item B<--request-acc>
+=item B<--container>
 
-Set request access feature.
+Set container feature with permissions.
 
-C<.devscripts> values: B<SALSA_ENABLE_REQUEST_ACC> (yes/no, default: yes)
+C<.devscripts> value: B<SALSA_ENABLE_CONTAINER> (yes/private/no, default: yes)
+
+=item B<--environments>
+
+Set environments feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_ENVIRONMENTS> (yes/private/no, default: yes)
+
+=item B<--feature-flags>
+
+Set feature flags feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_FEATURE_FLAGS> (yes/private/no, default: yes)
+
+=item B<--forks>
+
+Set forking a project feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_FORKS> (yes/private/no, default: yes)
+
+=item B<--infrastructure>
+
+Set infrastructure feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_INFRASTRUCTURE> (yes/private/no, default: yes)
+
+=item B<--issues>
+
+Set issues feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_ISSUES> (yes/private/no, default: yes)
+
+=item B<--jobs>
+
+Set jobs feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_JOBS> (yes/private/no, default: yes)
+
+=item B<--lfs>
+
+Set Large File Storage (LFS) feature.
+
+C<.devscripts> value: B<SALSA_ENABLE_LFS> (yes/no, default: yes)
+
+=item B<--mr>
+
+Set merge requests feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_MR> (yes/private/no, default: yes)
+
+=item B<--monitor>
+
+Set monitor feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_MONITOR> (yes/private/no, default: yes)
+
+=item B<--packages>
+
+Set packages feature.
+
+C<.devscripts> value: B<SALSA_ENABLE_PACKAGES> (yes/no, default: yes)
+
+=item B<--pages>
+
+Set pages feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_PAGES> (yes/private/no, default: yes)
+
+=item B<--releases>
+
+Set releases feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_RELEASES> (yes/private/no, default: yes)
 
 =item B<--enable-remove-source-branch>, B<--disable-remove-source-branch>
 
 Enable or disable deleting source branch option by default for all new merge
 requests.
 
-C<.devscripts> values: B<SALSA_REMOVE_SOURCE_BRANCH> (yes/no, default: yes)
+C<.devscripts> value: B<SALSA_REMOVE_SOURCE_BRANCH> (yes/no, default: yes)
+
+=item B<--repo>
+
+Set the project's repository feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_REPO> (yes/private/no, default: yes)
+
+=item B<--request-access>
+
+Allow users to request member access.
+
+C<.devscripts> value: B<SALSA_REQUEST_ACCESS> (yes/no)
+
+=item B<--requirements>
+
+Set requirements feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_REQUIREMENTS> (yes/private/no, default: yes)
+
+=item B<--security-compliance>
+
+Enable or disabled Security and Compliance feature.
+
+C<.devscripts> value: B<SALSA_ENABLE_SECURITY_COMPLIANCE> (yes/no)
+
+=item B<--service-desk>
+
+Allow service desk feature.
+
+C<.devscripts> value: B<SALSA_ENABLE_SERVICE_DESK> (yes/no)
+
+=item B<--snippets>
+
+Set snippets feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_SNIPPETS> (yes/private/no, default: yes)
+
+=item B<--wiki>
+
+Set wiki feature with permissions.
+
+C<.devscripts> value: B<SALSA_ENABLE_WIKI> (yes/private/no, default: yes)
 
 =item B<--irc-channel>
 
@@ -800,7 +849,7 @@ B<--irker>.
 B<Important>: channel must not include the first "#". If salsa finds a channel
 starting with "#", it will consider that the channel starts with 2 "#"!
 
-C<.devscript> value: B<SALSA_IRC_CHANNEL>.
+C<.devscript> value: B<SALSA_IRC_CHANNEL>
 
 Multiple values must be space separated.
 
@@ -810,19 +859,21 @@ and will ignore this value.
 
 =item B<--irker>, B<--no-irker>, B<--disable-irker>
 
-Enable, ignore or disable Irker service
+Enable, ignore or disable Irker service.
 
-C<.devscripts> values: B<SALSA_IRKER> (yes/ignore/no, default: ignore)
+C<.devscripts> value: B<SALSA_IRKER> (yes/ignore/no, default: ignore)
 
 =item B<--irker-host>
 
-Irker host. Default: ruprecht.snow-crash.org
+Irker host.
+Default: ruprecht.snow-crash.org.
 
 C<.devscripts> value: B<SALSA_IRKER_HOST>
 
 =item B<--irker-port>
 
-Irker port. Default: empty (default value)
+Irker port.
+Default: empty (default value).
 
 C<.devscripts> value: B<SALSA_IRKER_PORT>
 
@@ -834,9 +885,10 @@ C<.devscripts> value: B<SALSA_KGB> (yes/ignore/no, default: ignore)
 
 =item B<--kgb-options>
 
-List of KGB enabled options (comma separated). Default: issues_events,
-merge_requests_events, note_events, pipeline_events, push_events,
-tag_push_events, wiki_page_events, enable_ssl_verification
+List of KGB enabled options (comma separated).
+Default: issues_events, merge_requests_events, note_events,
+pipeline_events, push_events, tag_push_events, wiki_page_events,
+enable_ssl_verification
 
   $ salsa update_safe debian/devscripts --kgb --irc-channel devscripts \
     --kgb-options 'merge_requests_events,issues_events,enable_ssl_verification'
@@ -850,30 +902,29 @@ C<.devscripts> value: B<SALSA_KGB_OPTIONS>
 
 =item B<--no-fail>
 
-Don't stop on error when using B<update_repo> with B<--all> or B<--all-archived>.
+Don't stop on error when using B<update_projects> with B<--all> or B<--all-archived>
+when set to yes.
 
-C<.devscripts> value: B<SALSA_NO_FAIL> (yes/no)
-
-=item B<--request-access>
-
-Allow users to request member access.
-
-C<.devscripts> value: B<SALSA_REQUEST_ACCESS> (yes/no)
+C<.devscripts> value: B<SALSA_NO_FAIL> (yes/no, default: no)
 
 =item B<--rename-head>, B<--no-rename-head>
 
 Rename HEAD branch given by B<--source-branch> into B<--dest-branch> and change
-"default branch" of project. Works only with B<update_repo>.
+"default branch" of project. Works only with B<update_projects>.
 
 C<.devscripts> value: B<SALSA_RENAME_HEAD> (yes/no)
 
 =over
 
-=item B<--source-branch>: default "master"
+=item B<--source-branch>
+
+Default: "master".
 
 C<.devscripts> value: B<SALSA_SOURCE_BRANCH>
 
-=item B<--dest-branch>: default "debian/master"
+=item B<--dest-branch>
+
+Default: "debian/master".
 
 C<.devscripts> value: B<SALSA_DEST_BRANCH>
 
@@ -901,23 +952,28 @@ Branch or tag name that is triggered.
 
 =item B<--schedule-cron>
 
-Cron schedule, for example: 0 1 * * *.
+Cron schedule. Example:
+
+  0 1 * * *.
 
 =item B<--schedule-tz>
 
-Time zone to run cron schedule. Default: UTC
+Time zone to run cron schedule.
+Default: UTC.
 
 =item B<--schedule-enable>, B<--schedule-disable>
 
-Enable/disable the pipeline schedule to run. Default: disabled
+Enable/disable the pipeline schedule to run.
+Default: disabled.
 
 =item B<--schedule-run>
 
-Trigger B<--schedule-desc> scheduled pipeline to run immediately. Default:
+Trigger B<--schedule-desc> scheduled pipeline to run immediately.
+Default: false.
 
 =item B<--schedule-delete>
 
-Delete B<--schedule-desc> pipeline schedule
+Delete B<--schedule-desc> pipeline schedule.
 
 =back
 
@@ -927,11 +983,13 @@ Delete B<--schedule-desc> pipeline schedule
 
 =item B<--mr-title>
 
-Title for merge request. Default: last commit title.
+Title for merge request.
+Default: last commit title.
 
 =item B<--mr-desc>
 
-Description of new MR. Default:
+Description of new MR.
+Default:
 
 =over
 
@@ -943,24 +1001,28 @@ Description of new MR. Default:
 
 =item B<--mr-dst-branch> (or second command line argument)
 
-Destination branch. Default to "master".
+Destination branch.
+Default: "master".
 
 =item B<--mr-dst-project> (or first command line argument)
 
-Destination project. Default: project from which the current project was
-forked; or, if not found, "upstream" value found using
-B<git remote --verbose show>; or using source project.
+Destination project.
+Default: project from which the current project was forked; or,
+if not found, "upstream" value found using B<git remote --verbose show>;
+or using source project.
 
 If B<--mr-dst-project> is set to B<same>, salsa will use source project as
 destination.
 
 =item B<--mr-src-branch>
 
-Source branch. Default: current branch.
+Source branch.
+Default: current branch.
 
 =item B<--mr-src-project>
 
-Source project. Default: current project found using
+Source project.
+Default: current project found using
 B<git remote --verbose show>.
 
 =item B<--mr-allow-squash>, B<--no-mr-allow-squash>
@@ -971,43 +1033,45 @@ C<.devscripts> value: B<SALSA_MR_ALLOW_SQUASH> (yes/no)
 
 =item B<--mr-remove-source-branch>, B<--no-mr-remove-source-branch>
 
-Remove source branch if merge request is accepted. Default: no.
+Remove source branch if merge request is accepted.
+Default: no.
 
 C<.devscripts> value: B<SALSA_MR_REMOVE_SOURCE_BRANCH> (yes/no)
 
 =back
 
-=head2 Options to manage other Gitlab instances
+=head2 Options to manage other GitLab instances
 
 =over
 
 =item B<--api-url>
 
-GitLab API. Default: L<https://salsa.debian.org/api/v4>.
+GitLab API.
+Default: L<https://salsa.debian.org/api/v4>.
 
 C<.devscripts> value: B<SALSA_API_URL>
 
 =item B<--git-server-url>
 
-Default to "git@salsa.debian.org:"
+Default: "git@salsa.debian.org:".
 
 C<.devscripts> value: B<SALSA_GIT_SERVER_URL>
 
 =item B<--irker-server-url>
 
-Default to "ircs://irc.oftc.net:6697/"
+Default: "ircs://irc.oftc.net:6697/".
 
 C<.devscripts> value: B<SALSA_IRKER_SERVER_URL>
 
 =item B<--kgb-server-url>
 
-Default to L<http://kgb.debian.net:9418/webhook/?channel=>
+Default: L<https://kgb.debian.net/webhook/?channel=>.
 
 C<.devscripts> value: B<SALSA_KGB_SERVER_URL>
 
 =item B<--tagpending-server-url>
 
-Default to L<https://webhook.salsa.debian.org/tagpending/>
+Default: L<https://webhook.salsa.debian.org/tagpending/>.
 
 C<.devscripts> value: B<SALSA_TAGPENDING_SERVER_URL>
 
@@ -1059,4 +1123,3 @@ along with this program.  If not, see L<http://www.gnu.org/licenses/>.
 use Devscripts::Salsa;
 
 exit Devscripts::Salsa->new->run;
-

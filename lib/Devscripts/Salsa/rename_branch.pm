@@ -14,9 +14,14 @@ sub rename_branch {
     my @repos = $self->get_repo($prompt, @reponames);
     return @repos unless (ref $repos[0]);    # get_repo returns 1 when fails
     foreach (@repos) {
-        my $id = $_->[0];
-        ds_verbose "Configuring $_->[1]";
-        my $project = $self->api->project($_->[0]);
+        my $id  = $_->[0];
+        my $str = $_->[1];
+        if (!$id) {
+            ds_warn "Branch rename has failed for $str (missing ID)\n";
+            return 1;
+        }
+        ds_verbose "Configuring $str";
+        my $project = $self->api->project($id);
         eval {
             $self->api->create_branch(
                 $id,
@@ -27,16 +32,13 @@ sub rename_branch {
             $self->api->delete_branch($id, $self->config->source_branch);
         };
         if ($@) {
-            $res++;
-            if ($self->config->no_fail) {
-                ds_verbose $@;
-                ds_warn
-"Branch rename has failed for $_->[1]. Use --verbose to see errors\n";
-                next;
-            } else {
-                ds_warn $@;
+            ds_warn "Branch rename has failed for $str\n";
+            ds_verbose $@;
+            unless ($self->config->no_fail) {
+                ds_verbose "Use --no-fail to continue";
                 return 1;
             }
+            next;
         }
     }
     return $res;

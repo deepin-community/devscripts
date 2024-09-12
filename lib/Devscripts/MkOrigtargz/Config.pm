@@ -162,17 +162,15 @@ use constant rules => [
             my ($prog, $pkg);
             if ($self->upstream =~ /\.xpi$/i) {
                 $self->upstream_comp('xpi');
-                $prog = 'xpi-unpack';
-                $pkg  = 'mozilla-devscripts';
             } else {
                 $self->upstream_comp('zip');
-                $prog = $pkg = 'unzip';
             }
+            $prog = $pkg = 'unzip';
             return (0,
                     "$prog binary not found."
                   . " You need to install the package $pkg"
                   . " to be able to repack "
-                  . $self->upstream_type
+                  . $self->upstream_comp
                   . " upstream archives.\n")
               unless (which $prog);
         } elsif ($self->upstream =~ tar_regex) {

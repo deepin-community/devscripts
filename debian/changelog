@@ -1,3 +1,76 @@
+devscripts (2.23.7) unstable; urgency=medium
+
+  [ Nicholas D Steeves ]
+  * debsign: Override the gpg2 default to update trustdb at what may be an
+    inconvenient time, because an up-to-date trustdb is not needed for this
+    operation (Closes: Bug#1050387)
+
+  [ Niels Thykier ]
+  * wrap-and-sort:
+    + Add a --no-keep-first option
+    + Make --keep-first the default
+    + Support wrap-and-sort'ing d/control.in template files
+    + Cope better with deb822 parse errors
+  * README:
+    + Remove obsolete section about setuid wrappers
+    + Remove `fakeroot` from `debclean` and `debuild` dependencies
+  * debuild.pl: Clarify that the `fakeroot` default comes from dpkg-buildpackage
+  * dpkg-genbuilddeps.sh: Remove explicit `-rfakeroot` from error message
+  * d/control: Remove `fakeroot` from Depends. (Closes: #1041150)
+
+  [ g0t mi1k ]
+  * salsa:
+    + Split edit_project -> edit_project_multipart
+    + Only set avatar if told too
+    + Check if project is public for remote avatar
+    + Set user-agent when remotely checking md5
+    + List members including inherited
+    + Improve some salsa messages
+    + Drop --request-acc, duplicate of --request-access
+    + Update doc and comments
+    + Add ENVIRONMENTS, FEATURE_FLAGS, INFRASTRUCTURE, MONITOR
+      and SECURITY_COMPLIANCE
+    + Add ENABLE_SERVICE_DESK
+
+  [ Sean Whitton ]
+  * debchange: For --lts uploads, use urgency=high.
+
+  [ Damyan Ivanov ]
+  * new default KGB webhook URL (https)
+
+  [ Yadd ]
+  * Update French translation
+
+  [ Jochen Sprickerhof ]
+  * uscan: support zstd in more cases
+
+  [ Danilo Egea Gondolfo ]
+  * Move libgitlab-api-v4-perl to Suggests on Ubuntu (LP: #2046242)
+
+  [ Carlos Henrique Lima Melara ]
+  * uscan: add optional V prefix in @ANY_VERSION@ (Closes: #1037173)
+
+  [ Gioele Barabucci ]
+  * build-rdeps: Use all available distros by default. Restrict to unstable/sid
+    only if explicitly requested via the new parameter --only-devel.
+    (Closes: #1032396)
+
+  [ Diego Escalante Urrelo ]
+  * mk-build-deps: Actually use MKBUILDDEPS_ROOTCMD
+
+  [ Christian Göttsche ]
+  * MkOrigtargz.pm: dump newline to same output as messages
+
+  [ Benjamin Drung ]
+  * mk-origtargz/uscan: replace xpi-unpack by unzip to drop mozilla-devscripts
+  * uscan: Update GitHub documentation to use api.github.com
+    (Closes: #931091, #950880, #1019696, #1040314)
+
+  [ Athos Ribeiro ]
+  * uscan: remove duplicated example from docs
+
+ -- Benjamin Drung <bdrung@debian.org>  Tue, 12 Dec 2023 21:54:20 +0100
+
 devscripts (2.23.6) unstable; urgency=medium
 
   * Team upload
