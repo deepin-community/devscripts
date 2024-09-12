@@ -198,9 +198,8 @@ class Proxy(http.server.SimpleHTTPRequestHandler):
                         totalsize = int(f.headers["Content-Length"])
                     while downloaded < totalsize:
                         chunksize = 200 * 1024
-                        if totalsize - downloaded < chunksize:
-                            chunksize = totalsize - downloaded
-                        buf = f.read(chunksize)  # 200 kB/s
+                        chunksize = min(chunksize, totalsize - downloaded)
+                        buf = f.read(chunksize)
                         if len(buf) != chunksize:
                             # something went wrong
                             logging.warning(
