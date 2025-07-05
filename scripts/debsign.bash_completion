@@ -39,7 +39,7 @@ _debsign_completion () {
             ;;
 
         -k)
-            # Provide completions for GnuPG secret key IDs.
+            # Provide completions for OpenPGP secret key IDs.
             local keyid_options=$(
                 gpg --fixed-list-mode --with-colons --fingerprint \
                     --list-secret-keys \

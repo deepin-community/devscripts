@@ -1,6 +1,5 @@
 
 include ../Makefile.common
-include /usr/share/dpkg/vendor.mk
 DESTDIR =
 
 define \n
@@ -10,6 +9,8 @@ endef
 
 VERSION_FILE = ../version
 VERSION = $(shell cat $(VERSION_FILE))
+
+DEB_VENDOR = $(shell dpkg-vendor --query Vendor)
 
 PL_FILES := $(wildcard *.pl)
 SH_FILES = $(wildcard *.sh)
@@ -23,6 +24,8 @@ COMPL_DIR := $(shell pkg-config --variable=completionsdir bash-completion)
 PKGNAMES := \
 	build-rdeps \
 	dd-list \
+	deb2apptainer \
+	deb2docker \
 	debcheckout \
 	debsnap \
 	dget \
@@ -43,6 +46,7 @@ PKGNAMES := \
 GEN_MAN1S += \
 	deb-why-removed.1 \
 	debbisect.1 \
+	debftbfs.1 \
 	debootsnap.1 \
 	debrebuild.1 \
 	debrepro.1 \
@@ -98,12 +102,24 @@ test_pl: $(PL_CHECKS)
 %.pl_check: %
 	perl -I ../lib -c $<; \
 
-test_py: $(VERSION_FILE)
-	$(foreach python,$(shell py3versions -r ../debian/control),$(python) setup.py test$(\n))
+devscripts/__init__.py: ../debian/changelog
+	# Generate devscripts/__init__.py
+	python3 setup.py build
+
+test_py: devscripts/__init__.py
+	$(foreach python,$(shell py3versions -r ../debian/control),$(python) -m unittest discover devscripts$(\n))
 
 debbisect.1: debbisect
 	help2man \
 		--name="bisect snapshot.debian.org" \
+		--version-string=$(VERSION) \
+		--no-info \
+		--no-discard-stderr \
+		./$< >$@
+
+debftbfs.1: debftbfs
+	help2man \
+		--name="list packages that have FTBFS bugs filed" \
 		--version-string=$(VERSION) \
 		--no-info \
 		--no-discard-stderr \
@@ -145,7 +161,7 @@ clean:
 	rm -rf devscripts.egg-info $(BC_BUILD_DIR) .pylint.d
 	rm -f $(SCRIPTS) $(patsubst %,%.tmp,$(SCRIPTS)) \
 		$(GEN_MAN1S) $(SCRIPT_LIBS)
-
+	rm -rf build
 
 test: test_pl test_sh test_py
 

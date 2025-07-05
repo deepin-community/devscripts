@@ -1,0 +1,141 @@
+.TH "DEB2APPTAINER" "1" "February 2024" "" ""
+.hy
+.SH NAME
+.PP
+\f[B]deb2apptainer\f[R] - Build a Singularity/Apptainer image with given
+Debian packages
+.SH SYNOPSIS
+.PP
+\f[B]deb2apptainer\f[R] [\f[B]-hB\f[R]][\f[B]-c\f[R] \f[I]CMD\f[R]]
+[\f[B]-f\f[R] \f[I]FROM\f[R]][\f[B]-n\f[R] \f[I]NAME\f[R]]
+[\f[B]-o\f[R] \f[I]DIR\f[R]][\f[B]-p\f[R] \f[I]PRE_SCRIPT\f[R]]
+[\f[B]-s\f[R] \f[I]POST_SCRIPT\f[R]] \f[I]packages\f[R]
+.br
+\f[B]deb2singularity\f[R] [\f[B]-hB\f[R]][\f[B]-c\f[R] \f[I]CMD\f[R]]
+[\f[B]-f\f[R] \f[I]FROM\f[R]][\f[B]-n\f[R] \f[I]NAME\f[R]]
+[\f[B]-o\f[R] \f[I]DIR\f[R]][\f[B]-p\f[R] \f[I]PRE_SCRIPT\f[R]]
+[\f[B]-s\f[R] \f[I]POST_SCRIPT\f[R]] \f[I]packages\f[R]
+.SH DESCRIPTION
+.PP
+\f[B]deb2apptainer\f[R] is a simple script which takes as input a list
+of Debian packages and generates automatically a Singularity/Apptainer
+container including these packages.
+A set of \f[I]freedesktop.org\f[R] desktop launchers are also generated
+based on the .desktop and icon files found in the packages.
+In addition, a desktop launcher is created to start the container in a
+Terminal.
+.PP
+This tool is suited for deploying applications as containers, as well as
+for testing Debian packages in a sandbox.
+.SH OPTIONS
+.TP
+\f[B]-B\f[R]
+do NOT build the image (default is to build).
+A \f[I]build\f[R] script is generated in the DIR target directory.
+.TP
+\f[B]-c EXEC\f[R]
+Command to run in the container (default to \f[I]/bin/bash\f[R]).
+.TP
+\f[B]-f FROM\f[R]
+Distribution is to be used (default to \f[I]debian:stable\f[R]).
+.TP
+\f[B]-h\f[R]
+Show this help
+.TP
+\f[B]-n NAME\f[R]
+Name of the image (default is built from the package list).
+.TP
+\f[B]-o DIR\f[R]
+Use given directory DIR for the build (default is in /tmp).
+.TP
+\f[B]-p PRE_SCRIPT\f[R]
+Execute the given script \f[I]PRE_SCRIPT\f[R] before packages install.
+.TP
+\f[B]-s POST_SCRIPT\f[R]
+Execute the given script \f[I]POST_SCRIPT\f[R] after packages install.
+.TP
+\f[B]packages\f[R]
+The package list can be any Debian package, as well as local .deb files.
+.SH FILES
+.IP \[bu] 2
+DIR/README
+.IP \[bu] 2
+DIR/image.def
+.IP \[bu] 2
+DIR/image.sif
+.IP \[bu] 2
+DIR/launchers/
+.IP \[bu] 2
+DIR/icons/
+.IP \[bu] 2
+DIR/build
+.IP \[bu] 2
+DIR/start
+.SH NOTES
+.PP
+You obviously require to have \f[I]apptainer\f[R] installed.
+.PP
+Get the Debian package at: -
+https://apptainer.org/docs/admin/main/installation.html#install-debian-packages
+.PP
+Usual commands typically used to handle Apptainer/Singularity containers
+are:
+.TP
+\f[B]build\f[R]
+apptainer build image.sif
+.TP
+\f[B]run\f[R]
+apptainer run image.sif apptainer run \[en]nv image.sif # with NVIDIA
+GPU pass-through
+.TP
+\f[B]info\f[R]
+apptainer inspect image.sif
+.TP
+\f[B]header\f[R]
+apptainer sif header image.sif
+.TP
+\f[B]data\f[R]
+apptainer sif list image.sif
+.SH EXAMPLES
+.TP
+Create a Singularity/Apptainer container with package \f[I]x11-apps\f[R] in directory \f[I]/tmp/xeyes\f[R], and launch \f[I]xeyes\f[R]:
+.IP \[bu] 2
+deb2apptainer -o /tmp/xeyes x11-apps
+.IP \[bu] 2
+/tmp/xeyes/start xeyes
+.RS
+.PP
+A Desktop launcher is created as
+/tmp/xeyes/launchers/x11-apps-terminal.desktop
+.RE
+.TP
+Create a Singularity/Apptainer container with \f[I]x11-apps\f[R] and \f[I]meshlab\f[R]
+deb2apptainer x11-apps meshlab
+.TP
+Create a Singularity/Apptainer container making sure software channels are active:
+.IP \[bu] 2
+echo \[lq]sed -i `s/main/main contrib non-free/g'
+/etc/apt/sources.list\[rq] > pre.sh
+.IP \[bu] 2
+deb2apptainer -p pre.sh x11-apps
+.TP
+Create a Singularity/Apptainer container based on specific Debian version, and make use of the GPU:
+.IP \[bu] 2
+echo \[lq]echo `deb http://deb.debian.org/debian bullseye main contrib
+non-free' >> /etc/apt/sources.list\[rq] > pre-script.sh
+.IP \[bu] 2
+deb2apptainer -n pyhst2 -f debian:bullseye -p pre-script.sh -o
+/tmp/apptainer-pyhst2/ python3-pyhst2-cuda nvidia-smi
+nvidia-cuda-toolkit
+.IP \[bu] 2
+apptainer run \[en]nv /tmp/apptainer-pyhst2/pyhst2.sif nvidia-smi
+\[ga]\[ga]\[ga]
+.SH AUTHORS
+.PP
+Emmanuel Farhi (emmanuel.farhi\[at]synchrotron-soleil.fr)
+.SH SEE ALSO
+.PP
+deb2docker(1), distrobox-create(1), distrobox-enter(1), docker(1),
+apptainer(1)
+.SH AUTHORS
+Emmanuel Farhi.

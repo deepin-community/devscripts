@@ -170,33 +170,18 @@ signfile() {
     ASCII_SIGNED_FILE="${UNSIGNED_FILE}.asc"
     (cat "$file" ; echo "") > "$UNSIGNED_FILE"
 
-    gpgversion=$($signcommand --version | head -n 1 | cut -d' ' -f3)
-    gpgmajorversion=$(echo $gpgversion | cut -d. -f1)
-    gpgminorversion=$(echo $gpgversion | cut -d. -f2)
-
-    if [ $gpgmajorversion -gt 1 -o $gpgminorversion -ge 4 ]
-    then
-	    $signcommand --no-auto-check-trustdb \
-		--local-user "$signas" --clearsign \
-		--list-options no-show-policy-urls \
-		--armor --textmode --output "$ASCII_SIGNED_FILE"\
-		"$UNSIGNED_FILE" || \
-	    { SAVESTAT=$?
-	      echo "$PROGNAME: $signcommand error occurred!  Aborting...." >&2
-	      stty $savestty 2>/dev/null || true
-	      exit $SAVESTAT
-	    }
-    else
-	    $signcommand --local-user "$signas" --clearsign \
-		--no-show-policy-url \
-		--armor --textmode --output "$ASCII_SIGNED_FILE" \
-		"$UNSIGNED_FILE" || \
-	    { SAVESTAT=$?
-	      echo "$PROGNAME: $signcommand error occurred!  Aborting...." >&2
-	      stty $savestty 2>/dev/null || true
-	      exit $SAVESTAT
-	    }
-    fi
+    $signcommand --no-auto-check-trustdb \
+	--local-user "$signas" --clearsign \
+	--openpgp \
+	--personal-digest-preferences 'SHA512 SHA384 SHA256 SHA224' \
+	--list-options no-show-policy-urls \
+	--armor --textmode --output "$ASCII_SIGNED_FILE"\
+	"$UNSIGNED_FILE" || \
+    { SAVESTAT=$?
+      echo "$PROGNAME: $signcommand error occurred!  Aborting...." >&2
+      stty $savestty 2>/dev/null || true
+      exit $SAVESTAT
+    }
     stty $savestty 2>/dev/null || true
     echo
     PRECIOUS_FILES=$(($PRECIOUS_FILES + 1))
@@ -323,8 +308,6 @@ if [ -n "$DEBSIGN_PROGRAM" ]; then
 else
     if command -v gpg > /dev/null; then
 	signcommand=gpg
-    elif command -v gpg2 > /dev/null; then
-	signcommand=gpg2
     fi
 fi
 

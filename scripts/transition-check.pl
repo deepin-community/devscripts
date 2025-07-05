@@ -128,13 +128,13 @@ sub have_lwp() {
 
 sub have_yaml() {
     return ($yaml_broken ? 0 : 1) if defined $yaml_broken;
-    eval { require YAML::Syck; };
+    eval { require YAML::XS; };
 
     if ($@) {
         if ($@ =~ m%^Can\'t locate YAML%) {
-            $yaml_broken = "the libyaml-syck-perl package is not installed";
+            $yaml_broken = "the libyaml-libyaml-perl package is not installed";
         } else {
-            $yaml_broken = "couldn't load YAML::Syck: $@";
+            $yaml_broken = "couldn't load YAML::XS: $@";
         }
     } else {
         $yaml_broken = '';
@@ -187,7 +187,7 @@ if (!$response->is_success) {
 die "$progname: Unable to parse transition information: $yaml_broken\n"
   unless have_yaml();
 
-my $yaml        = YAML::Syck::Load($response->content);
+my $yaml        = YAML::XS::Load($response->content);
 my $packagelist = join("|", map { qq/\Q$_\E/ } @ARGV);
 my $found       = 0;
 

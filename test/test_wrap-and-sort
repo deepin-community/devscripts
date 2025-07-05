@@ -34,13 +34,18 @@ oneTimeSetUp() {
 
 # Run as `prepare_and_run_wrap_and_sort <test-name> [args-for-wrap-and-sort]`
 prepare_and_run_wrap_and_sort() {
-  TEST_NAME="${1}"
+  TEST_NAME="$1"
+  shift
   TEST_DIR="${TEMP_DIR}/${TEST_NAME}"
 
   mkdir "${TEST_DIR}"
   cp -a "${WORK_DIR}/wrap-and-sort/${TEST_NAME}/in/"* "$TEST_DIR/" || exit 1
-  assertPasses $wrap_and_sort -d "$TEST_DIR"
+  assertPasses $wrap_and_sort -d "$TEST_DIR" "$@"
   assertPasses diff -Nuarp "${WORK_DIR}/wrap-and-sort/${TEST_NAME}/out" "${TEST_DIR}"
+}
+
+test_build_system_first() {
+  prepare_and_run_wrap_and_sort 'build-system-first' -sat
 }
 
 test_install_comments() {

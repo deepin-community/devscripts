@@ -655,7 +655,7 @@ sub init_hashes {
           . qr'read\s+(?:-[a-qs-zA-Z\d-]+)' =>
           q<read with option other than -r>,
         $LEADIN
-          . qr'read\s*(?:-\w+\s*)*(?:\".*?\"|[\'].*?[\'])?\s*(?:;|$)' =>
+          . qr'read(?:\s+(?:-\w+\s*)*(?:\".*?\"|[\'].*?[\'])?)?\s*(?:;|$)' =>
           q<read without variable>,
         $LEADIN . qr'echo\s+(-n\s+)?-n?en?\s' => q<echo -e>,
         $LEADIN . qr'exec\s+-[acl]'           => q<exec -c/-l/-a name>,

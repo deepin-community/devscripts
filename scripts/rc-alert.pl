@@ -22,6 +22,7 @@
 use strict;
 use warnings;
 use Devscripts::Packages;
+use Dpkg::Path qw(find_command);
 use File::Basename;
 use File::Copy qw(move);
 use File::HomeDir;
@@ -170,10 +171,10 @@ $excludedists = remove_duplicate_values(uc($excludedists));
 
 my $curl_or_wget;
 my $getcommand;
-if (system("command -v wget >/dev/null 2>&1") == 0) {
+if (find_command('wget')) {
     $curl_or_wget = "wget";
     $getcommand   = "wget -q -O -";
-} elsif (system("command -v curl >/dev/null 2>&1") == 0) {
+} elsif (find_command('curl')) {
     $curl_or_wget = "curl";
     $getcommand   = "curl -qfsL";
 } else {

@@ -170,6 +170,10 @@ test_quoted_strings() {
     found "bashisms/quoted-strings.sh" "$(cat bashisms/quoted-strings.sh.out)"
 }
 
+test_read_no_var() {
+    found "bashisms/read.sh" "$(cat bashisms/read.sh.out)"
+}
+
 test_return() {
     found "bashisms/return.sh" "$(cat bashisms/return.sh.out)"
 }

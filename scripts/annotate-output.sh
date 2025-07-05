@@ -14,37 +14,93 @@
 
 set -eu
 
-PROGNAME=${0##*/}
+# TODO: Switch from using `/usr/bin/printf` to the (likely built-in) `printf`
+#       once POSIX has standardised `%q` for that
+#       (see https://austingroupbugs.net/view.php?id=1771) and `dash`
+#       implemented it.
 
-handler() {
-	while IFS= read -r line; do
-		printf "%s %s: %s\n" "$($1)" "$2" "$line"
-	done
-	if [ -n "$line" ]; then
-		printf "%s %s: %s" "$($1)" "$2" "$line"
-	fi
+define_get_prefix() {
+	eval " get_prefix() {
+		/usr/bin/printf '%q' $(/usr/bin/printf '%q' "$1")
+	}"
+}
+
+define_handler_with_date_conversion_specifiers() {
+	eval " handler() {
+		while IFS= read -r line; do
+			printf '%s%s: %s\\n' \"\$(date $(/usr/bin/printf '%q' "$1") )\" \"\$1\" \"\$line\"
+		done
+		if [ -n \"\$line\" ]; then
+			printf '%s%s: %s' \"\$(date $(/usr/bin/printf '%q' "$1") )\" \"\$1\" \"\$line\"
+		fi
+	}"
+	define_get_prefix "${1#+}"
+}
+
+define_handler_with_plain_prefix() {
+	eval " handler() {
+		while IFS= read -r line; do
+			printf '%s%s: %s\\n' $(/usr/bin/printf '%q' "$1") \"\$1\" \"\$line\"
+		done
+		if [ -n \"\$line\" ]; then
+			printf '%s%s: %s' $(/usr/bin/printf '%q' "$1") \"\$1\" \"\$line\"
+		fi
+	}"
+	define_get_prefix "$1"
 }
 
 usage() {
-	echo \
-"Usage: $PROGNAME [options] program [args ...]
-  Run program and annotate STDOUT/STDERR with a timestamp.
+	printf \
+'Usage: %s [OPTIONS ...] [--] PROGRAM [ARGS ...]
+Executes PROGRAM with ARGS as arguments and prepends printed lines with a format
+string, a stream indicator and `: `.
 
-  Options:
-   +FORMAT    - Controls the timestamp format as per date(1)
-   -h, --help - Show this message"
+Options:
+ +FORMAT
+  A format string that may use the conversion specifiers from the `date`(1)-
+  utility.
+  The printed string is separated from the following stream indicator by a
+  single space.
+  Defaults to `%%H:%%M:%%S`.
+--raw-date-format FORMAT
+  A format string that may use the conversion specifiers from the `date`(1)-
+  utility.
+  The printed string is not separated from the following stream indicator.
+ -h
+--help
+  Display this help message.
+' "${0##*/}"
 }
 
-FMT="+%H:%M:%S"
+define_handler_with_date_conversion_specifiers '+%H:%M:%S '
 while [ -n "${1-}" ]; do
 	case "$1" in
-	+*)
-		FMT="$1"
+	+*%*)
+		define_handler_with_date_conversion_specifiers "$1 "
 		shift
 		;;
-	-h|-help|--help)
+	+*)
+		define_handler_with_plain_prefix "${1#+} "
+		shift
+		;;
+	--raw-date-format)
+		if [ "$#" -lt 2 ]; then
+			printf '%s: The `--raw-date-format`-option requires an argument.\n' "${0##*/}" >&2
+			exit 125
+		fi
+		case "$2" in
+			*%*) define_handler_with_date_conversion_specifiers "+$2";;
+			*) define_handler_with_plain_prefix "${2#+}";;
+		esac
+		shift 2
+		;;
+	-h|--help)
 		usage
 		exit 0
+		;;
+	--)
+		shift
+		break
 		;;
 	*)
 		break
@@ -52,41 +108,33 @@ while [ -n "${1-}" ]; do
 	esac
 done
 
-if [ $# -lt 1 ]; then
-	usage
-	exit 1
+if [ "$#" -lt 1 ]; then
+	printf '%s: No program to be executed was specified.\n' "${0##*/}" >&2
+	exit 127
 fi
 
-# shellcheck disable=SC2317
-plainfmt() { printf "%s" "$FMT"; }
-# shellcheck disable=SC2317
-datefmt() { date "$FMT"; }
-case "$FMT" in
-	*%*) formatter=datefmt;;
-	*) formatter=plainfmt; FMT="${FMT#+}";;
-esac
+printf 'I: annotate-output %s\n' '###VERSION###'
+printf 'I: prefix='
+get_prefix
+printf '\n'
+{ printf 'Started'; /usr/bin/printf ' %q' "$@"; printf '\n'; } | handler I
 
-echo Started "$@" | handler $formatter I
-
-# The following block redirects FD 2 (stderr) to FD 1 (stdout) which is then
-# processed by the stderr handler. It redirects FD 1 (stdout) to FD 4 such
-# that it can later be move to FD 1 (stdout) and handled by the stdout handler.
-# The exit status of the program gets written to FD 2 (stderr) which is then
+# The following block redirects FD 2 (STDERR) to FD 1 (STDOUT) which is then
+# processed by the STDERR handler. It redirects FD 1 (STDOUT) to FD 4 such
+# that it can later be moved to FD 1 (STDOUT) and handled by the STDOUT handler.
+# The exit status of the program gets written to FD 2 (STDERR) which is then
 # captured to produce the correct exit status as the last step of the pipe.
-# Both the stdout and stderr handler output to FD 3 such that after exiting
-# with the correct exit code, FD 3 can be redirected to FD 1 (stdout).
-err=0
+# Both the STDOUT and STDERR handler output to FD 3 such that after exiting
+# with the correct exit code, FD 3 can be redirected to FD 1 (STDOUT).
 {
   {
     {
       {
         {
-          "$@" 2>&1 1>&4 3>&- 4>&-; echo $? >&2;
-        } | handler $formatter E >&3;
-      } 4>&1 | handler $formatter O >&3;
+          "$@" 2>&1 1>&4 3>&- 4>&-; printf "$?\n" >&2;
+        } | handler E >&3;
+      } 4>&1 | handler O >&3;
     } 2>&1;
-  } | { read -r xs; exit "$xs"; };
-} 3>&1 || err=$?
-
-echo "Finished with exitcode $err" | handler $formatter I
-exit $err
+  } | { IFS= read -r xs; exit "$xs"; };
+} 3>&1 && {         printf 'Finished with exitcode 0\n'    | handler I; exit 0;    } \
+       || { err="$?"; printf "Finished with exitcode $err\n" | handler I; exit "$err"; }

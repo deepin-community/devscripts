@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# pylint: disable=invalid-name
+
+#  Copyright © 2016 Maximiliano Curia <maxy@gnuservers.com.ar>
+
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#  GNU General Public License for more details.
+
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, see <http://www.gnu.org/licenses/>.
+
+"""
+Check the produced binary packages and checks if there are conflicting files
+against packages that are not declared with breaks and replaces.
+
+Note that the results depend on what apt repositories are enabled. If you want
+prevent upgrade issues across Debian releases, you need to have both unstable
+and the previous release repositories enabled in the apt sources configuration.
+"""
+
+import argparse
+import collections
+import logging
+import os
+import subprocess
+import sys
+
+from debian import deb822, debfile, debian_support
+from junit_xml import TestCase, TestSuite
+
+
+def get_pkg_file(lines):
+    found = collections.defaultdict(set)
+    for line in lines.split("\n"):
+        if not line:
+            continue
+        package, filename = line.split(": ", 1)
+        found[package].add(filename)
+    return found
+
+
+def get_relations(field_value):
+    relations = collections.defaultdict(lambda: collections.defaultdict(str))
+    if not field_value:
+        return relations
+    parsed = deb822.PkgRelation.parse_relations(field_value)
+    for or_part in parsed:
+        for part in or_part:
+            rel_name = part["name"]
+            if "version" in part:
+                if "version" in relations[rel_name]:
+                    if (
+                        debian_support.version_compare(
+                            part["version"][1], relations[rel_name]["version"]
+                        )
+                        > 0
+                    ):
+                        relations[rel_name]["version"] = part["version"][1]
+            else:
+                relations[rel_name] = collections.defaultdict(str)
+    return relations
+
+
+def process_options():
+    kw = {"format": "[%(levelname)s] %(message)s"}
+    arg_parser = argparse.ArgumentParser(description=__doc__)
+    arg_parser.add_argument("--debug", action="store_true")
+    arg_parser.add_argument(
+        "--changes-file", default=os.environ.get("CHANGES_FILE", "")
+    )
+    arg_parser.add_argument(
+        "-o",
+        "--output",
+        help="Output file",
+        default=f"{os.environ.get('EXPORT_DIR', '.')}/missing_breaks_replaces.xml",
+    )
+    args = arg_parser.parse_args()
+
+    if args.debug:
+        kw["level"] = logging.DEBUG
+
+    logging.basicConfig(**kw)
+
+    return args
+
+
+def get_package_relations(deb_control):
+    """Extract and parse package relation fields"""
+    deb_replaces = deb_control.get("Replaces", "")
+    deb_breaks = deb_control.get("Breaks", "")
+    deb_conflicts = deb_control.get("Conflicts", "")
+
+    return {
+        "breaks": get_relations(deb_breaks),
+        "conflicts": get_relations(deb_conflicts),
+        "replaces": get_relations(deb_replaces),
+    }
+
+
+def process_entry(dirname, entry):
+    """Process a single changes files entry"""
+    logging.debug(entry["name"])
+    deb_filename = os.path.join(dirname, entry["name"])
+
+    deb_control = debfile.DebFile(deb_filename).debcontrol()
+    name = deb_control["Package"]
+    logging.info("Processing: %s %s", name, deb_control["Version"])
+
+    relations = get_package_relations(deb_control)
+
+    # apt-file now returns 1 if the files are not found, specially bothering
+    # with the dbgsym packages (and the packages not yet uploaded)
+    proc = subprocess.run(
+        ["apt-file", "-D", "search", deb_filename],
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        check=False,
+    )
+    if proc.returncode and proc.stdout:
+        proc.check_returncode()
+    interesting = get_pkg_file(proc.stdout)
+    result = []
+    for pkg_name in interesting:
+        if pkg_name == name or pkg_name in relations["conflicts"]:
+            # TODO check versions
+            continue
+        if pkg_name in relations["breaks"] and pkg_name in relations["replaces"]:
+            # TODO check versions
+            continue
+        msg = f"{name} conflicts with {pkg_name} files: {interesting[pkg_name]}"
+        logging.error("Missing Breaks/Replaces found")
+        logging.error(msg)
+        result.append(msg)
+
+    return name, result, proc.stdout
+
+
+def generate_test_cases(results):
+    test_cases = []
+    for name, (result, output) in results.items():
+        test_case = TestCase(name, stdout=output)
+        if result:
+            test_case.add_error_info("\n".join(result))
+
+        test_cases.append(test_case)
+
+    return test_cases
+
+
+def main():
+    """Check changes files for missing Breaks/Replaces using apt-file"""
+    args = process_options()
+    dirname = os.path.dirname(args.changes_file)
+    results = {}
+    with open(args.changes_file, encoding="utf-8") as changes_file:
+        changes = deb822.Changes(changes_file)
+        for entry in changes["Files"]:
+            if not entry["name"].endswith(".deb"):
+                continue
+            name, result, output = process_entry(dirname, entry)
+            results[name] = (result, output)
+    test_cases = generate_test_cases(results)
+    test_suite = TestSuite("check_for_missing_breaks_replaces", test_cases)
+    with open(args.output, "w", encoding="utf-8") as output_file:
+        output_file.write(TestSuite.to_xml_string([test_suite]))
+    return 1 if any(test_case.is_error() for test_case in test_cases) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

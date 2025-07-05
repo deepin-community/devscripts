@@ -1,0 +1,49 @@
+.TH DEP-14-CONVERT-GIT-BRANCH-NAMES 1 "Debian Utilities" "DEBIAN"
+.SH NAME
+dep-14-convert-git-branch-names \- Convert git repository branch names to follow DEP-14.
+.SH DESCRIPTION
+This helper tool assists in renaming the branch names by printing the necessary
+git commands for local repository and salsa commands remote repository to rename
+the branches and to update the default git branch. It also prints commands to
+create a gbp.conf with matching branch names.
+.PP
+As this script does not actually modify anything, so feel free to run this
+script in any Debian packaging repository to see what it outputs.
+.
+Renaming is needed as git defaults to 'main' as the branch name. Previously git
+used 'master', and git-buildpackage still used 'master' as the branch name. This
+is not ideal for Debian packaging, as using the same default development branch
+names as upstream projects typically do may lead into branch name conflicts.
+.PP
+The DEP-14 (https://dep-team.pages.debian.net/deps/dep14/, status: candidate)
+states:
+.PP
+  In Debian this means that uploads to unstable and experimental should be
+  prepared either in the debian/latest branch or respectively in the
+  debian/unstable and debian/experimental branches.
+.PP
+and:
+.PP
+  The helper tools that do create those repositories should use a command like
+  git symbolic-ref HEAD refs/heads/debian/latest to update HEAD to point to the
+  desired branch.
+.SH SYNOPSIS
+.B dep-14-convert-git-branch-names
+[\fI\,options\/\fR]
+.IP
+.TP
+Options:
+.TP
+\fB\-\-packaging\-branch\fR <name>
+Branch for main packaging (e.g. 'debian/latest')
+.TP
+\fB\-\-debug\fR
+Display debug information while running
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Display this help message
+.TP
+\fB\-\-version\fR
+Display version information
+.SH "SEE ALSO"
+DEP-14: https://dep-team.pages.debian.net/deps/dep14/

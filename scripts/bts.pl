@@ -30,7 +30,7 @@
 package Pod::BTS;
 use strict;
 
-use base qw(Pod::Text);
+use parent qw(Pod::Text);
 
 sub cmd_i { return '<' . $_[2] . '>' }
 
@@ -57,7 +57,8 @@ use IO::File;
 use IO::Handle;
 use Devscripts::DB_File_Lock;
 use Devscripts::Debbugs;
-use Fcntl qw(O_RDWR O_RDONLY O_CREAT F_SETFD);
+use Dpkg::Path qw(find_command);
+use Fcntl      qw(O_RDWR O_RDONLY O_CREAT F_SETFD);
 use Getopt::Long;
 use Encode;
 # Need support for ; as query param separator
@@ -158,7 +159,7 @@ our (@gTags, @valid_tags, %valid_tags);
 	   "wheezy", "wheezy-ignore", "jessie", "jessie-ignore",
 	   "stretch", "stretch-ignore", "buster", "buster-ignore",
 	   "bullseye", "bullseye-ignore","bookworm","bookworm-ignore",
-	   "trixie","trixie-ignore",
+	   "trixie","trixie-ignore","forky","forky-ignore",
          );
 #>>>
 
@@ -549,7 +550,7 @@ if (@ARGV and $ARGV[0] =~ /^--no-?conf$/) {
         unless ($cmd =~ /^~?[A-Za-z0-9_\-\+\.\/]*$/) {
             die
 "BTS_SENDMAIL_COMMAND contained funny characters: $cmd\nPlease fix the configuration file.\n";
-        } elsif (system("command -v $cmd >/dev/null 2>&1") != 0) {
+        } elsif (!find_command($cmd)) {
             die
 "BTS_SENDMAIL_COMMAND $cmd could not be executed.\nPlease fix the configuration file.\n";
         }
@@ -686,7 +687,7 @@ if ($opt_sendmail) {
         my $cmd = (split ' ', $opt_sendmail)[0];
         unless ($cmd =~ /^~?[A-Za-z0-9_\-\+\.\/]*$/) {
             die "--sendmail command contained funny characters: $cmd\n";
-        } elsif (system("command -v $cmd >/dev/null 2>&1") != 0) {
+        } elsif (!find_command($cmd)) {
             die "--sendmail command $cmd could not be executed.\n";
         }
     }
@@ -1137,6 +1138,7 @@ sub bts_status {
     my @bugs;
     my $showempty = 0;
     my %field;
+    my @field;
     for my $bug (@args) {
         if (looks_like_number($bug)) {
             push @bugs, $bug;
@@ -1159,6 +1161,7 @@ sub bts_status {
         } elsif ($bug =~ m{^fields:(.+)}) {
             my $fields = $1;
             for my $field (split /,/, $fields) {
+                push @field, (lc $field) unless exists $field{$field};
                 $field{ lc $field } = 1;
             }
             $showempty = 1;
@@ -1175,9 +1178,14 @@ sub bts_status {
     for my $bug (keys %{$bugs}) {
         print "\n" if not $first;
         $first = 0;
-        my @keys = grep { $_ ne 'bug_num' }
-          keys %{ $bugs->{$bug} };
-        for my $key ('bug_num', @keys) {
+        my @keys;
+        if (%field) {
+            @keys = @field;
+        } else {
+            @keys = grep { $_ ne 'bug_num' } (sort (keys %{ $bugs->{$bug} }));
+            unshift @keys, 'bug_num';
+        }
+        for my $key (@keys) {
             if (%field) {
                 next unless exists $field{$key};
             }
@@ -1343,7 +1351,7 @@ sub bts_summary {
 =item B<submitter> I<bug> [I<bug> ...] I<submitter-email>
 
 Change the submitter address of a I<bug> or a number of bugs, with B<!> meaning
-`use the address on the current email as the new submitter address'.
+"use the address on the current email as the new submitter address".
 
 =cut
 
@@ -1572,7 +1580,7 @@ must be specified, unless the B<=> flag is used, where the command
 
 will remove all tags from the specified I<bug>.
 
-Adding/removing the B<security> tag will add "team\@security.debian.org"
+Adding/removing the B<security> tag will add "team@security.debian.org"
 to the Cc list of the control email.
 
 The list of valid tags and their significance is available at
@@ -1826,7 +1834,7 @@ unique substring.
 sub bts_severity {
     my $bug = checkbug(shift)
       or die "bts severity: change the severity of what bug?\n";
-    my $severity = lc(shift)
+    my $severity = lc(shift // '')
       or die "bts severity: set \#$bug\'s severity to what?\n";
     my @matches = grep /^\Q$severity\E/i, @valid_severities;
     if (@matches != 1) {
@@ -2033,7 +2041,7 @@ sub bts_limit {
 =item B<owner> I<bug> I<owner-email>
 
 Change the "owner" address of a I<bug>, with B<!> meaning
-`use the address on the current email as the new owner address'.
+"use the address on the current email as the new owner address".
 
 The owner of a bug accepts responsibility for dealing with it.
 
@@ -2677,7 +2685,8 @@ sub send_mail {
     } elsif (length $smtphost) {
         my $smtp;
 
-        if ($smtphost =~ m%^(?:(?:ssmtp|smtps)://)(.*)$%) {
+        my $smtps = $smtphost =~ m%^(?:(?:ssmtp|smtps)://)(.*)$%;
+        if ($smtps) {
             my ($host, $port) = split(/:/, $1);
             $port ||= '465';
 
@@ -2704,10 +2713,12 @@ sub send_mail {
         if ($smtpuser) {
             if (have_authen_sasl) {
                 $smtppass = getpass() if not $smtppass;
-                # Enforce STARTTLS; Net::SMTP will otherwise refuse auth() in
-                # the next step, and terminate the connection with FIN.
+                # Enforce STARTTLS, unless we're using SMTPS; Net::SMTP will
+                # otherwise refuse auth() in the next step, and terminate the
+                # connection with FIN.
                 $smtp->starttls()
-                  or die "$progname: Could not upgrade with STARTTLS";
+                  or die "$progname: Could not upgrade with STARTTLS"
+                  unless $smtps;
                 $smtp->auth($smtpuser, $smtppass)
                   or die
                   "$progname: failed to authenticate to $smtphost\n($@)\n";
@@ -2946,7 +2957,7 @@ sub mailto {
     if (defined($from) || $noaction) {
         send_mail($from, $to, '', $subject, $body);
     } else {    # No $from
-        unless (system("command -v mailx >/dev/null 2>&1") == 0) {
+        if (!find_command('mailx')) {
             die
 "$progname: You need to either specify an email address (say using DEBEMAIL)\nor have the bsd-mailx package (or another package providing mailx) installed\nto send mail!\n";
         }

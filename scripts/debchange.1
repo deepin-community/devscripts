@@ -351,7 +351,7 @@ also the \fBDEBCHANGE_MULTIMAINT\fR configuration file option below.
 .TP
 \fB\-\-\fR[\fBno\fR]\fBmultimaint\-merge\fR
 Should all changes made by the same author be merged into the same
-changelog section?  Default is no; see the discussion above and also the
+changelog section?  Default is yes; see the discussion above and also the
 \fBDEBCHANGE_MULTIMAINT_MERGE\fR configuration file option below.
 .TP
 .BR \-\-maintmaint ", " \-m
@@ -396,6 +396,10 @@ first option given on the command-line.
 Controls how \fBdebchange\fR determines if a package has been released,
 when deciding whether to create a new changelog entry or append to an
 existing changelog entry.
+.TP
+\fB\-\-date\fR \fIdate\fR
+Use the specified date in the changelog entry being edited.
+The date must be in RFC 5322 format, i.e. as produced by \fIdate -R\fR.
 .TP
 .BR \-\-help ", " \-h
 Display a help message and exit successfully.
@@ -484,7 +488,8 @@ by \fBsensible-editor\fR.
 .BR debclean (1),
 .BR dput (1),
 .BR dupload (1),
-.BR devscripts.conf (5)
+.BR devscripts.conf (5),
+.BR gbp-dch (1)
 .SH AUTHOR
 The original author was Christoph Lameter <clameter@debian.org>.
 Many substantial changes and improvements were made by Julian Gilbey

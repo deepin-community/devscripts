@@ -218,8 +218,7 @@ class Control:
 
             with _open(filename, fd=fd, encoding="utf8") as sequence:
                 self._deb822_file = parse_deb822_file(
-                    sequence,
-                    accept_files_with_error_tokens=allow_parse_errors,
+                    sequence, accept_files_with_error_tokens=allow_parse_errors
                 )
 
             self.paragraphs = list(self._deb822_file)
@@ -242,6 +241,10 @@ class Control:
     def get_original_maintainer(self):
         """Returns the value of the XSBC-Original-Maintainer field."""
         return self.paragraphs[0].get("XSBC-Original-Maintainer")
+
+    @property
+    def uses_different_style_tool(self):
+        return self.paragraphs[0].get("X-Style")
 
     def dump(self):
         if self.is_roundtrip_safe:

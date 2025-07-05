@@ -81,7 +81,17 @@ _debuild()
     esac
 
     if [[ "$cur" == -* ]]; then
-        _options='--preserve-envvar --set-envvar --rootcmd --preserve-env --prepend-path --lintian --no-lintian --no-tgz-check --tgz-check --username --clear-hooks --check-dirname-level --check-dirname-regex -d -D --dpkg-buildpackage-hook --clean-hook --dpkg-source-hook --dpkg-build-hook --dpkg-binary-hook --dpkg-genchanges-hook --final-clean-hook --lintian-hook signing-hook post-dpkg-buildpackage-hook --lintian-opts -g -G -b -B -A -S -F -si -sa -sd -v -C -m -e -a --host-type --target-arch --target-type -P -j -D -d -nc -tc --admindir --changes-options --source-options -z -Z -i -I -sn -ss -sA -sk -su -sr -sK -sU -sR --force-sign -us -uc -k -p --check-option --check-command -R -r'
+        _options='--preserve-envvar --set-envvar --rootcmd --preserve-env
+        --prepend-path --lintian --no-lintian --no-tgz-check --tgz-check
+        --username --clear-hooks --check-dirname-level --check-dirname-regex -d
+        -D --dpkg-buildpackage-hook --clean-hook --dpkg-source-hook
+        --dpkg-build-hook --dpkg-binary-hook --dpkg-genchanges-hook
+        --final-clean-hook --lintian-hook signing-hook
+        post-dpkg-buildpackage-hook --lintian-opts -g -G -b -B -A -S -F -si -sa
+        -sd -v -C -m -e -a --host-type --target-arch --target-type -P -j -D -d
+        -nc -tc --admindir --changes-options --source-options -z -Z -i -I -sn
+        -ss -sA -sk -su -sr -sK -sU -sR --force-sign -us -uc -k -p
+        --check-option --check-command -R -r'
         if [[ "$prev" == debuild ]]; then
             _options+=' --no-conf'
         fi

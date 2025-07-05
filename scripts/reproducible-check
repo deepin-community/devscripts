@@ -200,9 +200,9 @@ class ReproducibleCheck:
                 # strip these off when looking up against the JSON of results.
                 version = re.sub(r"\+b\d+$", "", pkg_ver.version)
 
-                result[
-                    (pkg.shortname, pkg_ver.architecture, version)
-                ] = pkg_ver.source_name
+                result[(pkg.shortname, pkg_ver.architecture, version)] = (
+                    pkg_ver.source_name
+                )
 
         self.log.debug("Parsed %d installed binary packages", len(result))
 
@@ -250,7 +250,7 @@ class ReproducibleCheck:
         num_reproducible = len(installed) - num_unreproducible
         percent = 100.0 * num_reproducible / num_installed
         print(
-            f"{num_unreproducible}/{num_installed} ({percent:.2f}%) of "
+            f"{num_reproducible}/{num_installed} ({percent:.2f}%) of "
             f"installed binary packages are reproducible."
         )
 

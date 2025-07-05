@@ -50,11 +50,7 @@ oneTimeSetUp () {
 	GPG=gpg
 	if ! command -v $GPG >/dev/null 2>&1;then
 		echo "$GPG missing"
-		GPG=gpg2
-		if ! command -v $GPG >/dev/null 2>&1;then
-		echo "$GPG missing"
 		exit 1
-		fi
 	fi
 
 	PRIVATE_KEY=${WORKDIR}/uscan/PRIVATE_KEY.asc
@@ -70,7 +66,7 @@ oneTimeSetUp () {
 	    --output $PUBLIC_KEYRING --dearmor $PUBLIC_KEY
 
 	$GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
-	    --secret-keyring $PRIVATE_KEYRING --default-key 72543FAF \
+	    --default-key 72543FAF \
 	    --list-keys --verbose
 
 	mkdir -p ${WORKDIR}/package_lifecycle/test/debian/source

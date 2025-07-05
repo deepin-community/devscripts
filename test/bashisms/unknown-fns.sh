@@ -238,7 +238,7 @@ attach_task_test()
 	# attach task into the cpuset group
 	echo $pid > "$CPUSET/sub_cpuset/tasks" 2> /dev/null
 	if [ $? -eq $expect ]; then
-		tst_resm TPASS "Attaching Task Test successed!!"
+		tst_resm TPASS "Attaching Task Test succeeded!!"
 	else
 		tst_resm TFAIL "Attaching Task Test failed!! cpus - \"$cpus\", mems - \"$mems\", Expect - \"$expect\", Fact - \"$ret\". (0 - Attach Success, 1 - Attach Fail)"
 		exit_status=1

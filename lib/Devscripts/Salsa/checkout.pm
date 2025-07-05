@@ -32,6 +32,8 @@ sub checkout {
     foreach (@repos) {
         my $path = $self->project2path($_);
         s#.*/##;
+        s#^https://salsa.debian.org/##;
+        s#\.git$##;
         if (-d $_) {
             chdir $_;
             ds_verbose "Updating existing checkout in $_";

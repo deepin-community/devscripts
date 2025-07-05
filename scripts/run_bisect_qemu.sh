@@ -60,48 +60,6 @@ if [ $# -eq 10 ]; then
 	toupgrade=${10}
 fi
 
-case $architecture in
-	alpha)    qemuarch=alpha;;
-	amd64)    qemuarch=x86_64;;
-	arm)      qemuarch=arm;;
-	arm64)    qemuarch=aarch64;;
-	armel)    qemuarch=arm;;
-	armhf)    qemuarch=arm;;
-	hppa)     qemuarch=hppa;;
-	i386)     qemuarch=i386;;
-	m68k)     qemuarch=m68k;;
-	mips)     qemuarch=mips;;
-	mips64)   qemuarch=mips64;;
-	mips64el) qemuarch=mips64el;;
-	mipsel)   qemuarch=mipsel;;
-	powerpc)  qemuarch=ppc;;
-	ppc64)    qemuarch=ppc64;;
-	ppc64el)  qemuarch=ppc64le;;
-	riscv64)  qemuarch=riscv64;;
-	s390x)    qemuarch=s390x;;
-	sh4)      qemuarch=sh4;;
-	sparc)    qemuarch=sparc;;
-	sparc64)  qemuarch=sparc64;;
-	*) echo "no qemu support for $architecture"; exit 1;;
-esac
-case $architecture in
-	i386)     linuxarch=686-pae;;
-	amd64)    linuxarch=amd64;;
-	arm64)    linuxarch=arm64;;
-	armhf)    linuxarch=armmp;;
-	ia64)     linuxarch=itanium;;
-	m68k)     linuxarch=m68k;;
-	armel)    linuxarch=marvell;;
-	hppa)     linuxarch=parisc;;
-	powerpc)  linuxarch=powerpc;;
-	ppc64)    linuxarch=powerpc64;;
-	ppc64el)  linuxarch=powerpc64le;;
-	riscv64)  linuxarch=riscv64;;
-	s390x)    linuxarch=s390x;;
-	sparc64)  linuxarch=sparc64;;
-	*) echo "no kernel image for $architecture"; exit 1;;
-esac
-
 TMPDIR=$(mktemp --tmpdir --directory debbisect_qemu.XXXXXXXXXX)
 cleantmp() {
 	for f in customize.sh id_rsa id_rsa.pub qemu.log config; do
@@ -116,52 +74,6 @@ chmod a+xr "$TMPDIR"
 
 ssh-keygen -q -t rsa -f "$TMPDIR/id_rsa" -N ""
 
-cat << SCRIPT > "$TMPDIR/customize.sh"
-#!/bin/sh
-set -exu
-
-rootfs="\$1"
-
-# setup various files in /etc
-echo host > "\$rootfs/etc/hostname"
-echo "127.0.0.1 localhost host" > "\$rootfs/etc/hosts"
-echo "/dev/vda1 / auto errors=remount-ro 0 1" > "\$rootfs/etc/fstab"
-cat /etc/resolv.conf > "\$rootfs/etc/resolv.conf"
-
-# setup users
-chroot "\$rootfs" passwd --delete root
-chroot "\$rootfs" useradd --home-dir /home/user --create-home user
-chroot "\$rootfs" passwd --delete user
-
-# extlinux config to boot from /dev/vda1 with predictable network interface
-# naming and a serial console for logging
-cat << END > "\$rootfs/extlinux.conf"
-default linux
-timeout 0
-
-label linux
-kernel /vmlinuz
-append initrd=/initrd.img root=/dev/vda1 net.ifnames=0 console=ttyS0
-END
-
-# network interface config
-# we can use eth0 because we boot with net.ifnames=0 for predictable interface
-# names
-cat << END > "\$rootfs/etc/network/interfaces"
-auto lo
-iface lo inet loopback
-
-auto eth0
-iface eth0 inet dhcp
-END
-
-# copy in the public key
-mkdir "\$rootfs/root/.ssh"
-cp "$TMPDIR/id_rsa.pub" "\$rootfs/root/.ssh/authorized_keys"
-chroot "\$rootfs" chown 0:0 /root/.ssh/authorized_keys
-SCRIPT
-chmod +x "$TMPDIR/customize.sh"
-
 # The following hacks are needed to go back as far as 2006-08-10:
 #
 #  - Acquire::Check-Valid-Until "false" allows Release files with an expired
@@ -172,7 +84,11 @@ chmod +x "$TMPDIR/customize.sh"
 #  - /usr/share/mmdebstrap/hooks/jessie-or-older performs some setup that is
 #    only required for Debian Jessie or older
 #
-mmdebstrap --architecture="$architecture" --verbose --variant=apt --components="$components" \
+debvm-create --skip=usrmerge --size="$disksize" \
+	--sshkey="$TMPDIR/id_rsa.pub" --release="$suite" \
+	--output="debian-rootfs.img" -- \
+	--architecture="$architecture" \
+	--components="$components" \
 	--aptopt='Acquire::Check-Valid-Until "false"' \
 	--aptopt='Apt::Key::gpgvcommand "/usr/libexec/mmdebstrap/gpgvnoexpkeysig"' \
 	--aptopt='Apt::Hashes::SHA1::Weak "yes"' \
@@ -180,59 +96,13 @@ mmdebstrap --architecture="$architecture" --verbose --variant=apt --components="
 	--hook-dir=/usr/share/mmdebstrap/hooks/maybe-jessie-or-older \
 	--hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr \
 	--skip=check/signed-by \
-	--include='openssh-server,systemd-sysv,ifupdown,netbase,isc-dhcp-client,udev,policykit-1,linux-image-'"$linuxarch" \
-	--customize-hook="$TMPDIR/customize.sh" \
-	"$suite" debian-rootfs.tar "$mirror1"
+	"$mirror1"
 
-# use guestfish to prepare the host system
-#
-#  - create a single 4G partition and unpack the rootfs tarball into it
-#  - unpack the tarball of the container into /
-#  - put a syslinux MBR into the first 440 bytes of the drive
-#  - install extlinux and make partition bootable
-#
-# useful stuff to debug any errors:
-#   LIBGUESTFS_BACKEND_SETTINGS=force_tcg
-#   libguestfs-test-tool || true
-#   export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
-guestfish -N "debian-rootfs.img=disk:$disksize" -- \
-	part-disk /dev/sda mbr : \
-	mkfs ext4 /dev/sda1 : \
-	mount /dev/sda1 / : \
-	tar-in "debian-rootfs.tar" / : \
-	upload /usr/lib/SYSLINUX/mbr.bin /mbr.bin : \
-	copy-file-to-device /mbr.bin /dev/sda size:440 : \
-	rm /mbr.bin : \
-	extlinux / : \
-	sync : \
-	umount / : \
-	part-set-bootable /dev/sda 1 true : \
-	shutdown
-
-
-# start the host system
-# prefer using kvm but fall back to tcg if not available
-# avoid entropy starvation by feeding the crypt system with random bits from /dev/urandom
-# the default memory size of 128 MiB is not enough for Debian, so we go with 1G
-# use a virtio network card instead of emulating a real network device
-# we don't need any graphics
-# this also multiplexes the console and the monitor to stdio
-# creates a multiplexed stdio backend connected to the serial port and the qemu
-# monitor
-# redirect tcp connections on port 10022 localhost to the host system port 22
-# redirect all output to a file
-# run in the background
 timeout --kill-after=60s 60m \
-	qemu-system-"$qemuarch" \
-	-M accel=kvm:tcg \
-	-no-user-config \
-	-object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
+	debvm-run --image="debian-rootfs.img" \
+	--sshport=10022 -- \
 	-m "$memsize" \
-	-net nic,model=virtio \
-	-nographic \
 	-serial mon:stdio \
-	-net user,hostfwd=tcp:127.0.0.1:10022-:22 \
-	-drive file="debian-rootfs.img",format=raw,if=virtio \
 	> "$TMPDIR/qemu.log" </dev/null 2>&1 &
 
 # store the pid
@@ -262,37 +132,7 @@ Host qemu
 	RequestTTY no
 END
 
-TIMESTAMP=$(sleepenh 0 || [ $? -eq 1 ])
-TIMEOUT=5
-NUM_TRIES=40
-i=0
-while true; do
-	rv=0
-	ssh -F "$TMPDIR/config" -o ConnectTimeout=$TIMEOUT qemu echo success || rv=1
-	[ $rv -eq 0 ] && break
-	# if the command before took less than $TIMEOUT seconds, wait the remaining time
-	TIMESTAMP=$(sleepenh "$TIMESTAMP" "$TIMEOUT" || [ $? -eq 1 ]);
-	i=$((i+1))
-	if [ $i -ge $NUM_TRIES ]; then
-		break
-	fi
-done
-
-if [ $i -eq $NUM_TRIES ]; then
-	echo "timeout reached: unable to connect to qemu via ssh"
-	exit 1
-fi
-
-# if any url in sources.list points to 127.0.0.1 then we have to replace them
-# by the host IP as seen by the qemu guest
-cat << SCRIPT | ssh -F "$TMPDIR/config" qemu sh
-set -eu
-if [ -e /etc/apt/sources.list ]; then
-	sed -i 's/http:\/\/127.0.0.1:/http:\/\/10.0.2.2:/' /etc/apt/sources.list
-fi
-find /etc/apt/sources.list.d -type f -name '*.list' -print0 \
-	| xargs --null --no-run-if-empty sed -i 's/http:\/\/127.0.0.1:/http:\/\/10.0.2.2:/'
-SCRIPT
+debvm-waitssh 10022
 
 # we install dependencies now and not with mmdebstrap --include in case some
 # dependencies require a full system present
@@ -323,7 +163,7 @@ else
 	ssh -F "$TMPDIR/config" qemu dpkg-query -W > "./debbisect.$DEBIAN_BISECT_TIMESTAMP.pkglist"
 fi
 
-ssh -F "$TMPDIR/config" qemu dpkg-query --list -no-pager
+ssh -F "$TMPDIR/config" qemu dpkg-query --list | cat
 
 # explicitly export all necessary variables
 # because we use set -u this also makes sure that this script has these

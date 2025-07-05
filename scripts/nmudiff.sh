@@ -28,6 +28,7 @@ usage() {
     --old             Send reports to the bugs which are being closed rather
                       than submit a new bug (default if only one bug being
                       closed)
+    --mua=MUACMD      Use MUACMD as Mail User Agent (such as \"thunderbird\")
     --sendmail=SENDMAILCMD
                       Use SENDMAILCMD instead of \"/usr/sbin/sendmail -t\"
     --mutt            Use mutt to mail the message (default)
@@ -71,7 +72,8 @@ DEFAULT_NMUDIFF_NEWREPORT="maybe"
 DEFAULT_BTS_SENDMAIL_COMMAND="/usr/sbin/sendmail"
 DEFAULT_NMUDIFF_PENDING=" pending"
 DEFAULT_MUTT_PRG="mutt"
-VARS="NMUDIFF_DELAY NMUDIFF_MUTT NMUDIFF_NEWREPORT BTS_SENDMAIL_COMMAND NMUDIFF_PENDING MUTT_PRG"
+DEFAULT_MUA_COMMAND=""
+VARS="NMUDIFF_DELAY NMUDIFF_MUTT NMUDIFF_NEWREPORT BTS_SENDMAIL_COMMAND NMUDIFF_PENDING MUTT_PRG MUA_COMMAND"
 # Don't think it's worth including this stuff
 # DEFAULT_DEVSCRIPTS_CHECK_DIRNAME_LEVEL=1
 # DEFAULT_DEVSCRIPTS_CHECK_DIRNAME_REGEX='PACKAGE(-.+)?'
@@ -151,7 +153,7 @@ fi
 # Need -o option to getopt or else it doesn't work
 # Removed: --long check-dirname-level:,check-dirname-regex: \
 TEMP=$(getopt -s bash -o "h" \
-	--long sendmail:,from:,new,old,mutt,no-mutt,nomutt \
+	--long mua:,sendmail:,from:,new,old,mutt,no-mutt,nomutt \
 	--long delay:,no-delay,nodelay \
 	--long no-conf,noconf \
 	--long no-pending,nopending \
@@ -209,6 +211,16 @@ while [ "$1" ]; do
 	    *) BTS_SENDMAIL_COMMAND="$1" ;;
         esac
         ;;
+    --mua)
+        NMUDIFF_MUTT=no
+        shift
+	case "$1" in
+	    "") echo "$PROGNAME: MUA (--mua) command cannot be empty" >&2
+                exit 1
+		;;
+	    *) MUA_COMMAND="$1" ;;
+        esac
+        ;;
     --from)
 	shift
 	FROM="$1"
@@ -250,7 +262,11 @@ if [ "$NMUDIFF_MUTT" = yes ]; then
     elif command -v neomutt > /dev/null; then
         MUTT_PRG=neomutt
     else
-        echo "$PROGNAME: can't find mutt, falling back to sendmail instead" >&2
+        if [ -n "${MUA_COMMAND}" ] ; then
+            echo "$PROGNAME: can't find mutt, falling back to MUA (--mua) instead" >&2
+        else
+            echo "$PROGNAME: can't find mutt, falling back to sendmail instead" >&2
+        fi
         NMUDIFF_MUTT=no
     fi
 fi
@@ -262,17 +278,19 @@ if [ "$NMUDIFF_MUTT" = no ]; then
     fi
     : ${FROM:="$DEBEMAIL"}
     : ${FROM:="$EMAIL"}
-    if [ -z "$FROM" ]; then
-	echo "$PROGNAME: must set email address either with DEBEMAIL environment variable" >&2
-	echo "or EMAIL environment variable or using --from command line option." >&2
-	exit 1
-    fi
-    if [ -n "$FROMNAME" ]; then
-	# If $FROM looks like "Name <email@address>" then extract just the address
-	if [ "$FROM" = "$(echo "$FROM" | sed -ne '/^\(.*\) *<\(.*\)> *$/p')" ]; then
-	    FROM="$(echo "$FROM" | sed -ne 's/^\(.*\) *<\(.*\)> *$/\2/p')"
-	fi
-	FROM="$FROMNAME <$FROM>"
+    if [ -z "${MUA_COMMAND}" ] ; then
+        if [ -z "$FROM" ]; then
+	    echo "$PROGNAME: must set email address either with DEBEMAIL environment variable" >&2
+	    echo "or EMAIL environment variable or using --from command line option." >&2
+	    exit 1
+        fi
+        if [ -n "$FROMNAME" ]; then
+	    # If $FROM looks like "Name <email@address>" then extract just the address
+	    if [ "$FROM" = "$(echo "$FROM" | sed -ne '/^\(.*\) *<\(.*\)> *$/p')" ]; then
+	        FROM="$(echo "$FROM" | sed -ne 's/^\(.*\) *<\(.*\)> *$/\2/p')"
+	    fi
+	    FROM="$FROMNAME <$FROM>"
+        fi
     fi
 fi
 
@@ -328,7 +346,7 @@ if [ ! -r ../${SOURCE}_${VERSION_NO_EPOCH}.dsc ]; then
 fi
 
 ret=0
-debdiff ../${SOURCE}_${OLDVERSION_NO_EPOCH}.dsc \
+debdiff --diffstat ../${SOURCE}_${OLDVERSION_NO_EPOCH}.dsc \
   ../${SOURCE}_${VERSION_NO_EPOCH}.dsc \
   > ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff || ret=$?
 if [ $ret -ne 0 ] && [ $ret -ne 1 ]; then
@@ -388,20 +406,44 @@ elif [ "$NMUDIFF_NONDD" = "yes" ]; then
 elif [ "$NMUDIFF_DELAY" = "0" ]; then
     BODY="$(printf "%s\n\n%s\n%s\n\n%s" \
 "Dear maintainer," \
-"I've prepared an NMU for $SOURCE (versioned as $VERSION). The diff" \
-"is attached to this message." \
+"I've uploaded an NMU for $SOURCE (versioned as $VERSION)." \
+"The diff is attached to this message." \
 "Regards.")"
 else
     BODY="$(printf "%s\n\n%s\n%s\n%s\n\n%s" \
 "Dear maintainer," \
 "I've prepared an NMU for $SOURCE (versioned as $VERSION) and" \
 "uploaded it to DELAYED/$NMUDIFF_DELAY. Please feel free to tell me if I" \
-"should delay it longer." \
+"should cancel it." \
 "Regards.")"
 fi
 
 if [ "$NMUDIFF_MUTT" = no ]; then
-    cat <<EOF > "$TMPNAM"
+    if [ -n "${MUA_COMMAND}" ]; then
+        if ! type python3 > /dev/null 2>&1 ; then
+            echo "python3 is required for --mua" >&2
+            exit 1
+        fi
+
+        cat <<EOF > "$TMPNAM"
+$TAGS
+$DELAY_HEADER
+
+$BODY
+
+EOF
+
+        cat ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff >> "$TMPNAM"
+
+        MAILTO_URL=$(python3 -m devscripts.mailto \
+                "TO=${TO_ADDRESSES_SENDMAIL}" \
+                "BCC=${BCC_ADDRESS_SENDMAIL}" \
+                "SUBJECT=${SOURCE}: diff for NMU version ${VERSION}" \
+                "BODY=@${TMPNAM}"
+        )
+        ${MUA_COMMAND} "${MAILTO_URL}"
+    else
+        cat <<EOF > "$TMPNAM"
 From: $FROM
 To: $TO_ADDRESSES_SENDMAIL
 Cc:
@@ -417,34 +459,34 @@ $BODY
 
 EOF
 
-    cat ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff >> "$TMPNAM"
-    sensible-editor "$TMPNAM"
-    if [ $? -ne 0 ]; then
-	echo "nmudiff: sensible-editor exited with error, aborting." >&2
-	rm -f ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff "$TMPNAM"
-	exit 1
+        cat ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff >> "$TMPNAM"
+        sensible-editor "$TMPNAM"
+        if [ $? -ne 0 ]; then
+	    echo "nmudiff: sensible-editor exited with error, aborting." >&2
+	    rm -f ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff "$TMPNAM"
+	    exit 1
+        fi
+
+        while : ; do
+	    echo -n "Do you want to go ahead and submit the bug report now? (y/n) "
+	    read response
+	    case "$response" in
+	        y*) break;;
+	        n*) echo "OK, then, aborting." >&2
+		    rm -f ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff "$TMPNAM"
+		    exit 1
+		    ;;
+	    esac
+        done
+
+        case "$BTS_SENDMAIL_COMMAND" in
+	    /usr/sbin/sendmail*|/usr/sbin/exim*)
+	        BTS_SENDMAIL_COMMAND="$BTS_SENDMAIL_COMMAND -t" ;;
+	    *)  ;;
+        esac
+
+        $BTS_SENDMAIL_COMMAND < "$TMPNAM"
     fi
-
-    while : ; do
-	echo -n "Do you want to go ahead and submit the bug report now? (y/n) "
-	read response
-	case "$response" in
-	    y*) break;;
-	    n*) echo "OK, then, aborting." >&2
-		rm -f ../${SOURCE}-${VERSION_NO_EPOCH}-nmu.diff "$TMPNAM"
-		exit 1
-		;;
-	esac
-    done
-
-    case "$BTS_SENDMAIL_COMMAND" in
-	/usr/sbin/sendmail*|/usr/sbin/exim*)
-	    BTS_SENDMAIL_COMMAND="$BTS_SENDMAIL_COMMAND -t" ;;
-	*)  ;;
-    esac
-
-    $BTS_SENDMAIL_COMMAND < "$TMPNAM"
-
 else # NMUDIFF_MUTT=yes
     cat <<EOF > "$TMPNAM"
 $TAGS

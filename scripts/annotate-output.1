@@ -2,20 +2,56 @@
 .SH NAME
 annotate-output \- annotate program output with time and stream
 .SH SYNOPSIS
-\fBannotate\-output\fR [\fIoptions\fR] \fIprogram\fR [\fIargs\fR ...]
+\fBannotate\-output\fR [\fIoptions\fR ...] [--] \fIprogram\fR [\fIargs\fR ...]
 .SH DESCRIPTION
-\fBannotate\-output\fR will execute the specified program, while
-prepending every line with the current time and O for stdout and E for
-stderr.
+\fBannotate\-output\fR executes \fIprogram\fR with \fIargs\fR as arguments
+and prepends printed lines with a format string followed by an indicator
+for the stream on which the line was printed followed by a colon and a
+single space.
+.br
+The stream indicators are \fBI\fR for information from
+\fBannotate\-output\fR as well as \fBO\fR for STDOUT and \fBE\fR for STDERR
+from \fIprogram\fR.
+
 
 .SH OPTIONS
 .TP
 \fB+FORMAT\fR
-Controls the timestamp format, as per \fBdate\fR(1).  Defaults to
-"%H:%M:%S".
+A format string that may use the conversion specifiers from the
+\fBdate\fR(1)-utility. The printed string is separated from the following
+stream indicator by a single space. May be overridden by later options that
+specify the format string.
+.br
+Defaults to "%H:%M:%S".
+.TP
+\fB--raw-date-format\fR \fIFORMAT\fR
+A format string that may use the conversion specifiers from the
+\fBdate\fR(1)-utility. There is no separator between the printed string and
+the following stream indicator. May be overridden by later options that
+specify the format string.
+.TP
+\fB--\fR
+Ends option parsing (unless it is itself an argument to an option).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Display a help message and exit successfully.
+Display a help message.
+
+.SH EXIT STATUS
+If \fIprogram\fR is invoked, the exit status of \fBannotate\-output\fR
+shall be the exit status of \fIprogram\fR; otherwise,
+\fBannotate\-output\fR shall exit with one of the following values:
+.TP
+0
+\fB\-h\fR or \fB\-\-help\fR was used.
+.TP
+125
+An error occurred in \fBannotate\-output\fR.
+.TP
+126
+\fIprogram\fR was found but could not be invoked.
+.TP
+127
+\fIprogram\fR could not be found or was not specified.
 
 .SH EXAMPLE
 
@@ -29,27 +65,51 @@ $ annotate-output make
 21:43:19 I: Finished with exitcode 2
 .fi
 
-.SH BUGS
-Since stdout and stderr are processed in parallel, it can happen that
-some lines received on stdout will show up before later-printed stderr
+.SH CAVEATS AND BUGS
+Since STDOUT and STDERR are processed in parallel, it can happen that
+some lines received on STDOUT will show up before later-printed STDERR
 lines (and vice-versa).
-
+.br
 This is unfortunately very hard to fix with the current annotation
 strategy.  A fix would involve switching to PTRACE'ing the process.
-Giving nice a (much) higher priority over the executed program could
+Giving nice a (much) higher priority over \fIprogram\fR could
 however cause this behaviour to show up less frequently.
 
-The program does not work as well when the output is not linewise.  In
-particular, when an interactive program asks for input, the question
-might not be shown until after you have answered it.  This will give
-the impression that the annotated program has hung, while it has not.
+\fBannotate\-output\fR expects \fIprogram\fR to output (text) lines (as
+specified by POSIX) to STDOUT and STDERR.
+.br
+In particular, it leads to undefined behaviour when lines are printed that
+contain NUL bytes.  It further may lead to undefined behaviour when lines
+are printed that contain bytes that do not form valid characters in the
+current locale.
+
+When an interactive \fIprogram\fR asks for input, the question might not be
+shown until after you have answered it.  This will give the impression that
+\fIprogram\fR has hung, while it has not.
+
+\fBannotate\-output\fR is implemented as a script in the Shell Command
+Language. Shells typically set various (shell) variables when started and
+may set the `export` attribute on some of them. They further initialise
+(shell) variables from their own environment (as set by the caller of the
+shell respectively the caller of \fBannotate\-output\fR) and set the
+`export` attribute on them.
+.br
+It follows from this, that when the caller of \fBannotate\-output\fR wants
+to set the environment (variables) of \fIprogram\fR, they may get
+overridden or additional ones may get added by the shell.
+.br
+Further, environment variables are in principle allowed to have names (for
+example `.`) that are not valid shell variable names. POSIX does not
+specify whether or not such environment variables are exported to programs
+invoked from the shell. No assumptions can thus be made on whether such
+environment variables will be exported correctly or at all to \fIprogram\fR.
 
 .SH "SEE ALSO"
 \fBdate\fR(1)
 
 .SH SUPPORT
-This program is community-supported (meaning: you'll need to fix it
-yourself).  Patches are however appreciated, as is any feedback
+\fBannotate\-output\fR is community-supported (meaning: you'll need to fix
+it yourself).  Patches are however appreciated, as is any feedback
 (positive or negative).
 
 .SH AUTHOR

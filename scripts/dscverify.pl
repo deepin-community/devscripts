@@ -28,6 +28,7 @@ use Cwd;
 use Fcntl;
 use Digest::MD5;
 use Dpkg::IPC;
+use Dpkg::Path qw(find_command);
 use File::HomeDir;
 use File::Spec;
 use File::Temp;
@@ -43,8 +44,7 @@ my $start_dir            = cwd;
 my $verify_sigs          = 1;
 my $use_default_keyrings = 1;
 my $verbose              = 0;
-my $havegpg = first { !system('sh', '-c', "command -v $_ >/dev/null 2>&1") }
-  qw(gpg2 gpg);
+my $havegpg              = first { find_command($_) } qw(gpg);
 
 sub usage {
     print <<"EOF";
@@ -96,6 +96,7 @@ sub get_rings {
     my @rings    = @_;
     my @keyrings = qw(/usr/share/keyrings/debian-keyring.gpg
       /usr/share/keyrings/debian-maintainers.gpg
+      /usr/share/keyrings/debian-tag2upload.pgp
       /usr/share/keyrings/debian-nonupload.gpg);
     $ENV{HOME} = File::HomeDir->my_home;
     if (defined $ENV{HOME} && -r "$ENV{HOME}/.gnupg/trustedkeys.gpg") {

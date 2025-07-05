@@ -141,7 +141,7 @@ END
 makeUpstreamTar() {
     UPNAME=${1:-foo} # Upstream package name
     UPVER=${2:-1.0}  # upstream package version
-    COMPRESSION=${3:-gz} # archve compression type
+    COMPRESSION=${3:-gz} # archive compression type
     TYPE=${4:-non-native} # set this if native-type upstream
     OLDDIR=`pwd`
     mkdir -p $TMPDIR/$REPOPATH/$POOLPATH/$UPNAME-$UPVER
@@ -181,12 +181,12 @@ makeUpstreamTar() {
     esac
     # make $NEWTAR.asc
     $GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
-        --secret-keyring $PRIVATE_KEYRING --default-key 72543FAF \
+        --default-key 72543FAF \
         --armor --detach-sign $NEWTAR
     if [ "$COMPRESSION" != "zip" ]; then
         NEWTAR=$UPNAME-$UPVER.tar
         $GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
-          --secret-keyring $PRIVATE_KEYRING --default-key 72543FAF \
+          --default-key 72543FAF \
           --armor --detach-sign $NEWTAR
 
     fi

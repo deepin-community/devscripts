@@ -215,10 +215,12 @@ def status(source: str, campaign: str, api_url: str = DEFAULT_API_URL) -> int:
             # TODO(jelmer): print info about next scheduled run and command?
             return 2
         raise
-    logging.info("Status: %s - %s", data["result_code"], data["description"])
-    logging.info("Command: %s", data["command"])
     if data.get("failure"):
-        logging.warning("Failure stage: %s", data["failure"])
+        if data["failure"]["transient"]:
+            transient = " (transient)"
+        else:
+            transient = ""
+        logging.warning("Failure stage: %s%s", data["failure"]["stage"], transient)
         return 1
     return 0
 

@@ -103,7 +103,7 @@ License: GPL-2+
 
 Files: scripts/build-rdeps.pl
 Copyright: Patrick Schoenfeld
- 2015, Johannes Schauer Marin Rodrigues <josch@debian.org>
+ 2015-2024, Johannes Schauer Marin Rodrigues <josch@debian.org>
  2017, James McCoy <jamessan@debian.org>
 License: GPL-2+
 
@@ -123,6 +123,11 @@ Comment: This script is essentially copied from
 Files: scripts/cowpoke.sh
 Copyright: 2007-2014, Ron <ron@debian.org>
 License: GPL-2+
+
+Files: scripts/deb2apptainer.*
+ scripts/deb2docker.*
+Copyright: 2023 Emmanuel Farhi <emmanuel.farhi@synchrotron-soleil.fr>
+License: GPL-3
 
 Files: scripts/dcmd.sh
 Copyright: 2008, Romain Francoise <rfrancoise@debian.org>
@@ -179,6 +184,10 @@ Files: scripts/debsnap*
 Copyright: 2010, David Paleino <d.paleino@gmail.com>
 License: GPL-3+
 
+Files: scripts/deb-check-file-conflicts
+Copyright: 2016 Maximiliano Curia <maxy@gnuservers.com.ar>,
+  2025 Otto Kekäläinen <otto@debian.org>
+
 Files: scripts/deb-janitor
 Copyright: 2020-2021 Jelmer Vernooĳ <jelmer@debian.org>
 License: GPL-3+
@@ -191,10 +200,13 @@ Files: scripts/dep3changelog.pl
 Copyright: 2010, Steve Langasek <vorlon@debian.org>
 License: GPL-2+
 
-Files: scripts/desktop2menu.pl
-Copyright: 2007, Sune Vuorela <debian@pusling.com>
- 2007, Adam D. Barratt <adam@adam-barratt.org.uk>
+Files: scripts/dep-14-convert-git-branch-names*
+Copyright: 2025, Otto Kekäläinen <otto@debian.org>
 License: GPL-2+
+
+Files: scripts/devscripts/proxy.py
+Copyright: 2024 Johannes Schauer Marin Rodrigues <josch@debian.org>
+License: Expat
 
 Files: scripts/dget.pl
 Copyright: 2005-2013, Christoph Berg <myon@debian.org>
@@ -218,6 +230,10 @@ Files: scripts/dscverify.pl
 Copyright: 1998, Roderick Schertler <roderick@argon.org>
  1999-2002, Julian Gilbey <jdg@debian.org>
 License: GPL-2+
+
+Files: scripts/debftbfs
+Copyright: 2024 Johannes Schauer Marin Rodrigues <josch@debian.org>
+License: Expat
 
 Files: scripts/getbuildlog.*
 Copyright: 2008, Frank S. Thomas <fst@debian.org>
@@ -320,7 +336,7 @@ Comment: Idea taken from GitLab::api::v4, copyright:
  2018, Aran Deltac <bluefeet@gmail.com>
 
 Files: scripts/debrebuild.pl
-Copyright: 2014-2016, Johannes Schauer Marin Rodrigues <josch@debian.org>
+Copyright: 2014-2024, Johannes Schauer Marin Rodrigues <josch@debian.org>
            2020       Niels Thykier <niels@thykier.net>
 License: Expat
 

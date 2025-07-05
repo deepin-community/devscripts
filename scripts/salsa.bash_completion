@@ -63,7 +63,7 @@ _salsa_completion () {
     opts+=" --schedule-delete --no-schedule-delete"
     # Manage other GitLab instances
     opts+=" --api-url --git-server-url --irker-server-url --kgb-server-url"
-    opts+=" --tagpending-server-url
+    opts+=" --tagpending-server-url"
 
 # Source: ./lib/Devscripts/Salsa.pm:sub run -> $ ls ./lib/Devscripts/Salsa/*.pm
 # Skipping: Config Hooks Repo -> `with "Devscripts::Salsa::<VALUE>";`

@@ -5,8 +5,6 @@ import re
 
 from setuptools import setup
 
-from devscripts.test import SCRIPTS
-
 
 def get_debian_version() -> str:
     """Determine the Debian package version from debian/changelog."""
@@ -43,10 +41,12 @@ def write_version(version: str) -> None:
 if __name__ == "__main__":
     VERSION = make_pep440_compliant(get_debian_version())
     write_version(VERSION)
+
+    from devscripts.test import SCRIPTS
+
     setup(
         name="devscripts",
         version=VERSION,
         scripts=SCRIPTS,
         packages=["devscripts"],
-        test_suite="devscripts.test",
     )

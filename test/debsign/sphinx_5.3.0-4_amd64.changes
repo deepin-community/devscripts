@@ -1,0 +1,54 @@
+Format: 1.8
+Date: Wed, 29 Mar 2023 11:31:27 +0300
+Source: sphinx
+Binary: libjs-sphinxdoc python3-sphinx sphinx-common sphinx-doc
+Architecture: source all
+Version: 5.3.0-4
+Distribution: unstable
+Urgency: medium
+Maintainer: Debian Python Team <team+python@tracker.debian.org>
+Changed-By: Dmitry Shachnev <mitya57@debian.org>
+Description:
+ libjs-sphinxdoc - JavaScript support for Sphinx documentation
+ python3-sphinx - documentation generator for Python projects
+ sphinx-common - documentation generator for Python projects - common data
+ sphinx-doc - documentation generator for Python projects - documentation
+Closes: 1033635
+Changes:
+ sphinx (5.3.0-4) unstable; urgency=medium
+ .
+   [ Dmitry Shachnev ]
+   * Update highlight_search_terms.diff to fix race condition affecting jstest:
+     - Highlight all occurrences, not just the first one.
+     - Stop using the old search query from localstorage.
+   * Port jstest to the new API from webkit2gtk 2.40 (closes: #1033635,
+     LP: #2013095).
+ .
+   [ Jeremy Bicha ]
+   * Set isolation-machine for sphinx-doc autopkgtest. This is needed for web
+     process sandbox, which is now mandatory.
+   * debian/tests/sphinx-doc: Set export GTK_A11Y=none.
+Checksums-Sha1:
+ beaef97ce1da6f6a1ffc826ddea26d57f79cf8e8 2431 sphinx_5.3.0-4.dsc
+ 001d755237dfa5e0c746ff0227b81c2af8a40da1 43816 sphinx_5.3.0-4.debian.tar.xz
+ 34b4706e57feb6485dfc3a2690fc3826645a0cce 130368 libjs-sphinxdoc_5.3.0-4_all.deb
+ f3b7fd64aa9bfab5acf009106618610d6251f346 549392 python3-sphinx_5.3.0-4_all.deb
+ 4a59d0d6bc5e192f257be0a1873af1e3af5f1d8e 652072 sphinx-common_5.3.0-4_all.deb
+ 3a942a38757035ee8610b976284669be2af98d66 2307440 sphinx-doc_5.3.0-4_all.deb
+ ff8c780058e0eeebc581c905fef2b0c17d821ca4 13257 sphinx_5.3.0-4_amd64.buildinfo
+Checksums-Sha256:
+ d52b32249a7c99e96ac2cb1079de4ef7dc95d45c88934ec283bfff3d2dc28d43 2431 sphinx_5.3.0-4.dsc
+ d11a31e0516d32ddf11f424eb4b84d3b56565109762c22c51a81e68bd40d6488 43816 sphinx_5.3.0-4.debian.tar.xz
+ ce0537651e3ae7926ed6c650665374582860e3cd74631c00381523d420ab036a 130368 libjs-sphinxdoc_5.3.0-4_all.deb
+ 4104a978e848cefabea38b7c7e41dd2eea491be9828f26767d5a64b93767a175 549392 python3-sphinx_5.3.0-4_all.deb
+ fe11fe8f0fd3c909118894371dc4d6dd3d11079233d836ac0583de1f3657f398 652072 sphinx-common_5.3.0-4_all.deb
+ 0b87f3123f950118ceb2eaf27d49bbbd1aedcd397602fd0a4f65cbfbc2372740 2307440 sphinx-doc_5.3.0-4_all.deb
+ ff337520a4a86baa2115a56a7315d7fbd84e35fd834cb9eade5ee3f2e5ed2c59 13257 sphinx_5.3.0-4_amd64.buildinfo
+Files:
+ 401936f96a708314cc4ff6d896f82bac 2431 python optional sphinx_5.3.0-4.dsc
+ 020c8e9dce1b287ca1a57bcd75af9b6b 43816 python optional sphinx_5.3.0-4.debian.tar.xz
+ 22a4a2edaaefa64e0ff73359329f4976 130368 javascript optional libjs-sphinxdoc_5.3.0-4_all.deb
+ 4b7f0edcc12d655f6b52c8d9aeb0cded 549392 python optional python3-sphinx_5.3.0-4_all.deb
+ 5e9362a2890257dbab4820178b152d0a 652072 python optional sphinx-common_5.3.0-4_all.deb
+ f5a42ff0f9ec949fce3ab7031b0f0a95 2307440 doc optional sphinx-doc_5.3.0-4_all.deb
+ ed45e301afc30fd58dd047bb4ef4888a 13257 python optional sphinx_5.3.0-4_amd64.buildinfo

@@ -140,7 +140,8 @@ testRepackGZ_GZ() { helperTestRepack "tar.gz" "gz" "gzip compressed data" ; }
 testRepackXZ_XZ() { helperTestRepack "tar.xz" "xz" "XZ compressed data" ; }
 testRepackTGZ_XZ() { helperTestRepack "tgz" "xz" "XZ compressed data" ; }
 testRepackTGZ_XZ() { helperTestRepack "tgz" "xz" "XZ compressed data" ; }
-testRepackLZ_XZ() { helperTestRepack "tar.lzma" "xz" "XZ compressed data" ; }
+testRepackLZ_XZ() { helperTestRepack "tar.lz" "xz" "XZ compressed data" ; }
+testRepackLZMA_XZ() { helperTestRepack "tar.lzma" "xz" "XZ compressed data" ; }
 testRepackZST_XZ() { helperTestRepack "tar.zst" "xz" "XZ compressed data" ; }
 testRepackZSTD_XZ() { helperTestRepack "tar.zstd" "xz" "XZ compressed data" ; }
 

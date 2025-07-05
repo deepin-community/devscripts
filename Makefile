@@ -53,7 +53,7 @@ install: all install_scripts install_doc
 	for f in lib/*; do cp -a "$$f" "$(DESTDIR)$(PERLMOD_DIR)"; done
 	install -m0644 conf.default "$(DESTDIR)$(DATA_DIR)"
 	install -m0644 templates/README.mk-build-deps "$(DESTDIR)$(TEMPLATES_DIR)"
-	install -m0644 README "$(DESTDIR)$(DOCDIR)"
+	install -m0644 README.md "$(DESTDIR)$(DOCDIR)"
 	ln -sf edit-patch.1 "$(DESTDIR)$(MAN1DIR)/add-patch.1"
 
 test_test:

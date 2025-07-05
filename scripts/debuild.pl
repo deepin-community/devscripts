@@ -55,6 +55,7 @@ use filetest 'access';
 use Cwd;
 use Dpkg::Changelog::Parse qw(changelog_parse);
 use Dpkg::IPC;
+use Dpkg::Path qw(find_command);
 use IO::Handle;                         # for flushing
 use vars qw(*BUILD *OLDOUT *OLDERR);    # prevent a warning
 
@@ -1043,7 +1044,7 @@ if (@ARGV) {
           . join("\n", @warnings) . "\n";
     }
 } else {
-    if ($run_lintian && system('command -v lintian >/dev/null 2>&1') == 0) {
+    if ($run_lintian && find_command('lintian')) {
         $lintian_exists = 1;
     }
     # We'll need to be a bit cleverer to determine the changes file name;

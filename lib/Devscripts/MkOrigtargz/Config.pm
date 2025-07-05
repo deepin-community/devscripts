@@ -5,8 +5,8 @@ use strict;
 use Devscripts::Compression qw'compression_is_supported
   compression_guess_from_file';
 use Devscripts::Uscan::Output;
+use Dpkg::Path qw(find_command);
 use Exporter 'import';
-use File::Which;
 use Moo;
 
 use constant default_compression => 'xz';
@@ -16,7 +16,7 @@ use constant default_compression => 'xz';
 # tgz
 # tar\.bz2
 # tbz2?
-# tar\.lzma
+# tar\.lz(?:ma)?
 # tlz(?:ma?)?
 # tar\.xz
 # txz
@@ -26,7 +26,7 @@ use constant default_compression => 'xz';
 # tar.zstd
 # END
 use constant tar_regex =>
-  qr/t(?:ar(?:\.(?:[gx]z|lzma|bz2|Z)|.zstd?)?|lz(?:ma?)?|[gx]z|bz2?)$/;
+  qr/t(?:ar(?:\.(?:lz(?:ma)?|[gx]z|bz2|Z)|.zstd?)?|lz(?:ma?)?|[gx]z|bz2?)$/;
 
 extends 'Devscripts::Config';
 
@@ -172,26 +172,25 @@ use constant rules => [
                   . " to be able to repack "
                   . $self->upstream_comp
                   . " upstream archives.\n")
-              unless (which $prog);
-        } elsif ($self->upstream =~ tar_regex) {
-            $self->upstream_type('tar');
-            if ($self->upstream =~ /\.tar$/) {
-                $self->upstream_comp('');
-            } else {
-                unless (
-                    $self->upstream_comp(
-                        compression_guess_from_file($self->upstream))
-                ) {
-                    return (0,
-                        "Unknown compression used in $self->{upstream}");
-                }
-            }
+              unless (find_command($prog));
         } else {
-            # TODO: Should we ignore the name and only look at what file knows?
-            return (0,
-                    'Parameter '
-                  . $self->upstream
-                  . ' does not look like a tar archive or a zip file.');
+            if ($self->upstream =~ /\.tar$/ and $mime eq 'tar') {
+                $self->upstream_type('tar');
+                $self->upstream_comp('');
+            } elsif ($mime) {
+                $self->upstream_type('tar');
+                $self->upstream_comp($mime);
+                unless ($self->upstream =~ tar_regex) {
+                    return (1,
+                            'Parameter '
+                          . $self->upstream
+                          . ' does not have a file extension, guessed a tarball compressed with '
+                          . $self->upstream_comp
+                          . '.');
+                }
+            } else {
+                return (0, "Unknown compression used in $self->{upstream}");
+            }
         }
         return 1;
     },

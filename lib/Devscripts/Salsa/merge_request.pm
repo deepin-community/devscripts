@@ -45,7 +45,7 @@ sub merge_request {
             # Case else: nothing after src...dst
             unless ($out =~ /\s(\S+)\.\.\.(\S+)/s) {
                 ds_warn
-                  "Current branch as no origin or isn't pushed, aborting";
+                  "Current branch has no origin or isn't pushed, aborting";
                 return 1;
             }
             # 2. Set source branch to current branch

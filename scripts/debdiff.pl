@@ -19,6 +19,7 @@ use strict;
 use warnings;
 use Cwd;
 use Dpkg::IPC;
+use Dpkg::Path qw(find_command);
 use File::Copy qw(cp move);
 use File::Basename;
 use File::Spec;
@@ -604,6 +605,8 @@ if ($type eq 'deb') {
                   or fatal "File name contains invalid characters: $file";
                 if ($file =~ /\.diff\.gz$/) {
                     $diffs[$i] = cwd() . '/' . $file;
+                } elsif ($file =~ /\.debian\.tar\.$compression_re$/) {
+                    $diffs[$i] = cwd() . '/' . $file;
                 } elsif ($file =~ /((?:\.orig)?\.tar\.$compression_re|\.git)$/)
                 {
                     $origs[$i] = $file;
@@ -632,12 +635,9 @@ if ($type eq 'deb') {
     }
 
     # Do we have interdiff?
-    system("command -v interdiff >/dev/null 2>&1");
-    my $use_interdiff = ($? == 0) ? 1 : 0;
-    system("command -v diffstat >/dev/null 2>&1");
-    my $have_diffstat = ($? == 0) ? 1 : 0;
-    system("command -v wdiff >/dev/null 2>&1");
-    my $have_wdiff = ($? == 0) ? 1 : 0;
+    my $use_interdiff = !!find_command('interdiff');
+    my $have_diffstat = !!find_command('diffstat');
+    my $have_wdiff    = !!find_command('wdiff');
 
     my ($fh, $filename) = tempfile(
         "debdiffXXXXXX",
@@ -655,7 +655,9 @@ if ($type eq 'deb') {
         and defined $diffs[2]
         and scalar(@excludes) == 0
         and $use_interdiff
-        and !$wdiff_source_control) {
+        and !$wdiff_source_control
+        and $dscformats[1] ne '3.0 (quilt)'
+        and $dscformats[2] ne '3.0 (quilt)') {
         # same orig tar ball, interdiff exists and not wdiffing
 
         my $tmpdir = tempdir(CLEANUP => 1);
@@ -705,7 +707,7 @@ if ($type eq 'deb') {
 "Warning: You do not seem to have interdiff (in the patchutils package)\ninstalled; this program would use it if it were available.\n";
     }
     # possibly different orig tarballs, or no interdiff installed,
-    # or wdiffing debian/control
+    # or source format 3.0 (quilt), or wdiffing debian/control
     our ($sdir1, $sdir2);
     mktmpdirs();
 
@@ -716,14 +718,31 @@ if ($type eq 'deb') {
             push @opts, '--skip-patches';
         }
         my $diri = ${"dir$i"};
-        eval {
-            spawn(
-                exec       => ['dpkg-source', @opts, $dscs[$i]],
-                to_file    => '/dev/null',
-                chdir      => $diri,
-                wait_child => 1
-            );
-        };
+        if (    $origs[1] eq $origs[2]
+            and $dscformats[$i] eq '3.0 (quilt)'
+            and !$apply_patches) {
+            eval {
+                my $source = $origs[$i];
+                $source =~ s/\.orig\.tar\.$compression_re//;
+                $source =~ s/_/-/;
+                mkdir $diri . '/' . $source;
+                spawn(
+                    exec       => ['tar', 'xf', $diffs[$i]],
+                    to_file    => '/dev/null',
+                    chdir      => $diri . '/' . $source,
+                    wait_child => 1
+                );
+            };
+        } else {
+            eval {
+                spawn(
+                    exec       => ['dpkg-source', @opts, $dscs[$i]],
+                    to_file    => '/dev/null',
+                    chdir      => $diri,
+                    wait_child => 1
+                );
+            };
+        }
         if ($@) {
             my $dir = dirname $dscs[1] if $i == 2;
             $dir = dirname $dscs[2] if $i == 1;
@@ -1046,7 +1065,7 @@ if (defined $singledeb[1] and defined $singledeb[2]) {
 
 exit $exit_status unless (@CommonDebs > 0) and $compare_control;
 
-unless (system("command -v wdiff >/dev/null 2>&1") == 0) {
+if (!find_command('wdiff')) {
     warn "Can't compare control files; wdiff package not installed\n";
     exit $exit_status;
 }

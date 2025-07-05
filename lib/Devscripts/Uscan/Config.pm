@@ -54,14 +54,15 @@ has pasv                     => (is => 'rw');
 has http_header              => (is => 'rw', default => sub { {} });
 
 # repack to .tar.$zsuffix if 1
-has repack     => (is => 'rw');
-has safe       => (is => 'rw');
-has signature  => (is => 'rw');
-has symlink    => (is => 'rw');
-has timeout    => (is => 'rw');
-has user_agent => (is => 'rw');
-has uversion   => (is => 'rw');
-has watchfile  => (is => 'rw');
+has repack                  => (is => 'rw');
+has safe                    => (is => 'rw');
+has signature               => (is => 'rw');
+has symlink                 => (is => 'rw');
+has timeout                 => (is => 'rw');
+has user_agent              => (is => 'rw');
+has uversion                => (is => 'rw');
+has vcs_export_uncompressed => (is => 'rw');
+has watchfile               => (is => 'rw');
 
 # II - Options
 
@@ -110,6 +111,7 @@ use constant keys => [
     ['log', undef, 'bool'],
     ['package=s'],
     ['uversion|upstream-version=s'],
+    ['vcs-export-uncompressed', 'USCAN_VCS_EXPORT_UNCOMPRESSED', 'bool'],
     ['watchfile=s'],
     # 2.3 - More complex options
     # http headers (#955268)

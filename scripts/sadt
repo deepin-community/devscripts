@@ -385,7 +385,9 @@ class TestGroup:
                 if os.getuid() != 0:
                     raise Skip("this test needs root privileges")
             elif restriction == "breaks-testbed":
-                raise Skip("breaks-testbed restriction is not implemented; use adt-run")
+                raise Skip(
+                    "breaks-testbed restriction is not implemented; use autopkgtest"
+                )
             elif restriction == "build-needed":
                 raise Skip("source tree not built")
             elif restriction == "allow-stderr":

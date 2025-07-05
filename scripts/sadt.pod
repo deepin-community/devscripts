@@ -73,4 +73,4 @@ README.package-tests shipped by autopkgtest 2.7.2
 
 =head1 SEE ALSO
 
-B<adt-run>(1)
+B<autopkgtest>(1)

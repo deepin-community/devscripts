@@ -72,6 +72,7 @@ my %mime2comp = (
     "application/x-tar"        => "tar",
     "application/zstd"         => "zst",
     "application/x-zstd"       => "zst",
+    "application/x-lzip"       => "lzip",
 );
 
 sub compression_guess_from_file {
@@ -97,6 +98,10 @@ my %comp_properties = (
     compress => {
         file_ext    => 'Z',
         decomp_prog => ['uncompress'],
+    },
+    lzip => {
+        file_ext    => 'lz',
+        decomp_prog => ['lzip', '--decompress', '--keep'],
     },
     zip => {
         file_ext    => 'zip',

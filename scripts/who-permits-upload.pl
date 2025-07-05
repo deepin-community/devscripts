@@ -19,6 +19,7 @@
 
 use strict;
 use Dpkg::Control;
+use Dpkg::Path qw(find_command);
 use LWP::UserAgent;
 use Encode::Locale;
 use Encode;
@@ -35,8 +36,7 @@ our $DM_URL = "https://ftp-master.debian.org/dm.txt";
 our $KEYRING
   = "/usr/share/keyrings/debian-keyring.gpg:/usr/share/keyrings/debian-maintainers.gpg";
 our $TYPE = "package";
-our $GPG  = first { !system('sh', '-c', "command -v $_ >/dev/null 2>&1") }
-  qw(gpg2 gpg);
+our $GPG  = first { find_command($_) } qw(gpg);
 our ($HELP, @ARGUMENTS, @DM_DATA, %GPG_CACHE);
 
 binmode STDIN,  ':encoding(console_in)';
@@ -74,7 +74,7 @@ Display a usage summary and exit.
 
 =item B<--keyring=>I<keyring>, B<-s> I<keyring>
 
-Use the supplied GnuPG keyrings to look-up GPG fingerprints from the DM permission
+Use the supplied OpenPGP keyrings to look-up OpenPGP fingerprints from the DM permission
 file. When not present, the default Debian Developer and Maintainer keyrings are used
 (I</usr/share/keyrings/debian-keyring.gpg> and
 I</usr/share/keyrings/debian-maintainers.gpg>, installed by the I<debian-keyring>
@@ -166,7 +166,7 @@ under the terms of the General Public License (GPL) version 2 or later.
 
 =head1 SEE ALSO
 
-B<gpg>(1), B<gpg2>(1), B<who-uploads>(1)
+B<gpg>(1), B<who-uploads>(1)
 
 S<I<https://lists.debian.org/debian-devel-announce/2012/09/msg00008.html>>
 

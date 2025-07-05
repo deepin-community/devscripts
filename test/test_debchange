@@ -61,6 +61,27 @@ success() {
     runCommand2 "-c \"$CHANGELOG\" $1" "" "" 0
 }
 
+runCommand3() {
+    local param="$1"
+    local exp_stdout="$2"
+    local exp_stderr="$3"
+    local exp_retval=$4
+    local stdoutF="${SHUNIT_TMPDIR}/stdout"
+    local stderrF="${SHUNIT_TMPDIR}/stderr"
+    eval "${COMMAND} $param" > ${stdoutF} 2> ${stderrF}
+    # Strip distribution data outdated warnings (caused by outdate distro-info-data).
+    cat $stderrF | \
+        grep -v "^Distribution data outdated. Please check for an update for distro-info-data. See /usr/share/doc/distro-info-data/README.Debian for details." | \
+        grep -v '^debchange[^ ]* warning: Unable to determine the current Ubuntu development release. Using UNRELEASED instead.$' > ${stderrF}.tmp
+    mv ${stderrF}.tmp ${stderrF}
+    retval=$?
+    assertContains "error output of ${COMMAND} $param\n" "$(cat ${stderrF})" "$exp_stderr"
+}
+
+failure() {
+    runCommand3 "-c \"$CHANGELOG\" $1" "" "$2" 0
+}
+
 checkUbuntuDevelAvailable() {
     if ubuntu-distro-info --devel 2>/dev/null >&2; then
         # distro-info-data knows of the current devel release
@@ -188,6 +209,9 @@ testEncoding() {
     success "-s \"LTS Security upload\""
     verifyMaintainer "dch --lts"
 
+    success "--sloppy \"Backports upload\""
+    verifyMaintainer "dch --sloppy"
+
     success "--bpo \"Backports upload\""
     verifyMaintainer "dch --bpo"
 
@@ -215,6 +239,8 @@ testEmptyMessage() {
 
     verifyEntryLines "--security ''"
 
+    verifyEntryLines "--sloppy ''"
+
     verifyEntryLines "--bpo ''"
 
     verifyEntryLines "--team ''"
@@ -238,6 +264,7 @@ testGuessedDistribution() {
     verifyGuessedDistribution experimental -i experimental
     verifyGuessedDistribution bookworm-backports -i bookworm-backports
     verifyGuessedDistribution trixie -i trixie
+    verifyGuessedDistribution unstable --sloppy bullseye-backports-sloppy
     verifyGuessedDistribution unstable --bpo bookworm-backports
     verifyGuessedDistribution unstable --stable bookworm
 }
@@ -247,6 +274,21 @@ testSpecialCharacterMaintainer() {
     export DEBFULLNAME='\k'
     success "--create -D unstable --package test-package -v 1.0-1 \"First upload\""
     success "-a \"Some change\""
+}
+
+testCustomDate() {
+    custom_date="Tue, 23 Jun 2023 12:34:56 +0530"
+    rm -f "$CHANGELOG"
+    success "--create -D unstable --package test-package -v 1.0-1 \"First upload\""
+    success "-i \"Second upload\" --date \"$custom_date\""
+    entry_date=$(dpkg-parsechangelog -l"$CHANGELOG" -SDate)
+    assertEquals "Changelog entry date" "$custom_date" "$entry_date"
+}
+
+testInvalidCustomDate() {
+    invalid_custom_date="Tue, 23 Jun 20234 12:34:56 +0530"
+    failure "-i \"Third upload\" --date \"$invalid_custom_date\"" \
+      "Date 'Tue, 23 Jun 20234 12:34:56 +0530' is not in RFC 5322 format. Example:"
 }
 
 . shunit2

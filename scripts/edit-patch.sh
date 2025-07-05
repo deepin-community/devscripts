@@ -57,15 +57,7 @@ ensure_debian_dir() {
 }
 
 detect_patchsystem() {
-    CDBS_PATCHSYS="^[^#]*simple-patchsys.mk"
-
-    if grep -q "$CDBS_PATCHSYS" debian/rules; then
-        PATCHSYSTEM="cdbs"
-        require_installed cdbs-edit-patch "no cdbs-edit-patch found, is 'cdbs' installed?"
-    elif [ -e debian/patches/00list ]; then
-        PATCHSYSTEM="dpatch"
-        require_installed dpatch-edit-patch "no dpatch-edit-patch found, is 'dpatch' installed?"
-    elif [ -e debian/patches/series -o \
+    if [ -e debian/patches/series -o \
            "$(cat debian/source/format 2> /dev/null)" = "3.0 (quilt)" ]; then
         PATCHSYSTEM="quilt"
         require_installed quilt "no quilt found, is 'quilt' installed?"
@@ -82,8 +74,6 @@ normalize_patch_path() {
 }
 
 # ensure (for new patches) that:
-# - dpatch ends with .dpatch
-# - cdbs/quilt with .patch
 normalize_patch_extension() {
     # check if we have a patch already
     if [ -e $PREFIX/$PATCHNAME ]; then
@@ -93,31 +83,9 @@ normalize_patch_extension() {
 
     # normalize name for new patches
     PATCHNAME=${PATCHNAME%.*}
-    if [ "$PATCHSYSTEM" = "quilt" ]; then
-        PATCHNAME="${PATCHNAME}.patch"
-    elif [ "$PATCHSYSTEM" = "cdbs" ]; then
-        PATCHNAME="${PATCHNAME}.patch"
-    elif [ "$PATCHSYSTEM" = "dpatch" ]; then
-        PATCHNAME="${PATCHNAME}.dpatch"
-    elif [ "$PATCHSYSTEM" = "none" ]; then
-        PATCHNAME="${PATCHNAME}.patch"
-    fi
+    PATCHNAME="${PATCHNAME}.patch"
 
     echo "Normalizing patch name to $PATCHNAME"
-}
-
-edit_patch_cdbs() {
-    cdbs-edit-patch $PATCHNAME
-    vcs_add debian/patches/$1
-}
-
-edit_patch_dpatch() {
-    dpatch-edit-patch $PATCHNAME
-    # add if needed
-    if ! grep -q $1 $PREFIX/00list; then
-        echo "$1" >> $PREFIX/00list
-    fi
-    vcs_add $PREFIX/00list $PREFIX/$1
 }
 
 edit_patch_quilt() {
@@ -164,21 +132,6 @@ add_patch_quilt() {
         echo "$2" >> $PREFIX/series
     fi
     vcs_add $PREFIX/$2 $PREFIX/series
-}
-
-add_patch_cdbs() {
-    # $1 is the original patchfile, $2 the normalized name
-    cp $1 $PREFIX/$2
-    vcs_add $PREFIX/$2
-}
-
-add_patch_dpatch() {
-    # $1 is the original patchfile, $2 the normalized name
-    cp $1 $PREFIX
-    if ! grep -q $2 $PREFIX/00list; then
-        echo "$2" >> $PREFIX/00list
-    fi
-    vcs_add $PREFIX/$2 $PREFIX/00list
 }
 
 add_patch_none() {
@@ -242,7 +195,7 @@ detect_patch_location() {
         PATCHORIG="$PATCHNAME"
     else
         if [ "$PATCHSYSTEM" = "none" ]; then
-            fatal_error "No patchsystem detected, cannot create new patch (no dpatch/quilt/cdbs?)"
+            fatal_error "No patchsystem detected, cannot create new patch (no quilt?)"
         else
             PATCHTYPE="new"
         fi
@@ -267,13 +220,6 @@ handle_file_patch() {
 
             if [ "$PATCHSYSTEM" = "quilt" ]; then
                 echo "$PATCHNAME" >> $PREFIX/series
-            elif [ "$PATCHSYSTEM" = "dpatch" ]; then
-                echo "$PATCHNAME" >> $PREFIX/00list
-
-                # Add the dpatch header to files that don't already have it
-                if ! grep -q "@DPATCH@" "$PREFIX/$PATCHNAME"; then
-                    sed -i '1i#! /bin/sh /usr/share/dpatch/dpatch-run\n@DPATCH@' $PREFIX/$PATCHNAME
-                fi
             fi
 
             echo "Copying and applying new patch. You can now edit the patch or exit the subshell to save."
@@ -283,7 +229,6 @@ handle_file_patch() {
 
 # TODO:
 # - edit-patch --remove implementieren
-# - dbs patch system
 
 main() {
     # parse args

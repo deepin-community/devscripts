@@ -143,7 +143,7 @@ sub download ($$$$$$$$) {
     } else {    # elsif ($$optref{'mode'} eq 'git')
         my $destdir = $self->destdir;
         my $curdir  = cwd();
-        $fname =~ m%(.*)/$pkg-([^_/]*)\.tar\.(gz|xz|bz2|lzma|zstd?)%;
+        $fname =~ m%(.*)/$pkg-([^_/]*)\.tar(?:\.(gz|xz|bz2|lzma|zstd?))?%;
         my $dst     = $1;
         my $abs_dst = abs_path($dst);
         my $ver     = $2;
@@ -231,70 +231,113 @@ sub download ($$$$$$$$) {
             }
         } else {
             if ($self->gitrepo_state == 0) {
-                if ($optref->gitmode eq 'shallow') {
+                my @opts = ();
+                if ($optref->git->{modules}) {
+                    foreach my $m (@{ $optref->git->{modules} }) {
+                        push(@opts, "--recurse-submodules=$m");
+                    }
+                } else {
+                    push(@opts, '--bare');
+                }
+                $self->gitrepo_state(2);
+                if ($optref->git->{mode} eq 'shallow') {
                     my $tag = $gitref;
                     $tag =~ s#^refs/(?:tags|heads)/##;
-                    uscan_exec('git', 'clone', '--bare', '--depth=1', '-b',
-                        $tag, $base, "$destdir/$gitrepo_dir");
+
+                    if ($optref->git->{modules}) {
+                        push(@opts, '--shallow-submodules');
+                    }
+                    push(@opts, '--depth=1', '-b', $tag);
                     $self->gitrepo_state(1);
-                } else {
-                    uscan_exec('git', 'clone', '--bare', $base,
-                        "$destdir/$gitrepo_dir");
-                    $self->gitrepo_state(2);
+                }
+                uscan_exec('git', 'clone', @opts, $base,
+                    "$destdir/$gitrepo_dir");
+            }
+
+            chdir "$destdir/$gitrepo_dir"
+              or
+              $clean_and_die->("Unable to chdir($destdir/$gitrepo_dir): $!");
+
+            if ($self->git_export_all) {
+                my (@info_dirs, @attr_files);
+                my @arr_refs = (\@info_dirs, \@attr_files);
+                my @gitpaths = ("info/", "info/attributes");
+
+                for (my $tmp, my $i = 0 ; $i < @gitpaths ; $i++) {
+                    my @cmd
+                      = ("git", "rev-parse", "--git-path", ${ gitpaths [$i] });
+                    spawn(
+                        exec      => [@cmd],
+                        to_string => \$tmp,
+                    );
+                    chomp $tmp;
+                    push(@{ $arr_refs[$i] }, split(/\n/, $tmp));
+
+                    if ($optref->git->{modules}) {
+                        spawn(
+                            exec =>
+                              ['git', 'submodule', '--quiet', 'foreach', @cmd],
+                            to_string => \$tmp,
+                        );
+                        chomp $tmp;
+                        push(@{ $arr_refs[$i] }, split(/\n/, $tmp));
+                    }
+                }
+
+                foreach my $infodir (@info_dirs) {
+                    mkdir $infodir unless -e $infodir;
+                }
+
+                # override any export-subst and export-ignore attributes
+                foreach my $attr_file (@attr_files) {
+                    my $attr_fh;
+                    open($attr_fh, '>', $attr_file);
+                    print $attr_fh "* -export-subst\n* -export-ignore\n";
+                    close $attr_fh;
                 }
             }
-            if ($self->git_export_all) {
-                # override any export-subst and export-ignore attributes
-                my ($infodir, $attr_file);
-                spawn(
-                    exec => [
-                        'git', "--git-dir=$destdir/$gitrepo_dir",
-                        'rev-parse', '--git-path', 'info/'
-                    ],
-                    to_string => \$infodir,
-                );
-                chomp $infodir;
-                mkdir $infodir unless -e $infodir;
-                spawn(
-                    exec => [
-                        'git',       "--git-dir=$destdir/$gitrepo_dir",
-                        'rev-parse', '--git-path',
-                        'info/attributes'
-                    ],
-                    to_string => \$attr_file,
-                );
-                chomp $attr_file;
-                my $attr_fh;
-                $clean_and_die->("could not open $attr_file for writing")
-                  unless open($attr_fh, '>', $attr_file);
-                print $attr_fh "* -export-subst\n* -export-ignore\n";
-                close $attr_fh;
+
+            # archive main repository
+            uscan_exec_no_fail('git', 'archive', '--format=tar',
+                "--prefix=$pkg-$ver/",
+                "--output=$abs_dst/$pkg-$ver.tar", $gitref) == 0
+              or $clean_and_die->("$gitrepo_dir", "git archive failed");
+
+            # archive submodules, append to main tarball, clean up
+            if ($optref->git->{modules}) {
+                my $cmd = join ' ',
+                  "git archive --format=tar --prefix=$pkg-$ver/\$sm_path/",
+                  "--output=$abs_dst/\$sha1.tar HEAD",
+                  "&& tar -Af $abs_dst/$pkg-$ver.tar $abs_dst/\$sha1.tar",
+                  "&& rm $abs_dst/\$sha1.tar";
+                uscan_exec_no_fail('git', 'submodule', '--quiet', 'foreach',
+                    $cmd) == 0
+                  or $clean_and_die->("git archive (submodules) failed");
             }
 
-            uscan_exec_no_fail(
-                'git',                 "--git-dir=$destdir/$gitrepo_dir",
-                'archive',             '--format=tar',
-                "--prefix=$pkg-$ver/", "--output=$abs_dst/$pkg-$ver.tar",
-                $gitref
-              ) == 0
-              or $clean_and_die->("git archive failed");
+            chdir "$curdir"
+              or $clean_and_die->("Unable to chdir($curdir): $!");
         }
 
-        chdir "$abs_dst" or $clean_and_die->("Unable to chdir($abs_dst): $!");
-        if ($suffix eq 'gz') {
-            uscan_exec("gzip", "-n", "-9", "$pkg-$ver.tar");
-        } elsif ($suffix eq 'xz') {
-            uscan_exec("xz", "$pkg-$ver.tar");
-        } elsif ($suffix eq 'bz2') {
-            uscan_exec("bzip2", "$pkg-$ver.tar");
-        } elsif ($suffix eq 'lzma') {
-            uscan_exec("lzma", "$pkg-$ver.tar");
-            #} elsif ($suffix =~ /^zstd?$/) {
-            #    uscan_exec("zstd", "$pkg-$ver.tar");
-        } else {
-            $clean_and_die->("Unknown suffix file to repack: $suffix");
+        if (defined($suffix)) {
+            chdir "$abs_dst"
+              or $clean_and_die->("Unable to chdir($abs_dst): $!");
+            if ($suffix eq 'gz') {
+                uscan_exec("gzip", "-n", "-9", "$pkg-$ver.tar");
+            } elsif ($suffix eq 'xz') {
+                uscan_exec("xz", "$pkg-$ver.tar");
+            } elsif ($suffix eq 'bz2') {
+                uscan_exec("bzip2", "$pkg-$ver.tar");
+            } elsif ($suffix eq 'lzma') {
+                uscan_exec("lzma", "$pkg-$ver.tar");
+                #} elsif ($suffix =~ /^zstd?$/) {
+                #    uscan_exec("zstd", "$pkg-$ver.tar");
+            } else {
+                $clean_and_die->("Unknown suffix file to repack: $suffix");
+            }
+            chdir "$curdir"
+              or $clean_and_die->("Unable to chdir($curdir): $!");
         }
-        chdir "$curdir" or $clean_and_die->("Unable to chdir($curdir): $!");
         $clean->();
     }
     return 1;

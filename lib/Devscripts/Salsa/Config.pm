@@ -315,7 +315,7 @@ use constant keys => [
     # Branch
     ['rename-head!',    'SALSA_RENAME_HEAD',   'bool'],
     ['source-branch=s', 'SALSA_SOURCE_BRANCH', undef, 'master'],
-    ['dest-branch=s',   'SALSA_DEST_BRANCH',   undef, 'debian/master'],
+    ['dest-branch=s',   'SALSA_DEST_BRANCH',   undef, 'debian/latest'],
     [
         'enable-remove-source-branch!',
         undef,

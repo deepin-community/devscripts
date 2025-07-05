@@ -18,7 +18,7 @@ salsa - tool to manipulate salsa projects, repositories and group members
   salsa fork salsa fork --group js-team user/node-foo
   salsa last_ci_status js-team/nodejs
   salsa pipelines js-team/nodejs
-  salsa mr debian/foo debian/master
+  salsa mr debian/foo debian/latest
   salsa push_repo . --group js-team --kgb --irc devscripts --tagpending
   salsa update_projects node-mongodb --group js-team --disable-kgb --desc \
         --desc-pattern "Package %p"
@@ -159,6 +159,7 @@ exists, update local repository.
   salsa --user yadd checkout devscripts
   salsa --group js-team checkout node-mongodb
   salsa checkout js-team/node-mongodb
+  salsa checkout https://salsa.debian.org/debian/devscripts.git
 
 You can clone more than one repository or all repositories of a group or a
 user:
@@ -280,11 +281,11 @@ I<(branch "master")>. You just have to launch this in source directory:
 
 Another example:
 
-  salsa merge_request --mr-dst-project debian/foo --mr-dst-branch debian/master
+  salsa merge_request --mr-dst-project debian/foo --mr-dst-branch debian/latest
 
 Or simply:
 
-  salsa merge_request debian/foo debian/master
+  salsa merge_request debian/foo debian/latest
 
 Note that unless destination project has been set using command line,
 B<salsa merge_request> will search it in the following order:
@@ -924,7 +925,7 @@ C<.devscripts> value: B<SALSA_SOURCE_BRANCH>
 
 =item B<--dest-branch>
 
-Default: "debian/master".
+Default: "debian/latest".
 
 C<.devscripts> value: B<SALSA_DEST_BRANCH>
 

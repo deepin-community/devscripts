@@ -53,7 +53,7 @@
 # allow more than 1000 lines in this file
 # pylint: disable=C0302
 #
-# TODO: Adress invalid names
+# TODO: Address invalid names
 # pylint: disable=invalid-name
 
 import argparse
@@ -67,25 +67,19 @@ import logging
 import lzma
 import math
 import os
+import pathlib
 import pty
 import re
 import select
-import shutil
-import socketserver
 import subprocess
 import sys
-import tempfile
-import threading
-import urllib.error
-import urllib.request
 from datetime import date, datetime, time, timedelta, timezone
-from functools import partial
-from http import HTTPStatus
-from time import sleep
 
 import debian
 import debian.deb822
 import requests
+
+from devscripts.proxy import setupcache
 
 HAVE_DATEUTIL = True
 try:
@@ -111,128 +105,20 @@ def format_timestamp(timestamp):
 # It would be better if there as an officially documented API function:
 # http://bugs.debian.org/969605
 def sanitize_timestamp(timestamp):
+    path = "/archive/debian/"
     conn = http.client.HTTPConnection("snapshot.debian.org")
-    conn.request(
-        "HEAD", "/archive/debian/" + timestamp.strftime("%Y%m%dT%H%M%SZ") + "/"
-    )
+    conn.request("HEAD", path + timestamp.strftime("%Y%m%dT%H%M%SZ") + "/")
     res = conn.getresponse()
     if res.status == 200:
         return timestamp
     assert res.status in (301, 302), res.status  # moved permanently or temporarily
-    prefix = "http://snapshot.debian.org/archive/debian/"
+    prefix = f"http://snapshot.debian.org{path}"
     location = res.headers["Location"]
-    assert location.startswith(prefix)
-    # flake8 wrongly insists that there must be no whitespace before colon
-    # See https://github.com/PyCQA/pycodestyle/issues/373
-    location = location[len(prefix) :]  # noqa: E203
-    return datetime.strptime(location, "%Y%m%dT%H%M%S%z/")
-
-
-# we use a http proxy for two reasons
-#  1. it allows us to cache package data locally which is useful even for
-#     single runs because temporally close snapshot timestamps share packages
-#     and thus we reduce the load on snapshot.d.o which is also useful because
-#  2. snapshot.d.o requires manual bandwidth throttling or else it will cut
-#     our TCP connection. Instead of using Acquire::http::Dl-Limit as an apt
-#     option we use a proxy to only throttle on the initial download and then
-#     serve the data with full speed once we have it locally
-class Proxy(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        # check validity and extract the timestamp
-        try:
-            c1, c2, c3, timestamp, _ = self.path.split("/", 4)
-        except ValueError:
-            logging.error("don't know how to handle this request: %s", self.path)
-            self.send_error(HTTPStatus.BAD_REQUEST, f"Bad request path ({self.path})")
-            return
-        if ["", "archive", "debian"] != [c1, c2, c3]:
-            logging.error("don't know how to handle this request: %s", self.path)
-            self.send_error(HTTPStatus.BAD_REQUEST, f"Bad request path ({self.path})")
-            return
-        # make sure the pool directory is symlinked to the global pool
-        linkname = os.path.join(self.directory, c2, c3, timestamp, "pool")
-        if not os.path.exists(linkname):
-            os.makedirs(os.path.join(self.directory, c2, c3, timestamp), exist_ok=True)
-            os.symlink("../../../pool", linkname)
-        path = os.path.abspath(self.translate_path(self.path))
-        if not os.path.exists(path):
-            self._download_new(path)
-            return
-        f = self.send_head()
-        if f:
-            try:
-                self.copyfile(f, self.wfile)
-            except ConnectionResetError:
-                pass
-            f.close()
-
-    def _download_new(self, path):
-        # save file in local cache
-        maxtries = 3
-        head, _ = os.path.split(path)
-        os.makedirs(head, exist_ok=True)
-        totalsize = -1
-        downloaded = 0
-        for trynum in range(maxtries):
-            try:
-                headers = {}
-                if downloaded > 0:
-                    # if file was partly downloaded, only request the rest
-                    headers["Range"] = f"bytes={downloaded}-"
-                req = urllib.request.Request(
-                    "http://snapshot.debian.org/" + self.path, headers=headers
-                )
-                # we use os.fdopen(os.open(...)) because we don't want to
-                # truncate the file and seek to the right position but also
-                # create it if it doesn't exist yet
-                with urllib.request.urlopen(req) as f, os.fdopen(
-                    os.open(path, os.O_RDWR | os.O_CREAT), "rb+"
-                ) as out:
-                    out.seek(downloaded)
-                    if trynum == 0:
-                        self.send_response(HTTPStatus.OK)
-                        self.send_header("Content-type", f.headers["Content-type"])
-                        self.send_header("Content-Length", f.headers["Content-Length"])
-                        self.send_header("Last-Modified", f.headers["Last-Modified"])
-                        self.end_headers()
-                        totalsize = int(f.headers["Content-Length"])
-                    while downloaded < totalsize:
-                        chunksize = 200 * 1024
-                        chunksize = min(chunksize, totalsize - downloaded)
-                        buf = f.read(chunksize)
-                        if len(buf) != chunksize:
-                            # something went wrong
-                            logging.warning(
-                                "%s: wanted %d but got %d bytes (try %d of %d)",
-                                path,
-                                chunksize,
-                                len(buf),
-                                trynum + 1,
-                                maxtries,
-                            )
-                            sleep(10)
-                            break
-                        sleep(1)  # snapshot.d.o needs heavy throttling
-                        out.write(buf)
-                        self.wfile.write(buf)
-                        downloaded += chunksize
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
-                    self.send_error(404, "URLError")
-                    return
-                logging.warning("got urllib.error.HTTPError: %s %s", repr(e), self.path)
-            except urllib.error.URLError as e:
-                logging.warning("got urllib.error.URLError: %s", repr(e))
-            if downloaded == totalsize:
-                break
-        if totalsize != downloaded:
-            if os.path.exists(path):
-                os.unlink(path)
-            self.send_error(500, "URLError")
-            return
-
-    def log_message(self, fmt, *args):
-        pass
+    assert location.startswith(prefix) or location.startswith(path), location
+    # location is either a full URL or a relative path ending in
+    # /archive/debian/<timestamp>/. All we need is <timestamp>
+    location = location.rsplit("/", 2)[-2]
+    return datetime.strptime(location, "%Y%m%dT%H%M%S%z")
 
 
 def srcpkgversions_by_timestamp(srcpkgname, timestamp, suite):
@@ -365,13 +251,6 @@ def first_seen_by_pkg(packages, timestamp_begin, timestamp_end, suite, architect
     return timestamps
 
 
-def get_mirror(port, timestamp):
-    timestamp_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
-    if port is not None:
-        return f"http://127.0.0.1:{port}/archive/debian/{timestamp_str}"
-    return f"http://snapshot.debian.org/archive/debian/{timestamp_str}"
-
-
 def runtest_cmd(cmd, env):
     ret = 0
     output = b""
@@ -413,11 +292,13 @@ def runtest_cmd(cmd, env):
 
 
 def runtest(timestamp, staticargs, toupgrade=None, badtimestamp=None):
-    goodmirror = get_mirror(staticargs.port, timestamp)
+    timestamp_str = timestamp.strftime("%Y%m%dT%H%M%SZ")
+    goodmirror = f"http://snapshot.debian.org/archive/debian/{timestamp_str}"
     env = {k: v for k, v in os.environ.items() if k.startswith("DEBIAN_BISECT_")}
     env["DEBIAN_BISECT_EPOCH"] = str(int(timestamp.timestamp()))
     env["DEBIAN_BISECT_TIMESTAMP"] = timestamp.strftime("%Y%m%dT%H%M%SZ")
     env["PATH"] = os.environ.get("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
+    env["http_proxy"] = f"http://127.0.0.1:{staticargs.port}/"
     if staticargs.port is not None:
         env["DEBIAN_BISECT_MIRROR"] = goodmirror
     if staticargs.depends or staticargs.qemu:
@@ -448,7 +329,13 @@ def runtest(timestamp, staticargs, toupgrade=None, badtimestamp=None):
         if staticargs.qemu:
             cmd.extend([staticargs.qemu["memsize"], staticargs.qemu["disksize"]])
         if toupgrade:
-            cmd.extend([get_mirror(staticargs.port, badtimestamp), toupgrade])
+            timestamp_str = badtimestamp.strftime("%Y%m%dT%H%M%SZ")
+            cmd.extend(
+                [
+                    f"http://snapshot.debian.org/archive/debian/{timestamp_str}",
+                    toupgrade,
+                ]
+            )
     else:
         # execute it directly if it's an executable file or if it there are no
         # shell metacharacters
@@ -512,6 +399,11 @@ def bisect(good, bad, staticargs):
             )
             return None
         write_log_symlink("good", output, good)
+        if not staticargs.nocache and next(
+            pathlib.Path(staticargs.cache).glob("**/*.part"), False
+        ):
+            print("partial files left in cache after test")
+            return None
     stepnum += 1
     steps = round(
         (math.log(diff.total_seconds()) - math.log(DINSTALLRATE)) / math.log(2) + 1
@@ -533,6 +425,11 @@ def bisect(good, bad, staticargs):
             )
             return None
         write_log_symlink("bad", output, bad)
+        if not staticargs.nocache and next(
+            pathlib.Path(staticargs.cache).glob("**/*.part"), False
+        ):
+            print("partial files left in cache after test")
+            return None
     stepnum += 1
 
     while True:
@@ -588,6 +485,11 @@ def bisect(good, bad, staticargs):
                 print("test script output: bad")
                 write_log_symlink("bad", output, newts)
                 bad = newts
+            if not staticargs.nocache and next(
+                pathlib.Path(staticargs.cache).glob("**/*.part"), False
+            ):
+                print("partial files left in cache after test")
+                return None
         stepnum += 1
     return good, bad
 
@@ -753,21 +655,24 @@ def upgrade_single_package(toupgrade, goodpkgs, badpkgs, good, bad, staticargs):
         if pkg not in goodpkgs or version != goodpkgs[pkg]:
             newupgraded.append(pkg)
     if not newupgraded:
-        logging.error("no difference -- this should never happen")
-        sys.exit(1)
-    elif len(newupgraded) == 1:
+        logging.error(
+            "no difference in installed packages -- something else must've changed"
+        )
+        return
+
+    if len(newupgraded) == 1:
         # the only upgraded package should be the one that was
         # requested to be upgraded
         assert newupgraded[0] == toupgrade
-    else:
-        print("  additional packages that got upgraded/installed at the same time:")
-        for newtoupgrade in newupgraded:
-            if newtoupgrade == toupgrade:
-                continue
-            print(
-                f"    {newtoupgrade} {goodpkgs.get(newtoupgrade, '(n.a.)')}"
-                f" -> {newbadpkgs[newtoupgrade]}"
-            )
+
+    print("  additional packages that got upgraded/installed at the same time:")
+    for newtoupgrade in newupgraded:
+        if newtoupgrade == toupgrade:
+            continue
+        print(
+            f"    {newtoupgrade} {goodpkgs.get(newtoupgrade, '(n.a.)')}"
+            f" -> {newbadpkgs[newtoupgrade]}"
+        )
 
 
 def parseargs():
@@ -782,7 +687,7 @@ snapshot.debian.org is found where the script first fails. Environment
 variables are used to tell the script which timestamp to test. See ENVIRONMENT
 VARIABLES below. At the end of the execution, the files debbisect.log.good and
 debbisect.log.bad are the log files of the last good and last bad run,
-respectively. By default, a temporary caching mirror is executed to reduce
+respectively. By default, a temporary caching proxy is executed to reduce
 bandwidth usage on snapshot.debian.org.  If you plan to run debbisect multiple
 times on a similar range of timestamps, consider setting a non-temporary cache
 directory with the --cache option.
@@ -852,7 +757,7 @@ devscripts as /usr/share/doc/devscripts/examples/debbisect_buildsrc.sh and
 either use it unmodified like this:
 
     $ DEBIAN_BISECT_SRCPKG=mysrc {progname} "two years ago" yesterday \
-    > /usr/share/doc/devscripts/examples/debbisect_buildsrc.sh
+    /usr/share/doc/devscripts/examples/debbisect_buildsrc.sh
 
 or use the script as a starting point to do your own custom builds.
 
@@ -905,7 +810,10 @@ The earliest timestamp that works with debbisect should be 2006-08-10.
 
 The following environment variables are available to the test script:
 
-DEBIAN_BISECT_MIRROR    Contains the caching mirror address.
+DEBIAN_BISECT_MIRROR    Contains the snapshot.d.o mirror address including the
+                        current timestamp. Can also be generated from
+                        DEBIAN_BISECT_TIMESTAMP as
+                        http://snapshot.debian.org/archive/debian/$DEBIAN_BISECT_TIMESTAMP
 
 DEBIAN_BISECT_EPOCH     Contains an integer representing the unix epoch of the
                         current timestamp. The value of this variable can
@@ -918,6 +826,10 @@ DEBIAN_BISECT_TIMESTAMP Contains a timestamp in the format used by
 
 DEBIAN_BISECT_*         All environment variables starting with DEBIAN_BISECT_
                         are passed to the test script.
+
+http_proxy              The address of the apt http caching proxy. Unset the
+                        variable in your script if you want to disable the
+                        cache.
 
 Written by Johannes Schauer Marin Rodrigues <josch@debian.org>
 """,
@@ -1025,52 +937,6 @@ Written by Johannes Schauer Marin Rodrigues <josch@debian.org>
         "named qemu.",
     )
     return parser.parse_args()
-
-
-def setupcache(cache, port):
-    if cache:
-        cachedir = cache
-    else:
-        cachedir = tempfile.mkdtemp(prefix="debbisect")
-    logging.info("using cache directory: %s", cachedir)
-    os.makedirs(cachedir + "/pool", exist_ok=True)
-    httpd = socketserver.TCPServer(
-        # the default address family for socketserver is AF_INET so we
-        # explicitly bind to ipv4 localhost
-        ("127.0.0.1", port),
-        partial(Proxy, directory=cachedir),
-        # to avoid "Address already in use" when the port is specified
-        # manually, we set socket.SO_REUSEADDR
-        # to do so, we must set allow_reuse_address and then bind and
-        # activate manually
-        bind_and_activate=False,
-    )
-    # this sets socket.SO_REUSEADDR
-    httpd.allow_reuse_address = True
-    httpd.server_bind()
-    httpd.server_activate()
-    # run server in a new thread
-    server_thread = threading.Thread(target=httpd.serve_forever)
-    server_thread.daemon = True
-    # start thread
-    server_thread.start()
-    # retrieve port (in case it was generated automatically)
-    _, port = httpd.server_address
-
-    def teardown():
-        httpd.shutdown()
-        httpd.server_close()
-        server_thread.join()
-        if not cache:
-            # this should be a temporary directory but lets still be super
-            # careful
-            if os.path.exists(cachedir + "/pool"):
-                shutil.rmtree(cachedir + "/pool")
-            if os.path.exists(cachedir + "/archive"):
-                shutil.rmtree(cachedir + "/archive")
-            os.rmdir(cachedir)
-
-    return port, teardown
 
 
 def find_exact_package(good, bad, staticargs, depends, no_find_exact_package):
@@ -1185,6 +1051,8 @@ def main():
             "components",
             "qemu",
             "ignore_cached_results",
+            "cache",
+            "nocache",
         ],
     )
     for a in staticargs._fields:

@@ -96,7 +96,6 @@ makeTarBall () {
 		chronic_sh $GPG
 		--homedir "$GPGHOME"
 		--no-options -q --batch --no-default-keyring
-		--secret-keyring "$PRIVATE_KEYRING"
 		--default-key 72544FAF
 		--detach-sign
 	)
@@ -248,8 +247,13 @@ run_mk_origtargz() {
 	output="$( cd $TMPDIR/$dir >/dev/null; LC_ALL=C $MK_ORIGTARGZ "$@" 2> $stderrF )"
 	stderr="$(cat $stderrF)"
 	retval=$?
+
+	# Strip ANSI color codes from the output
+	local clean_stderr=$(echo "$stderr" | sed 's/\x1b\[[0-9;]*m//g')
+
+	# Use the cleaned output for comparison
 	assertEquals "standard output of mk-origtargz $*\n" "$exp_stdout" "$output"
-	assertEquals "error output of mk-origtargz $*\n" "$exp_stderr" "$stderr"
+	assertEquals "error output of mk-origtargz $*\n" "$exp_stderr" "$clean_stderr"
 	assertEquals "return valueof mk-origtargz $*\n" "0" "$retval"
 }
 

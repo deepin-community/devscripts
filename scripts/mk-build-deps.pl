@@ -159,6 +159,7 @@ use Dpkg::Control;
 use Dpkg::Version;
 use Dpkg::IPC;
 use Dpkg::Deps;
+use Dpkg::Path qw(find_command);
 use FileHandle;
 use Text::ParseWords;
 
@@ -261,8 +262,7 @@ if (!@ARGV) {
 
 usage(1) unless @ARGV;
 
-system("command -v equivs-build >/dev/null 2>&1");
-if ($?) {
+if (!find_command('equivs-build')) {
     die "$progname: You must have equivs installed to use this program.\n";
 }
 
@@ -567,7 +567,8 @@ sub build_equiv {
     deps_iterate($negative, $handle_native_archqual);
 
     my $pkgname;
-    my $buildess = "build-essential:$buildarch";
+    my $buildess = "build-essential";
+    $buildess .= ":$buildarch" if $packagearch ne "all";
     if ($buildarch eq $hostarch) {
         $pkgname = "$opts->{name}-$opts->{type}";
     } else {

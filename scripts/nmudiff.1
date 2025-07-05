@@ -42,6 +42,12 @@ Use \fBsensible\-editor\fR(1) to edit the message and then mail it
 directly using \fI/usr/bin/sendmail\fR.  This can be controlled using
 a configuration file option (see below).
 .TP
+\fB\-\-mua\fR \fIMUACMD\fR
+Use the given command as a mail user agent (MUA). The command will be split
+on white space and will be interpreted by the shell. The command will
+be given a \fImailto:\fR URL as first argument. The \fBthunderbird\fR
+is a known example of a program that is compatible with this option.
+.TP
 \fB\-\-sendmail\fR \fISENDMAILCMD\fR
 Specify the \fBsendmail\fR command.  The command will be split on white
 space and will be interpreted by the shell.  Default is
@@ -104,7 +110,7 @@ queue has not been used.
 .TP
 .B NMUDIFF_MUTT
 Can be \fIyes\fR (default) or \fIno\fR, and specifies whether to use
-\fBmutt\fR (or \fBneomutt\fR)to compose and send the message or not, as
+\fBmutt\fR (or \fBneomutt\fR) to compose and send the message or not, as
 described above.
 .TP
 .B NMUDIFF_NEWREPORT

@@ -18,11 +18,16 @@ import inspect
 import os
 import unittest
 
+# This list is used by scripts/setup.py to populate the scripts argument
+# for setup(). As such, this list governs what setup() will end up installing
+# into /usr/bin.
 SCRIPTS = [
+    "deb-check-file-conflicts",
+    "deb-janitor",
     "debbisect",
     "debdiff-apply",
+    "debftbfs",
     "debootsnap",
-    "deb-janitor",
     "reproducible-check",
     "sadt",
     "suspicious-source",

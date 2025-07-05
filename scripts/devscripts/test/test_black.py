@@ -32,8 +32,8 @@ class BlackTestCase(unittest.TestCase):
 
     def test_black(self) -> None:
         """Test: Run black code formatter on Python source code."""
-        if int(black.__version__.split(".", 1)[0]) <= 20:
-            self.skipTest("black >= 21 needed")
+        if int(black.__version__.split(".", 1)[0]) < 24:
+            self.skipTest("black >= 24 needed")
         cmd = ["black", "--check", "--diff"] + get_source_files()
         if unittest_verbosity() >= 2:
             sys.stderr.write(f"Running following command:\n{' '.join(cmd)}\n")

@@ -164,6 +164,9 @@ Options:
   --bpo
          Increment the Debian release number for a backports upload
          to "bookworm-backports"
+  --sloppy
+         Increment the Debian release number for a sloppy backports upload
+         to "bullseye-backports-sloppy"
   --stable
          Increment the Debian release number for a stable upload.
   -l, --local <suffix>
@@ -205,7 +208,7 @@ Options:
   --[no]multimaint-merge
          When appending an entry to a changelog section, [do not] merge the
          entry into an existing changelog section for the current author.
-         (default: do not)
+         (default: do merge)
   -m, --maintmaint
          Don\'t change (maintain) the maintainer details in the changelog entry
   -M, --controlmaint
@@ -228,12 +231,15 @@ Options:
   --release-heuristic log|changelog
          Select heuristic used to determine if a package has been released.
          (default: changelog)
+  --date <date>
+         Use the specified date in the changelog entry being edited.
+         The date must be in RFC 5322 format, i.e. as produced by \'date -R\'.
   --help, -h
          Display this help message and exit
   --version
          Display version information
   At most one of -a, -i, -e, -r, -v, -d, -n, --bin-nmu, -q, --qa, -R, -s,
-  --lts, --team, --bpo, --stable, -l (or their long equivalents) may be used.
+  --lts, --team, --bpo, --sloppy, --stable, -l (or their long equivalents) may be used.
   With no options, one of -i or -a is chosen by looking at the release
   specified in the changelog.
 
@@ -261,13 +267,14 @@ my $opt_query                 = 1;
 my $opt_release_heuristic     = 'changelog';
 my $opt_release_heuristic_re  = '^(changelog|log)$';
 my $opt_multimaint            = 1;
-my $opt_multimaint_merge      = 0;
+my $opt_multimaint_merge      = 1;
 my $opt_tz                    = undef;
 my $opt_t                     = '';
 my $opt_allow_lower           = '';
 my $opt_auto_nmu              = 1;
 my $opt_force_save_on_release = 1;
 my $opt_vendor                = undef;
+my $opt_date                  = undef;
 
 # Next, read configuration files and then command line
 # The next stuff is boilerplate
@@ -285,7 +292,7 @@ if (@ARGV and $ARGV[0] =~ /^--no-?conf$/) {
         'DEBCHANGE_RELEASE_HEURISTIC'    => 'changelog',
         'DEBCHANGE_MULTIMAINT'           => 'yes',
         'DEBCHANGE_TZ'                   => $ENV{TZ},       # undef if TZ unset
-        'DEBCHANGE_MULTIMAINT_MERGE'     => 'no',
+        'DEBCHANGE_MULTIMAINT_MERGE'     => 'yes',
         'DEBCHANGE_MAINTTRAILER'         => '',
         'DEBCHANGE_LOWER_VERSION_PATTERN' => '',
         'DEBCHANGE_AUTO_NMU'              => 'yes',
@@ -319,7 +326,7 @@ if (@ARGV and $ARGV[0] =~ /^--no-?conf$/) {
     $config_vars{'DEBCHANGE_MULTIMAINT'} =~ /^(yes|no)$/
       or $config_vars{'DEBCHANGE_MULTIMAINT'} = 'yes';
     $config_vars{'DEBCHANGE_MULTIMAINT_MERGE'} =~ /^(yes|no)$/
-      or $config_vars{'DEBCHANGE_MULTIMAINT_MERGE'} = 'no';
+      or $config_vars{'DEBCHANGE_MULTIMAINT_MERGE'} = 'yes';
     $config_vars{'DEBCHANGE_AUTO_NMU'} =~ /^(yes|no)$/
       or $config_vars{'DEBCHANGE_AUTO_NMU'} = 'yes';
     $config_vars{'DEBCHANGE_FORCE_SAVE_ON_RELEASE'} =~ /^(yes|no)$/
@@ -359,10 +366,10 @@ my (
     $opt_b, $opt_d, $opt_D, $opt_u, $opt_force_dist
 );
 my (
-    $opt_n,       $opt_bn,   $opt_qa, $opt_R,   $opt_s,
-    $opt_lts,     $opt_team, $opt_U,  $opt_bpo, $opt_stable,
-    $opt_l,       $opt_c,    $opt_m,  $opt_M,   $opt_create,
-    $opt_package, @closes
+    $opt_n,      $opt_bn,      $opt_qa, $opt_R,   $opt_s,
+    $opt_lts,    $opt_team,    $opt_U,  $opt_bpo, $opt_sloppy,
+    $opt_stable, $opt_l,       $opt_c,  $opt_m,   $opt_M,
+    $opt_create, $opt_package, @closes
 );
 my ($opt_news);
 my ($opt_noconf, $opt_empty);
@@ -394,6 +401,7 @@ GetOptions(
     "team"                   => \$opt_team,
     "U|upstream"             => \$opt_U,
     "bpo"                    => \$opt_bpo,
+    "sloppy"                 => \$opt_sloppy,
     "lts"                    => \$opt_lts,
     "stable"                 => \$opt_stable,
     "l|local=s"              => \$opt_l,
@@ -417,6 +425,7 @@ GetOptions(
     "auto-nmu!"              => \$opt_auto_nmu,
     "force-save-on-release!" => \$opt_force_save_on_release,
     "vendor=s"               => \$opt_vendor,
+    "date=s"                 => \$opt_date,
   )
   or die
 "Usage: $progname [options] [changelog entry]\nRun $progname --help for more details\n";
@@ -447,7 +456,7 @@ if ($opt_release_heuristic !~ $opt_release_heuristic_re) {
 
 # Only allow at most one non-help option
 fatal
-"Only one of -a, -i, -e, -r, -v, -d, -n/--nmu, --bin-nmu, -q/--qa, -R/--rebuild, -s/--security, --lts, --team, --bpo, --stable, -l/--local is allowed;\ntry $progname --help for more help"
+"Only one of -a, -i, -e, -r, -v, -d, -n/--nmu, --bin-nmu, -q/--qa, -R/--rebuild, -s/--security, --lts, --team, --bpo, --sloppy, --stable, -l/--local is allowed;\ntry $progname --help for more help"
   if ($opt_i ? 1 : 0)
   + ($opt_a ? 1 : 0)
   + ($opt_e ? 1 : 0)
@@ -462,6 +471,7 @@ fatal
   + ($opt_lts ? 1 : 0)
   + ($opt_team ? 1 : 0)
   + ($opt_bpo ? 1 : 0)
+  + ($opt_sloppy ? 1 : 0)
   + ($opt_stable ? 1 : 0)
   + ($opt_l ? 1 : 0) > 1;
 
@@ -499,9 +509,16 @@ if (defined $opt_vendor && $opt_vendor) {
     }
 }
 $vendor ||= 'Debian';
-if ($vendor eq 'Ubuntu'
-    and ($opt_n or $opt_bn or $opt_qa or $opt_bpo or $opt_stable or $opt_lts))
-{
+if (
+    $vendor eq 'Ubuntu'
+    and (  $opt_n
+        or $opt_bn
+        or $opt_qa
+        or $opt_bpo
+        or $opt_sloppy
+        or $opt_stable
+        or $opt_lts)
+) {
     $vendor = 'Debian';
 }
 
@@ -596,11 +613,12 @@ if ($opt_create) {
         || $opt_lts
         || $opt_team
         || $opt_bpo
+        || $opt_sloppy
         || $opt_stable
         || $opt_l
         || $opt_allow_lower) {
         warn
-"$progname warning: ignoring -a/-i/-e/-r/-b/--allow-lower-version/-n/--bin-nmu/-q/--qa/-R/-s/--lts/--team/--bpo/--stable,-l options with --create\n";
+"$progname warning: ignoring -a/-i/-e/-r/-b/--allow-lower-version/-n/--bin-nmu/-q/--qa/-R/-s/--lts/--team/--bpo/--sloppy/--stable,-l options with --create\n";
         $warnings++;
     }
     if ($opt_package && $opt_d) {
@@ -671,8 +689,9 @@ my $EMAIL        = 'EMAIL';
 my $DISTRIBUTION = 'UNRELEASED';
 # when updating the lines below also update the help text, the manpage and the testcases.
 my %dists       = (10, 'buster', 11, 'bullseye', 12, 'bookworm', 13, 'trixie');
-my $lts_dist    = '10';
 my $latest_dist = '12';
+my $old_dist    = $latest_dist - 1;
+my $lts_dist    = '11';
 # dist guessed from backports, SRU, security uploads...
 my $guessed_dist = '';
 my $CHANGES      = '';
@@ -902,6 +921,7 @@ if (
     and !$opt_qa
     and !$opt_R
     and !$opt_bpo
+    and !$opt_sloppy
     and !$opt_bn
     and !$opt_n
     and !$opt_c
@@ -933,7 +953,7 @@ if (
 
         if (    $maintainer !~ m/<packages\@qa\.debian\.org>/
             and !grep { $_ eq $packager } ($maintainer, @uploaders)
-              and $packager ne $changelog->{Maintainer}
+            and $packager ne $changelog->{Maintainer}
             and !$opt_team) {
             $opt_n = 1;
             $opt_a = 0;
@@ -1042,8 +1062,22 @@ if (@ARGV and !$TEXT) {
 # Get the date
 my $DATE;
 {
-    local $ENV{TZ} = $opt_tz if $opt_tz;
-    $DATE = strftime "%a, %d %b %Y %T %z", localtime();
+    my $date_rfc5322
+      = '^(((Mon|Tue|Wed|Thu|Fri|Sat|Sun))[,]?\s[0-9]{1,2})\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s([0-9]{4})\s([0-9]{2}):([0-9]{2})(:([0-9]{2}))?\s([\+|\-][0-9]{4})$';
+
+    if (defined $opt_date) {
+        if ($opt_date =~ /$date_rfc5322/) {
+            $DATE = $opt_date;
+        } else {
+            my $example_date = strftime "%a, %d %b %Y %T %z", localtime();
+            fatal(
+"Date '$opt_date' is not in RFC 5322 format. Example: $example_date"
+            );
+        }
+    } else {
+        local $ENV{TZ} = $opt_tz if $opt_tz;
+        $DATE = strftime "%a, %d %b %Y %T %z", localtime();
+    }
 }
 
 if ($opt_news && !$opt_i && !$opt_a) {
@@ -1069,6 +1103,7 @@ if (   !$opt_i
     && !$opt_lts
     && !$opt_team
     && !$opt_bpo
+    && !$opt_sloppy
     && !$opt_stable
     && !$opt_l
     && !$opt_create) {
@@ -1158,6 +1193,7 @@ if ((
         || $opt_lts
         || $opt_team
         || $opt_bpo
+        || $opt_sloppy
         || $opt_stable
         || $opt_l
         || $opt_v
@@ -1279,6 +1315,10 @@ if ((
                 # If it's not already a backport make it so
                 # otherwise we can be safe if we behave like dch -i
                 $end .= "~bpo$latest_dist+1";
+            } elsif ($opt_sloppy and not $start =~ /~bpo[0-9]+\+$/) {
+                # If it's not already a backport make it so
+                # otherwise we can be safe if we behave like dch -i
+                $end .= "~bpo$old_dist+1";
             } elsif ($opt_stable and not $start =~ /\+deb\d+u/) {
                 $end .= "+deb${latest_dist}u1";
             } elsif ($opt_lts and not $start =~ /\+deb\d+u/) {
@@ -1319,7 +1359,11 @@ if ((
 
                 # Attempt to set the distribution for a stable upload correctly
                 # based on the version of the previous upload
-                if ($opt_stable || $opt_bpo || $opt_s || $opt_lts) {
+                if (   $opt_stable
+                    || $opt_bpo
+                    || $opt_sloppy
+                    || $opt_s
+                    || $opt_lts) {
                     my $previous_dist = $start;
                     $previous_dist =~ s/^.*[+~](?:deb|bpo)(\d+)(?:u\+)$/$1/;
                     if (    defined $previous_dist
@@ -1330,6 +1374,9 @@ if ((
                         } elsif ($opt_bpo) {
                             +$guessed_dist
                               = $dists{$previous_dist} . '-backports';
+                        } elsif ($opt_sloppy) {
+                            +$guessed_dist
+                              = $dists{$old_dist} . '-backports-sloppy';
                         } elsif ($opt_stable) {
                             $guessed_dist = $dists{$previous_dist};
                         }
@@ -1361,7 +1408,15 @@ if ((
                     }
                 }
 
-                if (!($opt_qa or $opt_bpo or $opt_stable or $opt_l)) {
+                if (
+                    !(
+                           $opt_qa
+                        or $opt_bpo
+                        or $opt_sloppy
+                        or $opt_stable
+                        or $opt_l
+                    )
+                ) {
                     $useextra = 1;
                 }
             }
@@ -1387,6 +1442,9 @@ if ((
 
     if ($opt_bpo) {
         $guessed_dist ||= $dists{$latest_dist} . '-backports';
+    }
+    if ($opt_sloppy) {
+        $guessed_dist ||= $dists{$old_dist} . '-backports-sloppy';
     }
     if ($opt_stable) {
         $guessed_dist ||= $dists{$latest_dist};
@@ -1442,6 +1500,9 @@ if ((
             print O "  * Team upload.\n";
             $line = 1;
         } elsif ($opt_bpo && !$opt_news) {
+            print O "  * Rebuild for $guessed_dist.\n";
+            $line = 1;
+        } elsif ($opt_sloppy && !$opt_news) {
             print O "  * Rebuild for $guessed_dist.\n";
             $line = 1;
         }
