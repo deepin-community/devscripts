@@ -1,7 +1,7 @@
 # dummy subclass used to store all the redirections for later use
 package Devscripts::Uscan::CatchRedirections;
 
-use base 'LWP::UserAgent';
+use parent qw(LWP::UserAgent);
 
 my @uscan_redirections;
 

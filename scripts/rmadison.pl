@@ -54,8 +54,9 @@ my %url_map = (
     'debian'  => "https://api.ftp-master.debian.org/madison",
     'new'     => "https://api.ftp-master.debian.org/madison?s=new",
     'qa'      => "https://qa.debian.org/madison.php",
-    'ubuntu'  => "https://people.canonical.com/~ubuntu-archive/madison.cgi",
+    'ubuntu'  => "https://ubuntu-archive-team.ubuntu.com/madison.cgi",
     'udd'     => 'https://qa.debian.org/cgi-bin/madison.cgi',
+    'all'     => 'https://qa.debian.org/cgi-bin/madison.cgi?table=all',
     'archive' => 'https://qa.debian.org/cgi-bin/madison.cgi?table=archived',
     'ports'   => 'https://qa.debian.org/cgi-bin/madison.cgi?table=ports',
     'janitor' => 'https://janitor.debian.net/api/madison',
@@ -331,8 +332,9 @@ use I<URL> for the query. Supported shorthands are
  B<debian> https://api.ftp-master.debian.org/madison
  B<new> https://api.ftp-master.debian.org/madison?s=new
  B<qa> https://qa.debian.org/madison.php
- B<ubuntu> https://people.canonical.com/~ubuntu-archive/madison.cgi
+ B<ubuntu> https://ubuntu-archive-team.ubuntu.com/madison.cgi
  B<udd> https://qa.debian.org/cgi-bin/madison.cgi
+ B<all> https://qa.debian.org/cgi-bin/madison.cgi?table=all
  B<archive> https://qa.debian.org/cgi-bin/madison.cgi?table=archived
  B<ports> https://qa.debian.org/cgi-bin/madison.cgi?table=ports
 

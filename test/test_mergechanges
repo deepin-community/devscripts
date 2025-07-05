@@ -21,8 +21,8 @@ use warnings;
 
 use Cwd qw(getcwd);
 use Data::Dumper;
+use Dpkg::IPC;
 use File::Temp qw(tempdir);
-use IPC::Run qw(run);
 use Test::More;
 
 use Dpkg::Control;
@@ -48,16 +48,28 @@ my @words;
 my @lines;
 my $orig;
 
+sub run {
+    my ($argv, %opts) = @_;
+    diag("Running: @{$argv}") if $opts{verbose};
+    delete $opts{verbose};
+    spawn(
+        %opts,
+        exec       => $argv,
+        wait_child => 1,
+        nocheck    => 1,
+    );
+    return $? == 0;
+}
+
 sub verbose_run {
-    my $argv = shift;
-    diag("Running: @{$argv}");
-    return run($argv, @_);
+    my ($argv, %opts) = @_;
+    return run($argv, verbose => 1, %opts);
 }
 
 sub capture {
     my $output;
     my $argv = shift;
-    ok(verbose_run($argv, '>', \$output), "@{$argv}");
+    ok(verbose_run($argv, to_string => \$output), "@{$argv}");
     chomp $output;
     return $output;
 }
@@ -426,7 +438,7 @@ diag('Only one');
 ok(! verbose_run([
     $mergechanges,
     "mergechanges/$source",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Not enough parameters});
 
@@ -435,7 +447,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$source",
     "mergechanges/does-not-exist.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{ERROR: Cannot read mergechanges/does-not-exist\.changes});
 
@@ -444,7 +456,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$all",
     "mergechanges/different-description.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Error: Descriptions do not match});
 
@@ -453,7 +465,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$all",
     "mergechanges/unsupported-format.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Error: Changes files have different Format fields});
 
@@ -462,7 +474,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$all",
     "mergechanges/different-source.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Error: Source packages do not match});
 
@@ -471,7 +483,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$all",
     "mergechanges/different-version.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{ERROR: Version numbers do not match});
 
@@ -480,7 +492,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/$all",
     "mergechanges/unsupported-checksum.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Error: Unsupported checksum fields});
 
@@ -489,7 +501,7 @@ ok(! verbose_run([
     $mergechanges,
     "mergechanges/unsupported-format.changes",
     "mergechanges/unsupported-format.changes",
-], '>', \$stdout, '2>', \$stderr));
+], to_string => \$stdout, error_to_string => \$stderr));
 is($stdout, '');
 like($stderr, qr{Error: Changes files use unknown Format});
 

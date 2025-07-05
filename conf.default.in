@@ -127,27 +127,19 @@
 #
 # No variables currently; see cowpoke.conf and cowpoke(1)
 
-##### cvs-debc
-#
-# No variables currently
-
-##### cvs-debi
-#
-# No variables currently
-
-##### cvs-debrelease
-#
-# No variables currently
-
-##### cvs-debuild
-#
-# No variables currently
-
 ##### dd-list
 #
 # No variables currently
 
 ##### dcmd
+#
+# No variables currently
+
+##### deb2apptainer
+#
+# No variables currently
+
+##### deb2docker
 #
 # No variables currently
 
@@ -179,7 +171,7 @@
 # When appending to a multiple-maintainer changelog, if there are
 # existing changes made by the current maintainer, should new
 # changelog entries be appended to the existing entries?
-# DEBCHANGE_MULTIMAINT_MERGE=no
+# DEBCHANGE_MULTIMAINT_MERGE=yes
 #
 # When appending entries to the changelog, should the trailer line
 # be maintained as-is?
@@ -227,7 +219,7 @@
 # Strip a leading "* " from commit messages taken from changelogs?
 # DEBCOMMIT_STRIP_MESSAGE=yes
 #
-# Sign created tags using gnupg?
+# Sign created tags using OpenPGP?
 # DEBCOMMIT_SIGN_TAGS=no
 #
 # Take any uncommitted changes in the changelog in
@@ -235,7 +227,7 @@
 # for a release?
 # DEBCOMMIT_RELEASE_USE_CHANGELOG=no
 #
-# Sign commits using gnupg?
+# Sign commits using OpenPGP?
 # DEBCOMMIT_SIGN_COMMITS=no
 
 ##### debdiff
@@ -320,10 +312,10 @@
 # manpage.  Corresponds to -sgpg and -spgp.
 # DEBSIGN_SIGNLIKE=
 #
-# Maintainer name (only used to determine GPG keyid; -m option)
+# Maintainer name (only used to determine OpenPGP key ID; -m option)
 # DEBSIGN_MAINT=
 #
-# GPG keyid to use (-k option)
+# OpenPGP key ID to use (-k option)
 # DEBSIGN_KEYID=
 
 ##### debsnap
@@ -432,14 +424,14 @@
 # It pays attention to the values of DEBSIGN_MAINT and DEBSIGN_KEY in
 # addition to the following.
 #
-# This key ID takes precedence over the rest
+# This OpenPGP key ID takes precedence over the rest
 # DPKGSIG_KEYID=
 #
 # Do we sign the .changes and .dsc files?  See the manpage for more
 # info.  Valid options are no, auto, yes, full and force_full.
 # DPKGSIG_SIGN_CHANGES=auto
 #
-# Do we cache the gpg passphrase by default?  This can be dangerous!
+# Do we cache the OpenPGP passphrase by default?  This can be dangerous!
 # DPKGSIG_CACHE_PASS=no
 
 ##### dscverify
@@ -629,4 +621,3 @@
 ##### wnpp-check
 #
 # No variables currently
-

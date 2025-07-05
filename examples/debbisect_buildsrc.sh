@@ -12,6 +12,9 @@ mmdebstrap --variant=apt unstable \
 --aptopt='Apt::Key::gpgvcommand "/usr/share/debuerreotype/scripts/.gpgv-ignore-expiration.sh"' \
 --aptopt='Acquire::Check-Valid-Until "false"' \
 --customize-hook='chroot "$1" apt-get --yes build-dep '"$DEBIAN_BISECT_SRCPKG" \
+--customize-hook='chroot "$1" sh -c "dpkg-query -W > /pkglist"' \
+--customize-hook='download /pkglist ./debbisect.'"$DEBIAN_BISECT_TIMESTAMP"'.pkglist' \
+--customize-hook='rm "$1"/pkglist' \
 --customize-hook="chroot \"\$1\" dpkg-query --showformat '\${binary:Package}=\${Version}\n' --show" \
 --customize-hook='chroot "$1" apt-get source --build '"$DEBIAN_BISECT_SRCPKG" \
 /dev/null $DEBIAN_BISECT_MIRROR "deb-src $DEBIAN_BISECT_MIRROR unstable main"

@@ -54,8 +54,8 @@ components=$6
 #
 #  - Acquire::Check-Valid-Until "false" allows Release files with an expired
 #    Valid-Until dates
-#  - Apt::Key::gpgvcommand allows expired GPG keys
-#  - Apt::Hashes::SHA1::Weak "yes" allows GPG keys with weak SHA1 signature
+#  - Apt::Key::gpgvcommand allows expired OpenPGP keys
+#  - Apt::Hashes::SHA1::Weak "yes" allows OpenPGP keys with weak SHA1 signature
 #  - /usr/share/keyrings lets apt use debian-archive-removed-keys.gpg
 #  - /usr/share/mmdebstrap/hooks/jessie-or-older performs some setup that is
 #    only required for Debian Jessie or older
@@ -77,7 +77,7 @@ if [ $# -eq 6 ]; then
 		--customize-hook='chroot "$1" sh -c "dpkg-query -W > /pkglist"' \
 		--customize-hook='download /pkglist ./debbisect.'"$DEBIAN_BISECT_TIMESTAMP"'.pkglist' \
 		--customize-hook='rm "$1"/pkglist' \
-		--customize-hook='chroot "$1" dpkg-query --list --no-pager' \
+		--customize-hook='chroot "$1" dpkg-query --list | cat' \
 		--customize-hook="$script" \
 		"$suite" \
 		- \
@@ -105,7 +105,7 @@ elif [ $# -eq 8 ]; then
 		--customize-hook='chroot "$1" sh -c "dpkg-query -W > /pkglist"' \
 		--customize-hook='download /pkglist ./debbisect.'"$DEBIAN_BISECT_TIMESTAMP.$toupgrade"'.pkglist' \
 		--customize-hook='rm "$1"/pkglist' \
-		--customize-hook='chroot "$1" dpkg-query --list --no-pager' \
+		--customize-hook='chroot "$1" dpkg-query --list | cat' \
 		--customize-hook="$script" \
 		"$suite" \
 		- \

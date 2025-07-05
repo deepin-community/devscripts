@@ -167,13 +167,15 @@ has decompress => (
     is      => 'rw',
     default => sub { 0 },
 );
-has gitexport => (
+has git => (
     is      => 'rw',
-    default => sub { 'default' },
-);
-has gitmode => (
-    is      => 'rw',
-    default => sub { 'shallow' },
+    default => sub {
+        {
+            export  => 'default',
+            mode    => 'shallow',
+            modules => 0,
+        }
+    },
 );
 has mode => (
     is      => 'rw',
@@ -443,7 +445,7 @@ EOF
                     $self->downloader->pasv(1);
                 } elsif ($opt =~ /^\s*active\s*$/
                     or $opt =~ /^\s*nopasv\s*$/
-                    or $opt =~ /^s*nopassive\s*$/) {
+                    or $opt =~ /^\s*nopassive\s*$/) {
                     $self->downloader->pasv(0);
                 }
 
@@ -461,10 +463,13 @@ EOF
                 # Boolean line parameter
                 #
                 # $ regexp-assemble <<EOF
+                # gitmodules
                 # decompress
                 # repack
                 # EOF
-                elsif ($opt =~ /^\s*(decompress|repack)\s*$/) {
+                elsif ($opt =~ /^\s*gitmodules\s*$/) {
+                    $self->git->{modules} = ['.'];
+                } elsif ($opt =~ /^\s*(decompress|repack)\s*$/) {
                     $self->$1(1);
                 }
 
@@ -476,6 +481,7 @@ EOF
                 # date
                 # gitexport
                 # gitmode
+                # gitmodules
                 # hrefdecode
                 # mode
                 # pgpmode
@@ -485,9 +491,13 @@ EOF
                 # unzipopt
                 # EOF
                 elsif ($opt
-                    =~ /^\s*((?:(?:(?:(?:search)?m|hrefdec)od|dat)e|c(?:omponent|type)|git(?:export|mode)|p(?:gpmode|retty)|repacksuffix|unzipopt))\s*=\s*(.+?)\s*$/
+                    =~ /^\s*((?:(?:(?:(?:search)?m|hrefdec)od|dat)e|c(?:omponent|type)|p(?:gpmode|retty)|repacksuffix|unzipopt))\s*=\s*(.+?)\s*$/
                 ) {
                     $self->$1($2);
+                } elsif ($opt =~ /^\s*git(export|mode)\s*=\s*(.+?)\s*$/) {
+                    $self->git->{$1} = $2;
+                } elsif ($opt =~ /^\s*gitmodules\s*=\s*(.+?)\s*$/) {
+                    $self->git->{modules} = [split /;/, $1];
                 } elsif ($opt =~ /^\s*versionmangle\s*=\s*(.+?)\s*$/) {
                     $self->uversionmangle([split /;/, $1]);
                     $self->dversionmangle([split /;/, $1]);
@@ -619,7 +629,7 @@ EOF
               . "  $self->{line}";
             return $self->status(1);
         }
-        if ($self->mode ne 'git' and $self->gitexport ne 'default') {
+        if ($self->mode ne 'git' and $self->git->{export} ne 'default') {
             uscan_warn "gitexport option is valid only in git mode,\n"
               . "  ignoring gitexport in $watchfile:\n"
               . "  $self->{line}";
@@ -711,14 +721,13 @@ EOF
         }
 
         # Allow 2 char shorthands for opts="gitmode=..." and check
-        if ($self->gitmode =~ m/^sh/) {
-            $self->gitmode('shallow');
-        } elsif ($self->gitmode =~ m/^fu/) {
-            $self->gitmode('full');
+        if ($self->git->{mode} =~ m/^sh/) {
+            $self->git->{mode} = 'shallow';
+        } elsif ($self->git->{mode} =~ m/^fu/) {
+            $self->git->{mode} = 'full';
         } else {
-            uscan_warn
-              "Override strange manual gitmode '$self->gitmode --> 'shallow'";
-            $self->gitmode('shallow');
+            uscan_warn "Unknown gitmode, defaulting to 'shallow'";
+            $self->git->{mode} = 'shallow';
         }
 
         # Handle sf.net addresses specially
@@ -806,12 +815,22 @@ EOF
     if ($self->versionmode eq 'ignore' and $self->config->download_version) {
         uscan_verbose 'Ignore --download_version for component with "ignore"';
     } elsif ($self->config->download_version) {
-        $self->shared->{download_version} = $self->config->download_version;
+        my $mangled_downloadversion = $self->config->download_version;
+        if (
+            mangle(
+                $watchfile,        \$self->line,
+                'uversionmangle:', \@{ $self->uversionmangle },
+                \$mangled_downloadversion
+            )
+        ) {
+            return $self->status(1);
+        }
+        $self->shared->{download_version} = $mangled_downloadversion;
         $self->shared->{download}         = 2
           if $self->shared->{download} == 1;    # Change default 1 -> 2
         $self->badversion(1);
         uscan_verbose "Download the --download-version specified version: "
-          . "$self->{shared}->{download_version}";
+          . "(uversionmangled): $self->{shared}->{download_version}";
     } elsif ($self->config->download_debversion) {
         $self->shared->{download_version} = $mangled_lastversion;
         $self->shared->{download}         = 2
@@ -1228,7 +1247,7 @@ sub download_file_and_sig {
     }
 
     # configure downloader
-    $self->downloader->git_export_all($self->gitexport eq 'all');
+    $self->downloader->git_export_all($self->git->{export} eq 'all');
 
     # 6.1 download tarball
     my $download_available = 0;
@@ -1248,6 +1267,8 @@ sub download_file_and_sig {
             and -e "$self->{config}->{destdir}/$self->{newfile_base}") {
             uscan_verbose
 "Downloading and overwriting existing file: $self->{newfile_base}";
+            uscan_exec_no_fail("rm", "-f",
+                "$self->{config}->{destdir}/$self->{newfile_base}");
             $download_available = $self->downloader->download(
                 $self->upstream_url,
                 "$self->{config}->{destdir}/$self->{newfile_base}",
@@ -1255,7 +1276,8 @@ sub download_file_and_sig {
                 $self->parse_result->{base},
                 $self->pkg_dir,
                 $self->pkg,
-                $self->mode
+                $self->mode,
+                $self->gitrepo_dir,
             );
             if ($download_available) {
                 dehs_verbose
@@ -1532,9 +1554,10 @@ sub download_file_and_sig {
         uscan_verbose "Don't check OpenPGP signature";
     } elsif ($self->pgpmode eq 'gittag') {
         if ($skip_git_vrfy) {
-            uscan_warn "File already downloaded, skipping gpg verification";
+            uscan_warn
+              "File already downloaded, skipping OpenPGP verification";
         } elsif (!$self->keyring) {
-            uscan_warn "No keyring file, skipping gpg verification";
+            uscan_warn "No keyring file, skipping OpenPGP verification";
             return $self->status(1);
         } else {
             my ($gitrepo, $gitref) = split /[[:space:]]+/, $self->upstream_url;
@@ -1617,6 +1640,9 @@ sub mkorigtargz {
         if ($Devscripts::MkOrigtargz::found_comp) {
             uscan_verbose
               "Forcing compression to $Devscripts::MkOrigtargz::found_comp";
+            $self->repack(1);
+        } elsif ($path =~ /\.tar$/) {
+            # Always repack uncompressed tarballs
             $self->repack(1);
         }
         @ARGV = ();

@@ -145,8 +145,9 @@ sub make_orig_targz {
         $self->config->force_repack(1);
     }
 
-    # From now on, $upstream_tar is guaranteed to be a compressed tarball. It
-    # is always a full (possibly relative) path, and distinct from $destfile.
+    # From now on, $upstream_tar is guaranteed to be a tarball, usually
+    # compressed. It is always a full (possibly relative) path, and distinct
+    # from $destfile.
 
     # Find out if we have to repack
     my $do_repack = 0;

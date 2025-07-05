@@ -1,0 +1,72 @@
+.\" Copyright (c) 2016 Maximiliano Curia <maxy@gnuservers.com.ar>
+.\"
+.\" This program is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License
+.\" as published by the Free Software Foundation; either version 2
+.\" of the License, or (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" See file /usr/share/common-licenses/GPL-2 for more details.
+.\"
+.TH "DEB\-CHECK\-MISSING\-BREAKS\-REPLACES\-CONFLICTS" 1 "Debian Utilities" "DEBIAN"
+
+.SH NAME
+deb-check-file-conflicts \- check for missing Breaks/Replaces in Debian packages
+
+.SH SYNOPSIS
+.B deb-check-file-conflicts
+[\fB\-\-debug\fR]
+[\fB\-\-changes\-file\fR=\fIFILE\fR]
+[\fB\-o\fR \fIOUTPUT\fR]
+[\fB\-\-output\fR=\fIOUTPUT\fR]
+
+.SH DESCRIPTION
+.B deb-check-file-conflicts
+checks produced binary packages for conflicting files against packages that are not
+declared with Breaks and Replaces relationships.
+.PP
+The tool helps identify potential upgrade issues where files from one package
+might conflict with files from other packages during installation.
+.PP
+Note that the results depend on what apt repositories are enabled. If you want
+to prevent upgrade issues across Debian releases, you need to have both unstable
+and the previous release repositories enabled in the apt sources configuration.
+
+.SH OPTIONS
+.TP
+.B \-\-debug
+Enable debug output
+.TP
+.B \-\-changes\-file=\fIFILE\fR
+Specify the changes file to check (defaults to CHANGES_FILE environment variable)
+.TP
+.BR \-o ", " \-\-output =\fIFILE\fR
+Write output to FILE (defaults to $EXPORT_DIR/missing_breaks_replaces.xml or ./missing_breaks_replaces.xml)
+
+.SH OUTPUT
+The tool generates a JUnit XML format report containing test results for each
+binary package checked. Each test case indicates whether missing Breaks/Replaces
+relationships were found.
+
+.SH EXAMPLES
+.EX
+# Check a changes file for missing relationships:
+$ deb-check-file-conflicts --changes-file foo_1.0-1_amd64.changes
+
+# Write results to a specific output file:
+$ deb-check-file-conflicts -o results.xml --changes-file foo_1.0-1_amd64.changes
+.EE
+
+.SH AUTHOR
+\fBdeb-check-file-conflicts\fR and this manual page were written by
+Maximiliano Curia <maxy@gnuservers.com.ar>.
+.PP
+Both are released under the GNU General Public License, version 2 or later.
+
+.SH SEE ALSO
+.BR dpkg (1),
+.BR apt\-file (1)

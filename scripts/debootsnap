@@ -12,7 +12,7 @@
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
 
-# This tool is similar to debootstrap but is able to recreate a chroot
+# This tool is similar to debootstrap but is able to recreate a chroot tarball
 # containing precisely the given package and version selection. The package
 # list is expected on standard input and may be of the format produced by:
 #
@@ -21,31 +21,31 @@
 # The name was suggested by Adrian Bunk as a portmanteau of debootstrap and
 # snapshot.debian.org.
 
-# TODO: Adress invalid names
+# TODO: Address invalid names
 # pylint: disable=invalid-name
 
 import argparse
+import atexit
 import dataclasses
+import difflib
 import http.server
 import os
 import pathlib
 import re
 import shutil
-import socketserver
 import subprocess
 import sys
 import tempfile
 import threading
-import time
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
-from http import HTTPStatus
 from operator import itemgetter
 
-import pycurl
 import requests
 from debian.deb822 import BuildInfo
+
+from devscripts.proxy import setupcache
 
 
 class MyHTTPException(Exception):
@@ -62,139 +62,6 @@ class MyHTTPTimeoutException(Exception):
 
 class RetryCountExceeded(Exception):
     pass
-
-
-# pylint: disable=c-extension-no-member
-class Proxy(http.server.SimpleHTTPRequestHandler):
-    last_request = None
-    maxretries = 10
-
-    def do_GET(self):  # pylint: disable=too-many-branches,too-many-statements
-        # check validity and extract the timestamp
-        url = "http://snapshot.debian.org/" + self.path
-        start = None
-        state = ""
-        written = 0
-        for retrynum in range(self.maxretries):
-            try:
-                c = pycurl.Curl()
-                c.setopt(c.URL, url)
-                # even 100 kB/s is too much sometimes
-                c.setopt(c.MAX_RECV_SPEED_LARGE, 1000 * 1024)  # bytes per second
-                c.setopt(c.CONNECTTIMEOUT, 30)  # the default is 300
-                # sometimes, curl stalls forever and even ctrl+c doesn't work
-                start = time.time()
-
-                def progress(*_):
-                    # a download must not last more than 10 minutes
-                    # with 100 kB/s this means files cannot be larger than 62MB
-                    if time.time() - start > 10 * 60:
-                        print("transfer took too long")
-                        # the code will not see this exception but instead get a
-                        # pycurl.error
-                        raise MyHTTPTimeoutException(url)
-
-                c.setopt(pycurl.NOPROGRESS, 0)
-                c.setopt(pycurl.XFERINFOFUNCTION, progress)
-                # $ host snapshot.debian.org
-                # snapshot.debian.org has address 185.17.185.185
-                # snapshot.debian.org has address 193.62.202.27
-                # c.setopt(c.RESOLVE, ["snapshot.debian.org:80:185.17.185.185"])
-                if written > 0:
-                    c.setopt(pycurl.RESUME_FROM, written)
-
-                def writer_cb(data):
-                    assert state == "headers sent", state
-                    nonlocal written
-                    written += len(data)
-                    return self.wfile.write(data)
-
-                c.setopt(c.WRITEFUNCTION, writer_cb)
-
-                # using a header callback allows us to send headers of our own
-                # with the correct content-length value out without having to
-                # wait for perform() to finish
-                def header_cb(line):
-                    nonlocal state
-                    # if this is a retry, then the headers have already been
-                    # sent and there is nothing to do
-                    if state == "headers sent":
-                        return
-                    # HTTP standard specifies that headers are encoded in iso-8859-1
-                    line = line.decode("iso-8859-1").rstrip()
-                    # the first try must be a http 200
-                    if line == "HTTP/1.1 200 OK":
-                        assert state == ""
-                        self.send_response(HTTPStatus.OK)
-                        state = "http200 sent"
-                        return
-                    # the header is done
-                    if line == "":
-                        assert state == "length sent"
-                        self.end_headers()
-                        state = "headers sent"
-                        return
-                    field, value = line.split(":", 1)
-                    field = field.strip().lower()
-                    value = value.strip()
-                    # we are only interested in content-length
-                    if field != "content-length":
-                        return
-                    assert state == "http200 sent"
-                    self.send_header("Content-Length", value)
-                    state = "length sent"
-
-                c.setopt(c.HEADERFUNCTION, header_cb)
-                c.perform()
-                if c.getinfo(c.RESPONSE_CODE) == 404:
-                    raise MyHTTP404Exception(f"got HTTP 404 for {url}")
-                if c.getinfo(c.RESPONSE_CODE) not in [200, 206]:
-                    raise MyHTTPException(
-                        f"got HTTP {c.getinfo(c.RESPONSE_CODE)} for {url}"
-                    )
-                c.close()
-                # if the requests finished too quickly, sleep the remaining time
-                # s/r  r/h
-                # 3    1020
-                # 2.5  1384
-                # 2.4  1408
-                # 2    1466
-                # 1.5  2267
-                seconds_per_request = 1.5
-                if self.last_request is not None:
-                    sleep_time = seconds_per_request - (time.time() - self.last_request)
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
-                self.last_request = time.time()
-                break
-            except pycurl.error as e:
-                code, _ = e.args
-                if code in [
-                    pycurl.E_PARTIAL_FILE,
-                    pycurl.E_COULDNT_CONNECT,
-                    pycurl.E_ABORTED_BY_CALLBACK,
-                ]:
-                    if retrynum == self.maxretries - 1:
-                        break
-                    if code == pycurl.E_ABORTED_BY_CALLBACK:
-                        # callback was aborted due to timeout
-                        pass
-                    sleep_time = 4 ** (retrynum + 1)
-                    print(f"retrying after {sleep_time} s...")
-                    time.sleep(sleep_time)
-                    continue
-                raise
-            except MyHTTPException as e:
-                print("got HTTP error:", repr(e))
-                if retrynum == self.maxretries - 1:
-                    break
-                sleep_time = 4 ** (retrynum + 1)
-                print(f"retrying after {sleep_time} s...")
-                time.sleep(sleep_time)
-                # restart from the beginning or otherwise, the result might
-                # include a varnish cache error message
-        else:
-            raise RetryCountExceeded("failed too often...")
 
 
 @dataclasses.dataclass
@@ -259,13 +126,13 @@ def parse_pkgs(val):
     return [pkgs]
 
 
-def parse_args(args: list[str]) -> argparse.Namespace:
+def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""\
 
-Combines debootstrap and snapshot.debian.org to create a chroot with exact
-package versions from the past either to reproduce bugs or to test source
+Combines debootstrap and snapshot.debian.org to create a chroot tarball with
+exact package versions from the past either to reproduce bugs or to test source
 package reproducibility.
 
 To obtain a list of packages run the following command on one machine:
@@ -286,11 +153,14 @@ On one system run:
 
 Then copy over "pkglist" and on another system run:
 
-    $ debootsnap --pkgs=./pkglist chroot.tar
+    $ debootsnap --pkgs=./pkglist > ./chroot.tar
 
 Or use a buildinfo file as input:
 
-    $ debootsnap --buildinfo=./package.buildinfo chroot.tar
+    $ debootsnap --buildinfo=./package.buildinfo > ./chroot.tar
+
+A tarball of a chroot with precisely the requested package versions then be
+found in the file `./chroot.tar`.
 
 """,
     )
@@ -307,6 +177,17 @@ Or use a buildinfo file as input:
         help="only warn about packages that cannot be found on "
         "snapshot.debian.org instead of exiting",
     )
+    parser.add_argument(
+        "--cache", help="cache directory -- by default $TMPDIR is used", type=str
+    )
+    parser.add_argument(
+        "--port",
+        help="manually choose port number for the apt cache instead of "
+        "automatically choosing a free port",
+        type=int,
+        default=0,
+    )
+    parser.add_argument("--nocache", help="disable cache", action="store_true")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "--buildinfo",
@@ -328,16 +209,20 @@ Or use a buildinfo file as input:
         "trailing illegal characters are allowed. Example: "
         "pkg1:arch=ver1,pkg2:arch=ver2",
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--sources-list-only",
         action="store_true",
         help="only query metasnap.debian.net and print the sources.list "
         "needed to create chroot and exit",
     )
-    parser.add_argument(
-        "output", nargs="?", default="-", help="path to output chroot tarball"
+    group.add_argument(
+        "output",
+        nargs="?",
+        default="-",
+        help="path to output chroot tarball",
     )
-    return parser.parse_args(args)
+    return parser
 
 
 def query_metasnap(pkgsleft, archive, nativearch):
@@ -443,6 +328,24 @@ def compute_sources(pkgs, nativearch, ignore_notfound) -> list[Source]:
     return sources
 
 
+def create_install_hook(tmpdirname, deb_files):
+    # manually feed apt install the complete package list
+    # to be sure that the apt solver did not change it.
+    hook = pathlib.Path(tmpdirname) / "apt_install.sh"
+    hook.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                "cat << END | APT_CONFIG=$MMDEBSTRAP_APT_CONFIG"
+                " xargs apt-get install --yes",
+                "\n".join(deb_files),
+                "END",
+            ]
+        )
+    )
+    hook.chmod(0o755)
+
+
 def create_repo(tmpdirname, pkgs):
     with open(tmpdirname + "/control", "w", encoding="utf8") as f:
 
@@ -454,7 +357,13 @@ def create_repo(tmpdirname, pkgs):
         f.write("Package: debootsnap-dummy\n")
         f.write(f"Depends: {', '.join([pkg2name(*pkg) for pkg in pkgs])}\n")
     subprocess.check_call(
-        ["equivs-build", tmpdirname + "/control"], cwd=tmpdirname + "/cache"
+        ["equivs-build", tmpdirname + "/control"],
+        cwd=tmpdirname + "/cache",
+        # equivs-build behaves differently depending on whether TMPDIR is set
+        # or not, so to force the same behaviour independent on whether the
+        # user has TMPDIR set, we set or override that variable with our own
+        # (which is a path below the user's $TMPDIR anyways, if it was set)
+        env={**os.environ, "TMPDIR": tmpdirname + "/cache"},
     )
 
     packages_content = subprocess.check_output(
@@ -511,7 +420,11 @@ def run_mmdebstrap(
             f"--architectures={','.join([nativearch] + list(foreignarches))}",
             "--variant=essential",
             "--include=debootsnap-dummy",
+            "--format=tar",
+            "--skip=cleanup/reproducible",
             '--aptopt=Apt::Key::gpgvcommand "/usr/libexec/mmdebstrap/gpgvnoexpkeysig"',
+            "--hook-dir=/usr/share/mmdebstrap/hooks/maybe-merged-usr",
+            f"--customize={tmpdirname}/apt_install.sh",
             '--customize-hook=chroot "$1" dpkg -r debootsnap-dummy',
             '--customize-hook=chroot "$1" dpkg-query --showformat '
             "'${binary:Package}=${Version}\\n' --show > \"$1/pkglist\"",
@@ -537,31 +450,16 @@ def run_mmdebstrap(
     return newpkgs
 
 
-@contextmanager
-def proxy_snapshot(tmpdirname):
-    httpd = socketserver.TCPServer(
-        # the default address family for socketserver is AF_INET so we
-        # explicitly bind to ipv4 localhost
-        ("localhost", 0),
-        partial(Proxy, directory=tmpdirname + "/cache"),
-    )
-    # run server in a new thread
-    server_thread = threading.Thread(target=httpd.serve_forever)
-    server_thread.daemon = True
-    # start thread
-    server_thread.start()
-    # retrieve port (in case it was generated automatically)
-    _, port = httpd.server_address
-    try:
-        yield port
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-        server_thread.join()
-
-
+# pylint: disable=too-many-locals
 def download_packages(
-    tmpdirname, sources: list[Source], pkgs, nativearch, foreignarches
+    tmpdirname,
+    sources: list[Source],
+    pkgs,
+    nativearch,
+    foreignarches,
+    cache,
+    nocache,
+    port,
 ):
     for d in [
         "/etc/apt/apt.conf.d",
@@ -593,59 +491,79 @@ def download_packages(
 
     os.makedirs(tmpdirname + "/cache")
 
-    with proxy_snapshot(tmpdirname) as port:
-        with open(tmpdirname + "/etc/apt/sources.list", "w", encoding="utf8") as f:
-            for source in sources:
-                f.write(source.deb_line(f"localhost:{port}"))
-        subprocess.check_call(
-            ["apt-get", "update", "--error-on=any"],
-            env={"APT_CONFIG": tmpdirname + "/apt.conf"},
-        )
-        for i, nav in enumerate(pkgs):
-            print(f"{i + 1} of {len(pkgs)}")
-            with tempfile.TemporaryDirectory() as tmpdir2:
-                subprocess.check_call(
-                    ["apt-get", "download", "--yes", f"{nav[0]}:{nav[1]}={nav[2]}"],
-                    cwd=tmpdir2,
-                    env={"APT_CONFIG": tmpdirname + "/apt.conf"},
-                )
-                debs = os.listdir(tmpdir2)
-                assert len(debs) == 1
-                # Normalize the package name to how it appears in the archive.
-                # Mainly this removes the epoch from the filename, see
-                # https://bugs.debian.org/645895
-                # This avoids apt bugs connected with a percent sign in the
-                # filename as they occasionally appear, for example as
-                # introduced in apt 2.1.15 and later fixed by DonKult:
-                # https://salsa.debian.org/apt-team/apt/-/merge_requests/175
-                subprocess.check_call(["dpkg-name", tmpdir2 + "/" + debs[0]])
-                debs = os.listdir(tmpdir2)
-                assert len(debs) == 1
-                shutil.move(tmpdir2 + "/" + debs[0], tmpdirname + "/cache")
+    apt_env = {"APT_CONFIG": tmpdirname + "/apt.conf"}
+    if not nocache:
+        port, teardown = setupcache(cache, port)
+        apt_env["http_proxy"] = f"http://127.0.0.1:{port}"
+        atexit.register(teardown)
+
+    with open(tmpdirname + "/etc/apt/sources.list", "w", encoding="utf8") as f:
+        for source in sources:
+            f.write(source.deb_line("snapshot.debian.org"))
+    subprocess.check_call(["apt-get", "update", "--error-on=any"], env=apt_env)
+
+    deb_files = []
+    cache = pathlib.Path(tmpdirname, "cache")
+    for i, (name, arch, version) in enumerate(pkgs):
+        pkg = f"{name}:{arch}={version}"
+        print(f"Downloading dependency {i + 1} of {len(pkgs)}: {pkg}")
+        with tempfile.TemporaryDirectory() as tmpdir2:
+            subprocess.check_call(
+                ["apt-get", "download", "--yes", pkg],
+                cwd=tmpdir2,
+                env=apt_env,
+            )
+            debs = os.listdir(tmpdir2)
+            assert len(debs) == 1
+            # Normalize the package name to how it appears in the archive.
+            # Mainly this removes the epoch from the filename, see
+            # https://bugs.debian.org/645895
+            # This avoids apt bugs connected with a percent sign in the
+            # filename as they occasionally appear, for example as
+            # introduced in apt 2.1.15 and later fixed by DonKult:
+            # https://salsa.debian.org/apt-team/apt/-/merge_requests/175
+            subprocess.check_call(["dpkg-name", tmpdir2 + "/" + debs[0]])
+            debs = os.listdir(tmpdir2)
+            assert len(debs) == 1
+            shutil.move(tmpdir2 + "/" + debs[0], cache)
+            deb_files.append((cache / debs[0]).as_posix())
+    return deb_files
+
+
+def handle_packages(architecture, packages):
+    pkgs = [v for sublist in packages for v in sublist]
+    if architecture is None:
+        arches = {a for _, a, _ in pkgs if a is not None}
+        if len(arches) == 0:
+            print("packages are not architecture qualified", file=sys.stderr)
+            print("use --architecture to set the native architecture", file=sys.stderr)
+            sys.exit(1)
+        elif len(arches) > 1:
+            print("more than one architecture in the package list", file=sys.stderr)
+            print("use --architecture to set the native architecture", file=sys.stderr)
+            sys.exit(1)
+        nativearch = arches.pop()
+        assert arches == set()
+    else:
+        nativearch = architecture
+    return pkgs, nativearch
 
 
 def main(arguments: list[str]) -> None:
-    args = parse_args(arguments)
+    parser = get_parser()
+    args = parser.parse_args(arguments)
+
+    if not args.sources_list_only and args.output == "-" and sys.stdout.isatty():
+        parser.print_usage()
+        print(
+            "E: Refusing to write tarball to interactive tty. "
+            "Redirect stdout to a file or pass the output tarball filename "
+            "as the positional argument [output]."
+        )
+        sys.exit(1)
+
     if args.packages:
-        pkgs = [v for sublist in args.packages for v in sublist]
-        if args.architecture is None:
-            arches = {a for _, a, _ in pkgs if a is not None}
-            if len(arches) == 0:
-                print("packages are not architecture qualified", file=sys.stderr)
-                print(
-                    "use --architecture to set the native architecture", file=sys.stderr
-                )
-                sys.exit(1)
-            elif len(arches) > 1:
-                print("more than one architecture in the package list", file=sys.stderr)
-                print(
-                    "use --architecture to set the native architecture", file=sys.stderr
-                )
-                sys.exit(1)
-            nativearch = arches.pop()
-            assert arches == set()
-        else:
-            nativearch = args.architecture
+        pkgs, nativearch = handle_packages(args.architecture, args.packages)
     else:
         pkgs, nativearch = args.buildinfo
     # unknown architectures are the native architecture
@@ -677,7 +595,21 @@ def main(arguments: list[str]) -> None:
         sys.exit(0)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        download_packages(tmpdirname, sources, pkgs, nativearch, foreignarches)
+        # chmod so mmdebstrap can run the generated install hook
+        os.chmod(tmpdirname, 0o711)
+
+        deb_files = download_packages(
+            tmpdirname,
+            sources,
+            pkgs,
+            nativearch,
+            foreignarches,
+            args.cache,
+            args.nocache,
+            args.port,
+        )
+
+        create_install_hook(tmpdirname, deb_files)
 
         create_repo(tmpdirname, pkgs)
 
@@ -687,7 +619,20 @@ def main(arguments: list[str]) -> None:
 
     # make sure that the installed packages match the requested package
     # list
-    assert set(newpkgs) == set(pkgs)
+    if set(newpkgs) != set(pkgs):
+        diff = "\n".join(
+            difflib.unified_diff(
+                ["_".join(pkg) for pkg in sorted(pkgs)],
+                ["_".join(pkg) for pkg in sorted(newpkgs)],
+                fromfile="buildinfo",
+                tofile="bootstrapped",
+                lineterm="",
+            )
+        )
+        raise AssertionError(
+            "environment bootstrapped from buildinfo file does not match "
+            "environment in buildinfo file:\n\n" + diff
+        )
 
 
 if __name__ == "__main__":

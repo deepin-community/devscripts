@@ -1,0 +1,4 @@
+# test data
+very-long-line-length-in-source-file 805 > 512 [test/debsign/sphinx_5.3.0-4.dsc:15]
+very-long-line-length-in-source-file 561 > 512 [test/dd-list/sources:148]
+very-long-line-length-in-source-file 981 > 512 [test/mergechanges/linux_4.9.161-1_amd64.changes:10]

@@ -30,11 +30,7 @@ GPG=gpg
 GPGHOME=$(mktemp -d -p /tmp gpg.XXXXX)
 if ! command -v $GPG >/dev/null 2>&1; then
 	echo "$GPG missing"
-	GPG=gpg2
-	if ! command -v $GPG >/dev/null 2>&1; then
-		echo "$GPG missing"
-		exit 1
-	fi
+	exit 1
 fi
 
 oneTimeSetUp () {

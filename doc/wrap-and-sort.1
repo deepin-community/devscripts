@@ -35,35 +35,31 @@ This script should be run in the root of a Debian package tree. It searches for
 .SH OPTIONS
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-Show this help message and exit.
+Show this help message and exit. Will also print the default values for
+the options below.
 .TP
-\fB\-a\fR, \fB\-\-wrap\-always\fR
+\fB\-a\fR, \fB\-\-[no\-]wrap\-always\fR
 Wrap all package lists in the Debian \fIcontrol\fR file
 even if they do not exceed the line length limit and could fit in one line.
 .TP
-\fB\-s\fR, \fB\-\-short\-indent\fR
-Only indent wrapped lines by one space (default is in\-line with the
-field name).
+\fB\-s\fR, \fB\-\-[no\-]short\-indent\fR
+Indent wrapped lines by a single space, instead of in\-line with the
+field name.
 .TP
-\fB\-b\fR, \fB\-\-sort\-binary\-packages\fR
+\fB\-b\fR, \fB\-\-[no\-]sort\-binary\-packages\fR
 Sort binary package paragraphs by name.
 .TP
-\fB\-k\fR, \fB\-\-keep\-first\fR
+\fB\-k\fR, \fB\-\-[no-]keep\-first\fR
 When sorting binary package paragraphs, leave the first one at the top.
 
 Unqualified
 .BR debhelper (7)
 configuration files are applied to the first package.
 .TP
-
-\fB\-\-no\-keep\-first\fR
-When sorting binary package paragraphs, do not treat the first package
-specially (opposite of \-\-keep\-first)
+\fB\-n\fR, \fB\-\-[no\-]cleanup\fR
+Remove trailing whitespaces.
 .TP
-\fB\-n\fR, \fB\-\-no\-cleanup\fR
-Do not remove trailing whitespaces.
-.TP
-\fB\-t\fR, \fB\-\-trailing\-comma\fR
+\fB\-t\fR, \fB\-\-[no\-]trailing\-comma\fR
 Add a trailing comma at the end of the sorted fields.
 This minimizes future differences in the VCS commits when additional
 dependencies are appended or removed.

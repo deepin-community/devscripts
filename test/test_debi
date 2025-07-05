@@ -40,8 +40,8 @@ use warnings;
 use Cwd qw(getcwd);
 use Digest::MD5;
 use Digest::SHA;
+use Dpkg::IPC;
 use File::Temp qw(tempdir);
-use IPC::Run qw(run);
 use Test::More;
 
 use Dpkg::Control;
@@ -58,10 +58,17 @@ else {
     $ENV{PATH} = "$top_srcdir/scripts:$ENV{PATH}";
 }
 
-sub verbose_run {
-    my $argv = shift;
-    diag("Running: @{$argv}");
-    my $ret = run($argv, @_);
+sub run {
+    my ($argv, %opts) = @_;
+    diag("Running: @{$argv}") if $opts{verbose};
+    delete $opts{verbose};
+    spawn(
+        %opts,
+        exec       => $argv,
+        wait_child => 1,
+        nocheck    => 1,
+    );
+    my $ret = $? == 0;
     if ($ret) {
         diag("=> success");
     } else {
@@ -70,10 +77,15 @@ sub verbose_run {
     return $ret;
 }
 
+sub verbose_run {
+    my ($argv, %opts) = @_;
+    return run($argv, verbose => 1, %opts);
+}
+
 sub capture {
     my $output;
     my $argv = shift;
-    ok(verbose_run($argv, '>', \$output), "@{$argv}");
+    ok(verbose_run($argv, to_string => \$output), "@{$argv}");
     chomp $output;
     return $output;
 }
@@ -149,7 +161,7 @@ sub version_of {
     my $output;
     my $ignored;
     run(['dpkg-query', '-W', '-f', '${Version}', shift],
-        '>', \$output, '2>', \$ignored);
+        to_string => \$output, error_to_string => \$ignored);
     chomp $output;
     return $output;
 }
@@ -158,7 +170,7 @@ sub status_of {
     my $output;
     my $ignored;
     run(['dpkg-query', '-W', '-f', '${Status}', shift],
-        '>', \$output, '2>', \$ignored);
+        to_string => \$output, error_to_string => \$ignored);
     chomp $output;
     return $output;
 }

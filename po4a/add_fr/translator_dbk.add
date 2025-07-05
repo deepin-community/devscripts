@@ -4,8 +4,9 @@ PO4A-HEADER:mode=after;position=AUTEUR;endboundary=</refsect1>
     <title>TRADUCTION</title>
 
     <para>
-      Cette page de manuel a été traduite par Cyril Brulebois,
-      Thomas Huriaux et David Prévot.
+      Cette page de manuel a été traduite et revue par un ou plusieurs
+      traducteurs dont Cyril Brulebois, Thomas Huriaux, David Prévot et
+      Xavier Guimard.
     </para>
 
     <para>
@@ -20,7 +21,7 @@ PO4A-HEADER:mode=after;position=AUTEUR;endboundary=</refsect1>
     </para>
 
     <para>
-      N'hésitez pas à signaler à l'auteur ou à la liste de traduction
+      Nʼhésitez pas à signaler à lʼauteur ou à la liste de traduction
       <email>debian-l10-french@lists.debian.org</email>
       selon le cas, toute erreur dans cette page de manuel.
     </para>

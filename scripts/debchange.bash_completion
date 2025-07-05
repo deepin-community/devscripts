@@ -29,8 +29,6 @@ _debchange()
     stable_codename='bookworm'
     testing_codename='trixie'
 
-    lts='buster-lts'
-
     distro="oldstable-security oldstable-proposed-updates\
             "$oldstable_codename"-security\
             "$oldstable_codename"-backports\
@@ -41,7 +39,7 @@ _debchange()
             "$stable_codename"-updates\
             testing-security testing-proposed-updates\
             "$testing_codename"-security\
-            unstable experimental $lts"
+            unstable experimental"
 
     urgency='low medium high critical'
 

@@ -223,7 +223,7 @@ __DATA__
 # file ~/.namecheckrc with your own contents in the same format.
 #
 http://%s.tuxfamily.org/             | Not Found
-http://freshmeat.net/projects/%s     | We encounted an error
+http://freshmeat.net/projects/%s     | We encountered an error
 http://launchpad.net/%s              | no page with this address
 http://savannah.gnu.org/projects/%s  | Invalid Group
 http://sourceforge.net/projects/%s   | Invalid Project

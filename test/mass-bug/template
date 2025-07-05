@@ -16,5 +16,7 @@ wrapped.
 
 #PACKAGE# reassembled=#EPOCH##UPSTREAM_VERSION##REVISION#
 
+#INCLUDE#
+
 -- 
 This signature does not get word-wrapped because it is a signature, even though it is longer than a line ought to be.

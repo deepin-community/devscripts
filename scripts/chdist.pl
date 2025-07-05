@@ -23,6 +23,13 @@ chdist - script to easily play with several distributions
 
 B<chdist> [I<options>] [I<command>] [I<command parameters>]
 
+B<chdist> [I<options>] I<DIST> I<command> [I<command parameters>]
+
+The second syntax is accepted when the I<DIST> does not match
+one of the known commands from the list below (see L</COMMANDS>).
+Then the I<command> may be any program available on the system
+and anything based on apt will be using the I<DIST> apt data.
+
 =head1 DESCRIPTION
 
 B<chdist> is a rewrite of what used to be known as 'MultiDistroTools'
@@ -79,6 +86,13 @@ Run B<apt-file> inside I<DIST>
 =item B<apt-rdepends> I<DIST> [...]
 
 Run B<apt-rdepends> inside I<DIST>
+
+=item B<build-rdeps> I<DIST> [...]
+
+Run B<build-rdeps> inside I<DIST>.
+When the I<DIST> origin and suite/codename
+differ from the system origin and suite/codename
+then they need to be set using B<build-rdeps> options.
 
 =item B<aptitude> I<DIST> [...]
 
@@ -140,8 +154,6 @@ License, or (at your option) any later version.
 
 use strict;
 use warnings;
-no if $] >= 5.018, 'warnings', 'experimental::smartmatch';
-use feature 'switch';
 use File::Copy qw(cp);
 use File::HomeDir;
 use File::Path qw(make_path);
@@ -423,6 +435,7 @@ EOF
     foreach my $keyring (
         qw(debian-archive-keyring.gpg
         debian-archive-removed-keys.gpg
+        kali-archive-keyring.gpg
         ubuntu-archive-keyring.gpg
         ubuntu-archive-removed-keys.gpg)
     ) {
@@ -707,72 +720,70 @@ sub parseFile {
 my $recursed = 0;
 MAIN:
 my $command = shift @ARGV;
-given ($command) {
-    when ('create') {
-        dist_create(@ARGV);
-    }
-    when ('apt') {
-        aptcmd('apt', @ARGV);
-    }
-    when ('apt-get') {
-        aptcmd('apt-get', @ARGV);
-    }
-    when ('apt-cache') {
-        aptcmd('apt-cache', @ARGV);
-    }
-    when ('apt-file') {
-        apt_file(@ARGV);
-    }
-    when ('apt-rdepends') {
-        aptcmd('apt-rdepends', @ARGV);
-    }
-    when ('aptitude') {
-        aptcmd('aptitude', @ARGV);
-    }
-    when ('bin2src') {
-        bin2src(@ARGV);
-    }
-    when ('src2bin') {
-        src2bin(@ARGV);
-    }
-    when ('compare-packages') {
-        dist_compare(@ARGV, 0, 'Sources');
-    }
-    when ('compare-bin-packages') {
-        dist_compare(@ARGV, 0, 'Packages');
-    }
-    when ('compare-versions') {
-        dist_compare(@ARGV, 1, 'Sources');
-    }
-    when ('compare-bin-versions') {
-        dist_compare(@ARGV, 1, 'Packages');
-    }
-    when ('grep-dctrl-packages') {
-        grep_file(@ARGV, 'Packages');
-    }
-    when ('grep-dctrl-sources') {
-        grep_file(@ARGV, 'Sources');
-    }
-    when ('compare-src-bin-packages') {
-        compare_src_bin(@ARGV, 0);
-    }
-    when ('compare-src-bin-versions') {
-        compare_src_bin(@ARGV, 1);
-    }
-    when ('list') {
-        list;
-    }
-    default {
-        my $dist = $command;
-        my $dir  = "$datadir/$dist";
-        if (-d $dir && !$recursed) {
-            splice @ARGV, 1, 0, $dist;
-            $recursed = 1;
-            goto MAIN;
-        } elsif ($dist && !$recursed) {
-            dist_check($dist);
+usage(1) unless $command;
+if ($command eq 'create') {
+    dist_create(@ARGV);
+} elsif ($command eq 'apt') {
+    aptcmd('apt', @ARGV);
+} elsif ($command eq 'apt-get') {
+    aptcmd('apt-get', @ARGV);
+} elsif ($command eq 'apt-cache') {
+    aptcmd('apt-cache', @ARGV);
+} elsif ($command eq 'apt-file') {
+    apt_file(@ARGV);
+} elsif ($command eq 'apt-rdepends') {
+    aptcmd('apt-rdepends', @ARGV);
+} elsif ($command eq 'build-rdeps') {
+    aptcmd('build-rdeps', @ARGV);
+} elsif ($command eq 'aptitude') {
+    aptcmd('aptitude', @ARGV);
+} elsif ($command eq 'synaptic') {
+    $ENV{PATH} .= ':/usr/sbin';
+    aptcmd('synaptic', @ARGV);
+} elsif ($command eq 'bin2src') {
+    bin2src(@ARGV);
+} elsif ($command eq 'src2bin') {
+    src2bin(@ARGV);
+} elsif ($command eq 'compare-packages') {
+    dist_compare(@ARGV, 0, 'Sources');
+} elsif ($command eq 'compare-bin-packages') {
+    dist_compare(@ARGV, 0, 'Packages');
+} elsif ($command eq 'compare-versions') {
+    dist_compare(@ARGV, 1, 'Sources');
+} elsif ($command eq 'compare-bin-versions') {
+    dist_compare(@ARGV, 1, 'Packages');
+} elsif ($command eq 'grep-dctrl-packages') {
+    grep_file(@ARGV, 'Packages');
+} elsif ($command eq 'grep-dctrl-sources') {
+    grep_file(@ARGV, 'Sources');
+} elsif ($command eq 'compare-src-bin-packages') {
+    compare_src_bin(@ARGV, 0);
+} elsif ($command eq 'compare-src-bin-versions') {
+    compare_src_bin(@ARGV, 1);
+} elsif ($command eq 'list') {
+    list;
+} else {
+    my $dist = $recursed ? shift @ARGV : $command;
+    $command = $recursed ? $command : shift @ARGV;
+    if ($dist) {
+        my $dir = "$datadir/$dist";
+        if (-d $dir) {
+            if (!$recursed) {
+                unshift @ARGV, $dist;
+                unshift @ARGV, $command;
+                $recursed = 1;
+                goto MAIN;
+            } else {
+                aptcmd($command, $dist, @ARGV);
+            }
         } else {
-            usage(1);
+            if ($command eq 'create') {
+                dist_create($dist, @ARGV);
+            } else {
+                dist_check($dist);
+            }
         }
+    } else {
+        usage(1);
     }
 }

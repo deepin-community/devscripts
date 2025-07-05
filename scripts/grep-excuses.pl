@@ -23,6 +23,7 @@ use 5.006;
 use strict;
 use warnings;
 use Data::Dumper;
+use Dpkg::Path qw(find_command);
 use File::Basename;
 use File::HomeDir;
 
@@ -123,7 +124,7 @@ sub wipnity {
 
     my $columns = Term::Size::chars();
 
-    if (system("command -v w3m >/dev/null 2>&1") != 0) {
+    if (!find_command('w3m')) {
         die
           "$progname: wipnity mode requires the w3m package to be installed\n";
     }
@@ -230,7 +231,7 @@ if (@ARGV) {
     die "$progname: too many arguments!  Try $progname --help for help.\n";
 }
 
-if (system("command -v wget >/dev/null 2>&1") != 0) {
+if (!find_command('wget')) {
     die "$progname: this program requires the wget package to be installed\n";
 }
 
@@ -318,10 +319,10 @@ sub grep_autoremovals () {
 
 grep_autoremovals() if $do_autoremovals;
 
-require_friendly qw(YAML::Syck);
+require_friendly qw(YAML::XS);
 {
     no warnings 'once';
-    $YAML::Syck::LoadBlessed = 0;
+    $YAML::XS::LoadBlessed = 0;
 }
 
 print DEBUG "Fetching $url\n";
@@ -364,7 +365,7 @@ sub print_migration_excuse_info ($;$) {
     }
 }
 
-my $excuses = YAML::Syck::Load($yaml);
+my $excuses = YAML::XS::Load($yaml);
 for my $source (@{ $excuses->{sources} }) {
     if (
         $source->{'item-name'} eq $string

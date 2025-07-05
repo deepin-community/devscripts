@@ -38,11 +38,7 @@ GPGHOME=$(mktemp -d -t gpg.XXXXX)
 GPG=gpg
 if ! command -v $GPG >/dev/null 2>&1; then
     echo "$GPG missing"
-    GPG=gpg2
-    if ! command -v $GPG >/dev/null 2>&1; then
-        echo "$GPG missing"
-        exit 1
-    fi
+    exit 1
 fi
 
 PRIVATE_KEY=$test_dir/uscan/PRIVATE_KEY.asc
@@ -84,10 +80,9 @@ oneTimeSetUp () {
     chronic_sh $GPG -v --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
         --output "$PUBLIC_KEYRING" --dearmor "$PUBLIC_KEY"
 
-    echo "Using test gpg key:"
+    echo "Using test OpenPGP key:"
     $GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
-        --secret-keyring "$PRIVATE_KEYRING" --default-key \
-        CF218F0E7EABF584B7E20402C77E2D6872543FAF \
+        --default-key CF218F0E7EABF584B7E20402C77E2D6872543FAF \
         --list-keys --verbose
 
     export GNUPGHOME=$GPGHOME

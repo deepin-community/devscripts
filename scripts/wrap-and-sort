@@ -50,11 +50,14 @@ CONTROL_LIST_FIELDS = (
     "Conflicts",
     "Depends",
     "Enhances",
+    "Features",
     "Pre-Depends",
     "Provides",
     "Recommends",
     "Replaces",
+    "Restrictions",
     "Suggests",
+    "Tests",
     "Xb-Npp-MimeType",
 )
 
@@ -82,6 +85,18 @@ SUPPORTED_FILES = (
     "*.manpages",
     "tests/control",
 )
+
+BUILD_SYSTEMS = (
+    "cdbs",
+    "debhelper-compat",
+    "debhelper",
+    "debputy",
+    "dh-.*",
+    "dpkg-build-api",
+    "dpkg-dev",
+)
+
+BUILD_SYSTEMS_RE = re.compile("(" + "|".join(BUILD_SYSTEMS) + ")")
 
 
 def erase_and_write(file_ob, data):
@@ -309,9 +324,17 @@ def sort_list(unsorted_list):
 
 
 def _sort_packages_key(package):
-    # Sort dependencies starting with a "real" package name before ones starting
-    # with a substvar
-    return 0 if re.match("[a-z0-9]", package) else 1, package
+    if re.match(BUILD_SYSTEMS_RE, package):
+        # Sort build-system related packages first.
+        group_order = -1
+    elif not re.match("[a-z0-9]", package):
+        # Sort dependencies without a "real" package name (e.g. substvars)
+        # last.
+        group_order = 1
+    else:
+        group_order = 0
+
+    return (group_order, package)
 
 
 def wrap_and_sort(args):
@@ -372,13 +395,16 @@ def get_files(debian_directory):
 def main():
     script_name = os.path.basename(sys.argv[0])
     epilog = f"See {script_name}(1) for more info."
-    parser = argparse.ArgumentParser(epilog=epilog)
+    parser = argparse.ArgumentParser(
+        epilog=epilog,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     # Remember to keep doc/wrap-and-sort.1 updated!
     parser.add_argument(
         "-a",
         "--wrap-always",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
         help="wrap lists even if they do not exceed the line length limit",
     )
@@ -386,44 +412,32 @@ def main():
         "-s",
         "--short-indent",
         dest="short_indent",
-        help="only indent wrapped lines by one space"
-        " (default is in-line with the field name)",
-        action="store_true",
+        help="only indent wrapped lines by one space",
+        action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(
         "-b",
         "--sort-binary-packages",
-        help="Sort binary package paragraphs by name",
+        help="sort binary package paragraphs by name",
         dest="sort_binary_packages",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(
         "-k",
         "--keep-first",
-        help="When sorting binary package paragraphs, leave the first one at the top."
-        " Unqualified debhelper configuration files are applied to the first package.",
+        help="when sorting binary packages, leave the first one at the top",
         dest="keep_first",
-        action="store_true",
-        default=True,
-    )
-    parser.add_argument(
-        "--no-keep-first",
-        help="When sorting binary package paragraphs, do not treat the first"
-        " binary package specially. This may cause Unqualified debhelper"
-        " configuration files to be applied to a different package than"
-        " originally intended",
-        dest="keep_first",
-        action="store_false",
+        action=argparse.BooleanOptionalAction,
         default=True,
     )
     parser.add_argument(
         "-n",
-        "--no-cleanup",
-        help="do not remove trailing whitespaces",
+        "--cleanup",
+        help="remove trailing whitespaces",
         dest="cleanup",
-        action="store_false",
+        action=argparse.BooleanOptionalAction,
         default=True,
     )
     parser.add_argument(
@@ -431,14 +445,14 @@ def main():
         "--trailing-comma",
         help="add trailing comma",
         dest="trailing_comma",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(
         "-d",
         "--debian-directory",
         dest="debian_directory",
-        help="location of the 'debian' directory (default: ./debian)",
+        help="location of the 'debian' directory",
         metavar="PATH",
         default="debian",
     )
@@ -449,7 +463,7 @@ def main():
         dest="files",
         action="append",
         default=[],
-        help="Wrap and sort only the specified file.",
+        help="wrap and sort only the specified file",
     )
     parser.add_argument(
         "-v",
@@ -463,7 +477,7 @@ def main():
         "--max-line-length",
         type=int,
         default=79,
-        help="set maximum allowed line length before wrapping (default: %(default)i)",
+        help="set maximum allowed line length before wrapping",
     )
     parser.add_argument(
         "-N",
@@ -479,11 +493,7 @@ def main():
         dest="rts_parser",
         action="store_true",
         default=False,
-        help="Use the round-safe parser, which can preserve most comments. The option"
-        " is here to opt-in to using while the feature matures. Some options are not"
-        " available with this feature. Note this option will eventually be removed."
-        " Please do not include it in scripts / functionality that requires backwards"
-        " compatibility",
+        help=argparse.SUPPRESS,
     )
 
     args = parser.parse_args()
@@ -504,6 +514,14 @@ def main():
         parser.error(f"Specified files not found: {', '.join(not_found)}")
 
     if not args.files:
+        dctrl = os.path.join(args.debian_directory, "control")
+        control = Control(dctrl) if os.path.isfile(dctrl) else None
+        if control is not None and control.uses_different_style_tool:
+            print(
+                "The package declares it style via `X-Style`."
+                " Please use `debputy reformat` instead."
+            )
+            sys.exit(1)
         args.files = get_files(args.debian_directory)
 
     modified_files = wrap_and_sort(args)

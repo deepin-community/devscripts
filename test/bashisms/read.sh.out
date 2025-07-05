@@ -1,0 +1,4 @@
+possible bashism in bashisms/read.sh line 3 (read without variable):
+read
+possible bashism in bashisms/read.sh line 4 (read without variable):
+read -r

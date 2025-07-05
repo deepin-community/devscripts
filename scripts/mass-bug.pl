@@ -51,6 +51,10 @@ The components of the version number may be specified using #EPOCH#,
 #REVISION# the leading dash so that #EPOCH#UPSTREAM_VERSION##REVISION# is
 always the same as #VERSION#.
 
+If B<--include> has been passed, #INCLUDE# is replaced by the contents of
+the named file. This contents is also subject to text wrapping as described
+below.
+
 Note that text in the template will be automatically word-wrapped to 70
 columns, up to the start of a signature (indicated by S<'-- '> at the
 start of a line on its own). This is another reason to avoid including
@@ -123,6 +127,11 @@ Do not wrap the template to lines of 70 characters.
 Do not read any configuration files.  This can only be used as the
 first option given on the command-line.
 
+=item B<--include=FILENAME>
+
+Include the contents of B<FILENAME> in the template, replacing the #INCLUDE#
+placeholder. A %s in B<FILENAME> gets replaced by the current package name.
+
 =item B<--help>
 
 Provide a usage message.
@@ -162,7 +171,8 @@ use warnings;
 use Getopt::Long qw(:config bundling permute no_getopt_compat);
 use Text::Wrap;
 use File::Basename;
-use POSIX qw(locale_h strftime);
+use Dpkg::Path qw(find_command);
+use POSIX      qw(locale_h strftime);
 
 setlocale(LC_TIME, "C");    # so that strftime is locale independent
 
@@ -206,12 +216,18 @@ Valid options are:
    --help                 Display this message
    --version              Display version and copyright info
 
+   --include="PATTERN"    Pattern specifying filename to be included in the
+                          template, replacing #INCLUDE#. %s in the pattern will
+                          be replaced with the package name, e.g.
+                          --include="logs/%s.log"
    <template>             File containing email template; #PACKAGE# will
-                          be replaced by the package name and #VERSION#
-			  with the corresponding version (or a blank
-			  string if the version was not specified)
+                          be replaced by the package name, #VERSION#
+                          with the corresponding version (or a blank
+                          string if the version was not specified),
+                          and #INCLUDE# with the contents of the file
+                          specified by --include (if given).
    <package-list>         File containing list of packages, one per line
-			  in the format package(_version)
+                          in the format package(_version)
 
   Ensure that you read the Developer\'s Reference on mass-filing bugs before
   using this script!
@@ -264,7 +280,7 @@ if (@ARGV and $ARGV[0] =~ /^--no-?conf$/) {
             warn
 "BTS_SENDMAIL_COMMAND contained funny characters: $cmd\nReverting to default value /usr/sbin/sendmail\n";
             $config_vars{'BTS_SENDMAIL_COMMAND'} = '/usr/sbin/sendmail';
-        } elsif (system("command -v $cmd >/dev/null 2>&1") != 0) {
+        } elsif (!find_command($cmd)) {
             warn
 "BTS_SENDMAIL_COMMAND $cmd could not be executed.\nReverting to default value /usr/sbin/sendmail\n";
             $config_vars{'BTS_SENDMAIL_COMMAND'} = '/usr/sbin/sendmail';
@@ -299,6 +315,7 @@ sub gen_bug {
     my $nowrap        = shift;
     my $type          = shift;
     my $control       = shift;
+    my $include       = shift;
     my $version       = "";
     my $bugtext;
 
@@ -309,6 +326,17 @@ sub gen_bug {
     $epoch    ||= "";
     $revision ||= "";
 
+    if ($include) {
+        my $filename = sprintf($include, $package);
+        if (-r $filename) {
+            open(INCLUDE, $filename) or die("Cannot open $filename: $!");
+            my @lines = <INCLUDE>;
+            my $text  = join("", @lines);
+            chomp $text;
+            $template_text =~ s/#INCLUDE#/$text/g;
+            close INCLUDE;
+        }
+    }
     $template_text =~ s/#PACKAGE#/$package/g;
     $template_text =~ s/#VERSION#/$version/g;
     $template_text =~ s/#EPOCH#/$epoch/g;
@@ -369,7 +397,7 @@ EOM
               or die "$progname: error running sendmail: $!\n";
         }
     } else {    # No $from
-        unless (system("command -v mail >/dev/null 2>&1") == 0) {
+        if (!find_command('mail')) {
             die
 "$progname: You need to either specify an email address (say using DEBEMAIL)\n or have the mailx/mailutils package installed to send mail!\n";
         }
@@ -399,7 +427,8 @@ my $usertags = "";
 my @control  = ();
 my $type     = "Package";
 my $opt_sendmail;
-my $nowrap = "";
+my $nowrap  = "";
+my $include = "";
 
 if (
     !GetOptions(
@@ -418,6 +447,7 @@ if (
         "no-wrap"        => sub { $nowrap = 1; },
         'noconf|no-conf' =>
           sub { die '--noconf must come first on the command line' },
+        'include=s' => \$include,
     )
 ) {
     usageerror();
@@ -461,7 +491,7 @@ if ($opt_sendmail) {
             warn
 "--sendmail command contained funny characters: $cmd\nReverting to default value $sendmailcmd\n";
             undef $opt_sendmail;
-        } elsif (system("command -v $cmd >/dev/null 2>&1") != 0) {
+        } elsif (!find_command($cmd)) {
             warn
 "--sendmail command $cmd could not be executed.\nReverting to default value $sendmailcmd\n";
             undef $opt_sendmail;
@@ -504,8 +534,8 @@ sub showsample {
     print "Subject: " . gen_subject($subject, $package) . "\n";
     print "\n";
     print gen_bug(
-        $template_text, $package, $severity, $tags, $user,
-        $usertags,      $nowrap,  $type,     \@control
+        $template_text, $package, $severity, $tags,     $user,
+        $usertags,      $nowrap,  $type,     \@control, $include,
     ) . "\n";
 }
 
@@ -545,9 +575,9 @@ if ($mode eq 'display') {
         mailbts(
             gen_subject($subject, $package),
             gen_bug(
-                $template_text, $package, $severity,
-                $tags,          $user,    $usertags,
-                $nowrap,        $type,    \@control,
+                $template_text, $package,  $severity, $tags,
+                $user,          $usertags, $nowrap,   $type,
+                \@control,      $include,
             ),
             $submission_email,
             $from

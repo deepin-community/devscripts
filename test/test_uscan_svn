@@ -27,7 +27,7 @@ if [ "$DEB_HOST_OS" = "kfreebsd" ]; then
 fi
 DEB_HOST_ARCH="$(dpkg-architecture -qDEB_HOST_ARCH)"
 if [ "$DEB_HOST_ARCH" = "i386" ]; then
-    echo "To \"help\" Ubuntu that has a fondamentally broken i386 (so that we can't depend on svn), this test is simply skipped on i386."
+    echo "To \"help\" Ubuntu that has a fundamentally broken i386 (so that we can't depend on svn), this test is simply skipped on i386."
     exit 0
 fi
 
@@ -147,11 +147,11 @@ helperLaunchFail() {
 testSvn() {
     helperLaunch "pgpmode=none"
     TARBALL="${PKG}_2.0.orig.tar.xz"
-    CHECKSUM=$(sha1sum "$TEMP_PKG_DIR/${PKG}-2.0.tar.xz" | awk '{print $1}')
+    CHECKSUM=$(xz --decompress --stdout "$TEMP_PKG_DIR/${PKG}-2.0.tar.xz" | sha1sum | awk '{print $1}')
     assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
     assertTrue 'pristine tarball is not created' "[ -f '$TEMP_PKG_DIR/$TARBALL' ]"
     assertTrue 'pristine tarball is a symlink' "[ -L '$TEMP_PKG_DIR/$TARBALL' ]"
-    if [ "$CHECKSUM" != 'bd4a60786013848e402bcf20db211fd465afeda5' ]; then
+    if [ "$CHECKSUM" != 'c362837a450fd9d5a8649aa3a23ad863af14bc17' ]; then
         set -x
         echo "Copying the faulty tarball to the artefact directory, if available..."
         if [ -n "${AUTOPKGTEST_ARTIFACTS:-}" ] && [ -d "$AUTOPKGTEST_ARTIFACTS" ]; then
@@ -159,7 +159,7 @@ testSvn() {
         fi
         set +x
     fi
-    assertTrue 'checksums do not match' "[ '${CHECKSUM}' = 'bd4a60786013848e402bcf20db211fd465afeda5' ]"
+    assertTrue 'checksums do not match' "[ '${CHECKSUM}' = 'c362837a450fd9d5a8649aa3a23ad863af14bc17' ]"
     cleanup
 }
 

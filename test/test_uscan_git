@@ -36,9 +36,38 @@ cleanup(){
     rm -rf "$TEMP_PKG_DIR"
 }
 
-spawnGitRepo(){
-    mkdir -p "$TEMP_PKG_DIR/repo"
-    (cd "$TEMP_PKG_DIR/repo" || exit 1
+spawnGitDaemon() {
+    [ -n "$TEMP_PKG_DIR" ] || fail "unexpected testsuite error"
+    (
+        local srv=${1:-srv}
+        mkdir -p "$TEMP_PKG_DIR/$srv" || exit 1
+        chronic_sh git daemon --base-path="$TEMP_PKG_DIR/$srv" \
+            --reuseaddr --detach \
+            --pid-file="$TEMP_PKG_DIR/$srv/pid"
+        local t=0
+        while [ ! -s "$TEMP_PKG_DIR/$srv/pid" ]; do
+            sleep 1s
+            if [ $t -gt 5 ]; then
+                echo "git daemon failed to start"
+                exit 1
+            fi
+            t=$((t+1))
+        done
+    )
+}
+
+killGitDaemon() {
+    local srv=${1:-srv}
+    if [ -n "$TEMP_PKG_DIR" ] && [ -s "$TEMP_PKG_DIR/$srv/pid" ]; then
+        local pid=$(< "$TEMP_PKG_DIR/$srv/pid")
+        kill -9 "$pid"
+    fi
+}
+
+spawnGitRepo() {
+    local repo=${1:-repo}
+    mkdir -p "$TEMP_PKG_DIR/$repo"
+    (cd "$TEMP_PKG_DIR/$repo" || exit 1
     chronic_sh git init
     git config user.name "Joe Developer"
     git config user.email "none@debian.org"
@@ -57,6 +86,11 @@ END
     done)
 }
 
+cleanup () {
+    killGitDaemon
+    rm -rf "$TEMP_PKG_DIR"
+}
+
 trap cleanup EXIT
 
 containsName(){
@@ -69,8 +103,17 @@ containsName(){
 
 PKG=foo
 
+writeDebianWatch() {
+    local watchargs="$1"
+    local gitref=${2:-"refs/tags/v([\\d\\.]+)"}
+    cat <<END > "$TEMP_PKG_DIR/$PKG/debian/watch"
+version=4
+opts="mode=git, $watchargs" \
+file:///$TEMP_PKG_DIR/repo $gitref debian
+END
+}
+
 makeDebianDir() {
-    WATCHARGS=$1
     TEMP_PKG_DIR=$(mktemp -d --tmpdir="$SHUNIT_TMPDIR" uscan_git.XXXXXX)
     if [ -z "$TEMP_PKG_DIR" ]; then
         echo "Failed to create temporary directory" >&2
@@ -78,13 +121,8 @@ makeDebianDir() {
     fi
     mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/upstream
     mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/source
-    spawnGitRepo
 
-    cat <<END > "$TEMP_PKG_DIR/$PKG/debian/watch"
-version=4
-opts="mode=git,gitmode=shallow,$WATCHARGS" \
-file:///$TEMP_PKG_DIR/repo refs/tags/v([\\d\\.]+) debian
-END
+    writeDebianWatch "$1" "${2:-}"
 
     cat <<END > "$TEMP_PKG_DIR/$PKG/debian/changelog"
 $PKG (0-1) unstable; urgency=low
@@ -98,8 +136,8 @@ END
 }
 
 makeDebianDirWithUpstream() {
-    WATCHARGS=$1
-    makeDebianDir "$WATCHARGS"
+    makeDebianDir "$1"
+    spawnGitRepo
     cd "$TEMP_PKG_DIR/$PKG" || exit 1
     chronic_sh git init
     chronic_sh git remote add upstream "file:///$TEMP_PKG_DIR/repo"
@@ -107,99 +145,165 @@ makeDebianDirWithUpstream() {
     cd - > /dev/null || exit 1
 }
 
-makeDebianDirHead() {
-    WATCHARGS=$1
-    makeDebianDir "$WATCHARGS"
-    cat <<END > "$TEMP_PKG_DIR/$PKG/debian/watch"
-version=4
-opts="mode=git,pretty=0.0+git%cd.%h" \
-file:///$TEMP_PKG_DIR/repo HEAD
-END
-}
-
-helperLaunch() {
-    WATCHARGS=$1
-    ARG="${2:-}"
-    CMD_ARG="${3:-}"
-    if test "$ARG" = "upstream"; then
-        makeDebianDirWithUpstream "$WATCHARGS"
-    elif test "$ARG" = "HEAD"; then
-        makeDebianDirHead "$WATCHARGS"
-    else
-        makeDebianDir "$WATCHARGS"
-    fi
-    ( cd "$TEMP_PKG_DIR/$PKG" || exit 1 ; $COMMAND $CMD_ARG --watchfile=debian/watch )
+runTest() {
+    local cmd_arg="${1:-}"
+    ( cd "$TEMP_PKG_DIR/$PKG" || exit 1 ; $COMMAND $cmd_arg --watchfile=debian/watch )
     assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
 }
 
 testGit() {
-    helperLaunch "pgpmode=none"
-    TARBALL=${PKG}_2.0.orig.tar.xz
+    makeDebianDir "gitmode=shallow, pgpmode=none"
+    spawnGitRepo
+    runTest
+    local tarball=${PKG}_2.0.orig.tar.xz
     assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$TEMP_PKG_DIR/$TARBALL' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$TEMP_PKG_DIR/$TARBALL' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$TEMP_PKG_DIR/$tarball' ]"
     cleanup
 }
 
 testGitHead() {
-    helperLaunch "pgpmode=none" HEAD
-    ORIG=$(find "$TEMP_PKG_DIR" | perl -ne 'print if/\/foo.*\.orig\.tar\.xz$/')
-    UPSTREAM=$(find "$TEMP_PKG_DIR" | perl -ne 'print if/\/foo.*(?<!orig)\.tar\.xz$/')
-    assertTrue 'downloaded tarfile not present' "[ -f '$UPSTREAM' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$ORIG' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$ORIG' ]"
-    cleanup
-}
-
-testGitSignedTag() {
-    helperLaunch "pgpmode=gittag"
-    TARBALL=${PKG}_2.0.orig.tar.xz
-    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$TEMP_PKG_DIR/$TARBALL' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$TEMP_PKG_DIR/$TARBALL' ]"
-    cleanup
-}
-
-testGitUpstream() {
-    helperLaunch "pgpmode=none" upstream
-    TARBALL=${PKG}_2.0.orig.tar.xz
-    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$TEMP_PKG_DIR/$TARBALL' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$TEMP_PKG_DIR/$TARBALL' ]"
-    cleanup
-}
-
-testGitUpstreamSignedTag() {
-    helperLaunch "pgpmode=gittag" upstream
-    TARBALL=${PKG}_2.0.orig.tar.xz
-    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$TEMP_PKG_DIR/$TARBALL' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$TEMP_PKG_DIR/$TARBALL' ]"
+    makeDebianDir "pgpmode=none, pretty=0.0+git%cd.%h" "HEAD"
+    spawnGitRepo
+    runTest
+    local orig=$(find "$TEMP_PKG_DIR" | perl -ne 'print if/\/foo.*\.orig\.tar\.xz$/')
+    local upstream=$(find "$TEMP_PKG_DIR" | perl -ne 'print if/\/foo.*(?<!orig)\.tar\.xz$/')
+    assertTrue 'downloaded tarfile not present' "[ -f '$upstream' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$orig' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$orig' ]"
     cleanup
 }
 
 testGitIgnoreExclusions() {
-    helperLaunch "gitexport=all"
-    assertTrue 'downloaded tarfile is incomplete' \
+    makeDebianDir "gitmode=shallow, gitexport=all"
+    spawnGitRepo
+    runTest
+    assertTrue 'downloaded tarball is incomplete' \
         "tar tf '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' '${PKG}-2.0/extra.c'"
     cleanup
 }
 
-testGitUpstreamIgnoreExclusions() {
-    helperLaunch "gitexport=all" upstream
-    assertTrue 'downloaded tarfile is incomplete' \
-        "tar tf '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' '${PKG}-2.0/extra.c'"
+testGitSignedTag() {
+    makeDebianDir "gitmode=shallow, pgpmode=gittag"
+    spawnGitRepo
+    runTest
+    local tarball=${PKG}_2.0.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$TEMP_PKG_DIR/$tarball' ]"
     cleanup
 }
 
 testGitSignedTagWithDestDir() {
-    DESTDIR=$TEMP_PKG_DIR/destdir
-    mkdir -p $DESTDIR
-    helperLaunch "pgpmode=gittag" "" "--destdir $TEMP_PKG_DIR/destdir"
-    TARBALL=${PKG}_2.0.orig.tar.xz
-    assertTrue 'downloaded tarfile not present' "[ -f '$DESTDIR/${PKG}-2.0.tar.xz' ]"
-    assertTrue 'pristine tarball is not created' "[ -f '$DESTDIR/$TARBALL' ]"
-    assertTrue 'pristine tarball is a symlink' "[ -L '$DESTDIR/$TARBALL' ]"
+    makeDebianDir "gitmode=shallow, pgpmode=gittag"
+    spawnGitRepo
+    local destdir=$TEMP_PKG_DIR/destdir
+    mkdir -p $destdir
+    runTest "--destdir $TEMP_PKG_DIR/destdir"
+    local tarball=${PKG}_2.0.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f '$destdir/${PKG}-2.0.tar.xz' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$destdir/$tarball' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$destdir/$tarball' ]"
+    cleanup
+}
+
+testGitUncompressed() {
+    makeDebianDir "gitmode=shallow, pgpmode=none"
+    spawnGitRepo
+    runTest "--vcs-export-uncompressed"
+    local tarball=${PKG}_2.0.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue 'pristine tarball should not be a symlink' "[ ! -L '$TEMP_PKG_DIR/$tarball' ]"
+    cleanup
+}
+
+testGitUpstream() {
+    makeDebianDirWithUpstream "gitmode=shallow, pgpmode=none"
+    runTest
+    local tarball=${PKG}_2.0.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$TEMP_PKG_DIR/$tarball' ]"
+    cleanup
+}
+
+testGitUpstreamSignedTag() {
+    makeDebianDirWithUpstream "gitmode=shallow, pgpmode=gittag"
+    runTest
+    local tarball=${PKG}_2.0.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' ]"
+    assertTrue 'pristine tarball not created' "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue 'pristine tarball should be a symlink' "[ -L '$TEMP_PKG_DIR/$tarball' ]"
+    cleanup
+}
+
+testGitUpstreamIgnoreExclusions() {
+    makeDebianDirWithUpstream "gitmode=shallow, gitexport=all"
+    runTest
+    assertTrue 'downloaded tarball is incomplete' \
+        "tar tf '$TEMP_PKG_DIR/${PKG}-2.0.tar.xz' '${PKG}-2.0/extra.c'"
+    cleanup
+}
+
+testGitSubmodules() {
+    makeDebianDir "gitmodules"
+    spawnGitRepo
+    local subrepo="subrepo"
+    spawnGitRepo "srv/${subrepo}.git"
+    touch "$TEMP_PKG_DIR/srv/${subrepo}.git/.git/git-daemon-export-ok"
+    spawnGitDaemon
+    cd "$TEMP_PKG_DIR/repo" || exit 1
+    chronic_sh git submodule add "git://localhost/${subrepo}.git"
+    chronic_sh git commit -a -m "Add $subrepo module"
+    local version="3.0"
+    cat >> changelog <<END
+Version $version
+
+END
+    chronic_sh git commit -a -m "Releasing $version"
+    chronic_sh git tag -s -u 72543FAF -m "Version $version" "v$version"
+    cd - > /dev/null || exit 1
+
+    local tarball="${PKG}_${version}.orig.tar.xz"
+    runTest
+    assertTrue "downloaded tarfile not present" \
+        "[ -f '$TEMP_PKG_DIR/${PKG}-${version}.tar.xz' ]"
+    assertTrue "pristine tarball not created" \
+        "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue "pristine tarball should be a symlink" \
+        "[ -L '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue "downloaded tarball is incomplete" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/file.c'"
+    assertTrue "downloaded tarball is incomplete; ${subrepo} missing" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/${subrepo}/file.c'"
+    assertFalse "${PKG}-${version}/extra.c should not be present" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/extra.c'"
+    assertFalse "${PKG}-${version}/${subrepo}/extra.c should not be present" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/${subrepo}/extra.c'"
+    # killGitDaemon() and cleanup() omitted intentionally
+    rm -f "$TEMP_PKG_DIR/$tarball" "$TEMP_PKG_DIR/${PKG}-${version}.tar.xz"
+}
+
+testGitSubmodulesIgnoreExclusions() {
+    writeDebianWatch "gitexport=all, gitmodules"
+    runTest
+    local version="3.0"
+    local tarball="${PKG}_${version}.orig.tar.xz"
+    local subrepo="subrepo"
+    assertTrue "downloaded tarfile not present" \
+        "[ -f '$TEMP_PKG_DIR/${PKG}-${version}.tar.xz' ]"
+    assertTrue "pristine tarball not created" \
+        "[ -f '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue "pristine tarball should be a symlink" \
+        "[ -L '$TEMP_PKG_DIR/$tarball' ]"
+    assertTrue "downloaded tarball is incomplete" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/file.c' \
+        '${PKG}-${version}/extra.c'"
+    assertTrue "downloaded tarball is incomplete; ${subrepo} missing" \
+        "tar -tf '$TEMP_PKG_DIR/$tarball' '${PKG}-${version}/${subrepo}/file.c' \
+         '${PKG}-${version}/${subrepo}/extra.c'"
+    killGitDaemon
     cleanup
 }
 

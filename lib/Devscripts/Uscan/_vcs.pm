@@ -13,9 +13,11 @@ our $progname = basename($0);
 
 sub _vcs_newfile_base {
     my ($self) = @_;
-    my $zsuffix = get_suffix($self->compression);
-    my $newfile_base
-      = "$self->{pkg}-$self->{search_result}->{newversion}.tar.$zsuffix";
+    # Compression may optionally be deferred to mk-origtargz
+    my $newfile_base = "$self->{pkg}-$self->{search_result}->{newversion}.tar";
+    if (!$self->config->{vcs_export_uncompressed}) {
+        $newfile_base .= '.' . get_suffix($self->compression);
+    }
     return $newfile_base;
 }
 

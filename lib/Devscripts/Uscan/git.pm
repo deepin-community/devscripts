@@ -18,9 +18,9 @@ sub git_search {
     if ($self->versionless) {
         $newfile = $self->parse_result->{filepattern}; # HEAD or heads/<branch>
         if ($self->pretty eq 'describe') {
-            $self->gitmode('full');
+            $self->git->{mode} = 'full';
         }
-        if (    $self->gitmode eq 'shallow'
+        if (    $self->git->{mode} eq 'shallow'
             and $self->parse_result->{filepattern} eq 'HEAD') {
             uscan_exec(
                 'git',
@@ -32,7 +32,7 @@ sub git_search {
                 "$self->{downloader}->{destdir}/" . $self->gitrepo_dir
             );
             $self->downloader->gitrepo_state(1);
-        } elsif ($self->gitmode eq 'shallow'
+        } elsif ($self->git->{mode} eq 'shallow'
             and $self->parse_result->{filepattern} ne 'HEAD')
         {    # heads/<branch>
             $newfile =~ s&^heads/&&;    # Set to <branch>
@@ -83,18 +83,38 @@ sub git_search {
         } else {
             my $tmp = $ENV{TZ};
             $ENV{TZ} = 'UTC';
-            spawn(
-                exec => [
-                    'git',
+            $newfile
+              = $self->parse_result->{filepattern};    # HEAD or heads/<branch>
+            if ($self->parse_result->{filepattern} eq 'HEAD') {
+                spawn(
+                    exec => [
+                        'git',
 "--git-dir=$self->{downloader}->{destdir}/$self->{gitrepo_dir}",
-                    'log',
-                    '-1',
-                    "--date=format-local:$self->{date}",
-                    "--pretty=$self->{pretty}"
-                ],
-                wait_child => 1,
-                to_string  => \$newversion
-            );
+                        'log',
+                        '-1',
+                        "--date=format-local:$self->{date}",
+                        "--pretty=$self->{pretty}"
+                    ],
+                    wait_child => 1,
+                    to_string  => \$newversion
+                );
+            } else {
+                $newfile =~ s&^heads/&&;    # Set to <branch>
+                spawn(
+                    exec => [
+                        'git',
+"--git-dir=$self->{downloader}->{destdir}/$self->{gitrepo_dir}",
+                        'log',
+                        '-1',
+                        '-b',
+                        "$newfile",
+                        "--date=format-local:$self->{date}",
+                        "--pretty=$self->{pretty}"
+                    ],
+                    wait_child => 1,
+                    to_string  => \$newversion
+                );
+            }
             $ENV{TZ} = $tmp;
             chomp($newversion);
         }

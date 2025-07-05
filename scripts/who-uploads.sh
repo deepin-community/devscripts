@@ -75,11 +75,7 @@ VARS="WHOUPLOADS_KEYRINGS WHOUPLOADS_MAXUPLOADS WHOUPLOADS_DATE"
 GPG=gpg
 if ! command -v $GPG > /dev/null; then
     echo "$GPG missing"
-    GPG=gpg2
-    if  ! command -v $GPG > /dev/null; then
-	echo "$GPG missing"
-	exit 1
-    fi
+    exit 1
 fi
 
 if [ "$1" = "--no-conf" -o "$1" = "--noconf" ]; then
@@ -221,26 +217,25 @@ fi
 for package; do
     echo "Uploads for $package:"
 
-    prefix=$(echo $package | sed -re 's/^((lib)?.).*$/\1/')
-    pkgurl="https://packages.qa.debian.org/${prefix}/${package}.html"
-    baseurl="https://packages.qa.debian.org/${prefix}/"
+    pkgurl="https://tracker.debian.org/pkg//${package}"
+    baseurl="https://tracker.debian.org"
 
     # only grab the actual "Accepted" news announcements; hopefully this
     # won't pick up many false positives
     WGETOPTS="-q -O - --timeout=30 "
     count=0
     for news in $(wget $WGETOPTS $pkgurl |
-                  sed -ne 's%^.*<a href="\('$package'/news/[0-9A-Z]*\.html\)">Accepted .*%\1%p'); do
+                  sed -ne 's%^.*<a href="\(/news/[0-9]\+/accepted-'$package'.*\)">.*$%\1%p'); do
 	HTML_TEXT=$(wget $WGETOPTS "$baseurl$news")
 	GPG_TEXT=$(echo "$HTML_TEXT" |
-	           sed -ne 's/^<pre>//; /-----BEGIN PGP SIGNED MESSAGE-----/,/-----END PGP SIGNATURE-----/p')
+	           sed -ne 's/^.*<pre>//; /-----BEGIN PGP SIGNED MESSAGE-----/,/-----END PGP SIGNATURE-----/p')
 
 	test -n "$GPG_TEXT" || continue
 
 	VERSION=$(echo "$GPG_TEXT" | awk '/^Version/ { print $2; exit }')
 	DISTRO=$(echo "$GPG_TEXT" | awk '/^Distribution/ { print $2; exit }')
 	if [ "$WANT_DATE" = "yes" ]; then
-	    DATE=$(echo "$HTML_TEXT" |  sed -ne 's%<li><em>Date</em>: \(.*\)</li>%\1%p')
+	    DATE=$(echo "$HTML_TEXT" | xargs | perl -ne 'print $1 if m%<li><b>Date</b>: (.+) </li>%;')
 	fi
 
 	GPG_ID=$(echo "$GPG_TEXT" | LC_ALL=C $GPG $GPG_NO_KEYRING --keyid-format long --verify 2>&1 |

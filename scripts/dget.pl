@@ -34,6 +34,7 @@ use IO::File;
 use Digest::MD5;
 use Devscripts::Compression;
 use Dpkg::Control;
+use Dpkg::Path   qw(find_command);
 use Getopt::Long qw(:config bundling permute no_getopt_compat);
 use File::Basename;
 
@@ -50,9 +51,9 @@ my $modified_conf_msg;
 my $compression_re = compression_get_file_extension_regex();
 
 # use curl if installed, wget otherwise
-if (system("command -v curl >/dev/null 2>&1") == 0) {
+if (find_command('curl')) {
     $wget = "curl";
-} elsif (system("command -v wget >/dev/null 2>&1") == 0) {
+} elsif (find_command('wget')) {
     $wget = "wget";
 } else {
     die
@@ -68,7 +69,12 @@ Usage: $progname [options] URL ...
 
 Downloads Debian packages (source and binary) from the specified URLs (first form),
 or using the mirror configured in /etc/apt/sources.list(.d) (second form).
-It is capable of downloading several packages at once.
+
+Note that the second form is possible also with 'apt-get download' and 'apt-get
+source', and thus the primary use case for dget is working with packages not in
+any repository, for example when reviewing mentors.debian.net packages.
+
+Multiple packages can be given as arguments and downloaded all at once.
 
    -a, --all       Package is a source package; download all binary packages
    -b, --backup    Move files that would be overwritten to ./backup
@@ -274,8 +280,8 @@ sub quote_version {
     return $version;
 }
 
-# we reinvent "apt-get -d install" here, without requiring root
-# (and we do not download dependencies)
+# This section implemented "apt-get download" and "apt-get source" probably
+# before apt-get had the capabilities, and since then has become obsolete.
 sub apt_get {
     my ($package, $version) = @_;
 
@@ -362,19 +368,20 @@ sub apt_get {
     my %dir;
     tie %dir, "IO::Dir", "/etc/apt/sources.list.d";
     foreach (keys %dir) {
-        next unless /\.list$/;
+        next unless /\.list$|\.sources$/;
         push @sources, "/etc/apt/sources.list.d/$_";
     }
 
-    foreach my $source (@sources) {
-        $apt = IO::File->new($source) or die "$source: $!";
-        while (<$apt>) {
-            if (/^\s*deb\s*(?:\[[^]]*\]\s*)?($host_re\b)/) {
-                $repositories{$1} = 1;
-            }
+    $apt
+      = IO::File->new(
+"LC_ALL=C apt-get indextargets 'Identifier: Packages' --format '\$(BASE_URI)' |"
+      ) or die "$!";
+    while (<$apt>) {
+        if (/^($host_re)/) {
+            $repositories{$1} = 1;
         }
-        close $apt;
     }
+    close $apt;
     unless (%repositories) {
         die "no repository found in /etc/apt/sources.list or sources.list.d";
     }
@@ -544,7 +551,7 @@ for my $arg (@ARGV) {
                     }
                 }
             } else {
-                my @packages = split /, /, $c->{Binary};
+                my @packages = split /,\s*/, $c->{Binary};
                 foreach my $package (@packages) {
                     eval { apt_get($package, $version) } or print "$@";
                 }
@@ -587,9 +594,7 @@ B<dpkg-source>.
 
 In the second form, B<dget> downloads a I<binary> package (i.e., a
 I<.deb> file) from the Debian mirror configured in
-/etc/apt/sources.list(.d).  Unlike B<apt-get install -d>, it does not
-require root privileges, writes to the current directory, and does not
-download dependencies.  If a version number is specified, this version
+/etc/apt/sources.list(.d).  If a version number is specified, this version
 of the package is requested.  With B<--all>, the list of all binaries for the
 source package I<package> is extracted from the output of
 C<apt-cache showsrc package>.
@@ -612,10 +617,15 @@ given by the B<--path> option or specified in the configuration files
 fails, dget consults B<apt-get source --print-uris>.  Download backends
 used are B<curl> and B<wget>, looked for in that order.
 
-B<dget> was written to make it easier to retrieve source packages from
-the web for sponsor uploads.  For checking the package with
-B<debdiff>, the last binary version is available via B<dget>
-I<package>, the last source version via B<apt-get source> I<package>.
+B<dget> I<package> should be implemented in B<apt-get install -d>.
+
+B<dget> was written to make it easier to retrieve source packages from the web
+to sponsor uploads, and thus the primary use case is downloading binary and
+source packages from a URL.  For fetching packages from apt repositories it is
+easier to simply run B<apt-get download> I<package> and B<apt-get source>
+I<package> with optional B<--download-only> to not uncompress it with
+B<dpkg-source> automatically, or I<package>=1.22-1 to define an exact version
+instead of just the latest version.
 
 =head1 OPTIONS
 
@@ -718,15 +728,26 @@ packages.  Default is 'yes'.
 
 =head1 EXAMPLES
 
-Download all I<.deb> files for the previous version of a package and run B<debdiff>
-on them:
+Download all binary I<.deb> files for current and previous version of a package,
+and compare them byte-for-byte with B<diffoscope>:
 
-  dget --all mypackage=1.2-1
-  debdiff --from *_1.2-1_*.deb --to *_1.2-2_*.deb
+  mkdir previous latest
+  (cd latest && dget --all mypackage=1.2-1)
+  (cd previous && dget --all mypackage) # download latest 1.2-2 in this example
+  diffoscope --html=diffoscope.html previous/ latest/
+
+Download the source package of the current version in apt repository and the
+to-be-reviewed new version at mentors.debian.net, and compare them with
+B<debdiff>:
+
+  dget https://mentors.debian.net/debian/pool/main/m/mypackage/mypackage_1.2-3.dsc
+  apt-get source mypackage=1.2-2
+  debdiff --from mypackage_1.2-2.dsc --to mypackage_1.2-3.dsc
 
 =head1 BUGS AND COMPATIBILITY
 
-B<dget> I<package> should be implemented in B<apt-get install -d>.
+B<dget --all> I<srcpkg> should be implemented in B<apt-get download> I<srcpkg>
+so B<apt-get> could download all binary packages based on source package name.
 
 Before devscripts version 2.10.17, the default was not to extract the
 downloaded source. Set DGET_UNPACK=no to revert to the old behaviour.
@@ -741,5 +762,5 @@ of the License, or (at your option) any later version.
 
 =head1 SEE ALSO
 
-B<apt-get>(1), B<curl>(1), B<debcheckout>(1), B<debdiff>(1), B<dpkg-source>(1), 
+B<apt-get>(1), B<curl>(1), B<debcheckout>(1), B<debdiff>(1), B<dpkg-source>(1),
 B<wget>(1)

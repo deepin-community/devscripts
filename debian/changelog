@@ -1,8 +1,716 @@
-devscripts (2.23.7+0deepin1) unstable; urgency=medium
+devscripts (2.25.15) unstable; urgency=medium
 
-  * Fix pylint warning. 
+  [ Yadd ]
+  * Update French translation.
+  * Fix optional salsa test.
 
- -- xiangzelong <xiangzelong@deepin.org>  Thu, 12 Sep 2024 14:05:28 +0800
+ -- Holger Levsen <holger@debian.org>  Mon, 16 Jun 2025 09:49:57 +0200
+
+devscripts (2.25.14) unstable; urgency=medium
+
+  * scripts/Makefile: also clean the build directory on clean. (see #1106532)
+
+ -- Holger Levsen <holger@debian.org>  Mon, 26 May 2025 17:39:28 +0200
+
+devscripts (2.25.13) unstable; urgency=medium
+
+  [ Andreas Tille ]
+  * debcommit: Prefer Git over SVN or CVS. Closes: #1106159
+
+  [ Jochen Sprickerhof ]
+  * scripts/devscripts/proxy.py: ignore zero size files in cache.
+
+  [ Holger Levsen ]
+  * mass-bug: fix typo in manpage, thanks to Julien Plissonneau Duquène.
+  * Update French translation, thanks to Julien Plissonneau Duquène/MR503.
+  * Update Portuguese translation, thanks to Américo Monteiro.
+    Closes: #1105959
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Thu, 22 May 2025 16:16:30 +0200
+
+devscripts (2.25.12) unstable; urgency=medium
+
+  [ Christopher Bock ]
+  * rmadison: add alias for table=all.
+
+  [ Paride Legovini ]
+  * rmadison: update Ubuntu URL in docs.
+
+  [ Chris Hofstaedtler ]
+  * debbisect: fix example.
+
+  [ Dorle Osterode ]
+  * deb2apptainer.1: Fix man page synopsis and highlighting.
+  * Update po4a.
+  * Update German translation.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * scripts/debrebuild.pl: Make sure that each print statement flushes
+    standard output.
+
+  [ Otto Kekäläinen ]
+  * test/test_mk-origtargz: Strip ANSI color to avoid sporadic failures.
+
+ -- Holger Levsen <holger@debian.org>  Sun, 11 May 2025 13:50:48 +0200
+
+devscripts (2.25.11) unstable; urgency=medium
+
+  [ Adrian Bunk ]
+  * bts: The forky{,-ignore} tags already exists and can already be used.
+  * nmudiff: Improve wording of non-delay NMU email.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debchange: --date argument *must* be in RFC 5322 format.
+  * uscan: document ~cs.
+
+  [ Roland Mas ]
+  * salsa: allow invoking checkout with a full URL.
+
+  [ Ian Jackson ]
+  * dscverify: Look in the t2u keyring, if it is installed.
+  * Add debian-tag2upload-keyring to Recommends.
+
+  [ Hugh McMaster ]
+  * uscan:
+    - add support for git repositories with submodules. Closes: #902846.
+    - create a Moo class for 'gitexport' and 'gitmode'.
+    - add documentation on the 'gitmodules' option.
+  * uscan/Downloader.pm: Export all submodule files when gitexport=all is set.
+  * uscan/WatchLine.pm:
+    - pass $self->gitrepo_dir to the downloader.
+    - remove suffixed tarball in --overwrite-download mode.
+    - add missing backslash to regex.
+  * test/test_uscan_git:
+    - make $TARBALL a local variable.
+    - make $DESTDIR a local variable.
+    - make $ORIG and $UPSTREAM local variables.
+    - update test failure messages (logic and grammar).
+    - add missing $WATCHARGS in makeDebianDirHead().
+    - aun tests from a separate function.
+    - create $destdir in the new $TEMP_PKG_DIR for clean-up.
+    - replace helperLaunch() with makeDebianDir*().
+    - separate spawnGitRepo() from makeDebianDir().
+    - simplify debian/watch creation.
+    - support custom repository paths.
+    - add tests for git repositories with submodules.
+
+  [ Holger Levsen ]
+  * Update Portuguese translation, thanks to Américo Monteiro. Closes: #1103688
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 29 Apr 2025 21:34:33 +0200
+
+devscripts (2.25.10) unstable; urgency=medium
+
+  [ Otto Kekäläinen ]
+  * New script: deb-check-file-conflicts.
+  * Update debsign example to a package that does not depend on Python 2.
+  * Apply 'wrap-and-sort -ast'.
+  * Fix misc typos.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debbisect: do not error out if no packages changed from one timestamp to
+    the other.
+
+  [ Antonio Terceiro ]
+  * mass-bug: add option to include external files in the bug template.
+
+  [ Philip Rinn ]
+  * dcmd: document --buildinfo option. Closes: #895346.
+
+  [ Niels Thykier ]
+  * nmudiff: Support `--mua` commands (like `thunderbird`).
+
+  [ Holger Levsen ]
+  * README.md: shorten lines which cause too wide package descriptions. Thanks
+    lintian.
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Thu, 17 Apr 2025 10:40:41 +0200
+
+devscripts (2.25.9) unstable; urgency=medium
+
+  [ Unit 193 ]
+  * debchange: Add '--sloppy' option for sloppy-backports.
+
+ -- Holger Levsen <holger@debian.org>  Sat, 12 Apr 2025 16:02:00 +0200
+
+devscripts (2.25.8) unstable; urgency=medium
+
+  [ Adrian Bunk ]
+  * debchange: LTS related fixes, current LTS release is bullseye.
+
+  [ Holger Levsen ]
+  * who-uploads: fetch data from tracker.d.o, patch thanks to gregor herrmann.
+    Closes: #1074038.
+
+ -- Holger Levsen <holger@debian.org>  Sat, 05 Apr 2025 20:29:06 +0200
+
+devscripts (2.25.7) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * d/control: Depend on gpg and gpg-agent instead of gnupg. Closes: #1070882.
+  * Use OpenPGP instead of gnupg or gpg when referring to the RFC or artifacts.
+  * Remove backwards compatibility gnupg2 support.
+  * Switch from discouraged Perl "base" to "parent" pragma.
+  * Switch from deprecated Perl YAML::Syck to YAML::XS.
+  * Switch from File::Which to Dpkg::Path.
+  * Switch from "command -v" via system() to Dpkg::Path::find_command().
+  * Switch from IPC::Run to Dpkg::IPC.
+  * d/control: explicitly depend on libdpkg-perl instead of via dpkg-dev and
+    Recommends.
+  * Hook test_mass_bug into the test suite.
+  * tests: remove obsolete GnuPG --secret-keyring option usage.
+  * Update .gitignore.
+
+  [ Jochen Sprickerhof ]
+  * scripts/devscripts/proxy.py: ignore error when symlink exists.
+  * debootsnap: skip cleanup/reproducible to keep the dbus/machine-id.
+
+  [ Antoine Beaupré ]
+  * build-rdeps: silence errors when not running with dose-extra.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 01 Apr 2025 22:32:28 +0200
+
+devscripts (2.25.6) unstable; urgency=medium
+
+  [ Holger Levsen ]
+  * po4a/Makefile: fix build when parallel is more than 26, thanks to Jing Luo.
+    Closes: #1094811.
+  * nmudiff manpage: add missing space, thanks to Jakub Wilk. Closes: #1100854.
+  * Update Portuguese translation of devscripts's manpage, thanks to
+    Américo Monteiro. Closes: #1099978.
+  * Bump Standard-Version to 4.7.2, no changes needed.
+  * Update po4a.
+
+  [ Adrian Bunk ]
+  * nmudiff:
+    - add diffstat to the diff.
+    - improve wording of email.
+  * debchange: document --date in the manpage.
+
+  [ Dorle Osterode ]
+  * (de) po4a/po/de.po: update translation.
+
+  [ Alexandre Detiste ]
+  * scripts/edit-patch.sh, doc/what-patch.1 and README.md: remove support and
+    references for removed "dpatch" and "cdbs-edit-patch".
+
+  [ Otto Kekäläinen ]
+  * dep-14-convert:
+    - add man page and other documentation.
+    - fix bug and refactor Salsa project slug detection.
+    - revert: document '--apply' flag.
+
+ -- Holger Levsen <holger@debian.org>  Thu, 27 Mar 2025 23:29:41 +0100
+
+devscripts (2.25.5) unstable; urgency=medium
+
+  [ Antonio Terceiro ]
+  * sadt: replace references to `adt-run` with `autopkgtest`.
+
+  [ Jochen Sprickerhof ]
+  * debrebuild: Don't set Rules-Requires-Root with new dpkg (>=1.22.13).
+  * Add missing test dependency on apt.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 25 Feb 2025 12:48:38 +0100
+
+devscripts (2.25.4) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * CI: switch to salsa-ci.
+  * Add missing lzip dependency in autopkgtests. Closes: #1098681.
+
+  [ Holger Levsen ]
+  * mk-build-deps: only specify arch if needed. Closes: #1058049. Thanks to
+    Stephen Gildea for the patch.
+
+ -- Holger Levsen <holger@debian.org>  Sun, 23 Feb 2025 15:25:16 +0100
+
+devscripts (2.25.3) unstable; urgency=medium
+
+  [ Andrius Merkys ]
+  * Support lzip decompression in uscan. Closes: #1061479.
+
+  [ Jochen Sprickerhof ]
+  * debrebuild: use $build_as_root_when_needed.
+  * Fix CI pipeline.
+
+  [ Holger Levsen ]
+  * Bump Standard-Version to 4.7.1, no changes needed.
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Fri, 21 Feb 2025 14:52:33 +0100
+
+devscripts (2.25.2) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * debrebuild: relax Rules-Requires-Root detection.
+
+  [ dann frazier ]
+  * scripts/hardening-check.pl:
+    - correct short arg for cfprotection in --help.
+    - detect branch protection in ARM binaries.
+    - make indentation consistent.
+
+  [ Julien Plissonneau Duquène ]
+  * Apply uversionmangle rules to --download-version. Closes: #1087641.
+  * Add test case for --download-version with uversionmangle.
+
+  [ IOhannes m zmölnig (Debian/GNU) ]
+  * dep-14-convert:
+    - more clearly mark the 'pristine-tar' branch as optional.
+    - document '--apply' flag.
+    - use a variable for the dep-14 compliant packaging branch.
+    - allow the user to override the packaging branch.
+    - fallback to other remotes if current remote is not on salsa.
+    - ensure that the packaging branch name is valid.
+    - 'debug' function to handle the debugging printout.
+    - ensure that branch settings go to gbp.conf's [DEFAULT] section.
+
+  [ Otto Kekäläinen ]
+  * dep-14-convert-git-branch-names: Automate git layout conversion.
+
+  [ Dorle Osterode ]
+  * (de) po4a/po/de.po: Update translation.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 04 Feb 2025 22:56:37 +0100
+
+devscripts (2.25.1) unstable; urgency=medium
+
+  [ Otto Kekäläinen ]
+  * debchange: enable multimaint-merge by default.
+
+  [ Philip Rinn ]
+  * Remove cvs-* scripts.
+
+  [ Andreas Metzler ]
+  * uscan: fix docs for downloading a specific branch in git mode.
+
+  [ Jacob Mealey ]
+  * Cleanup perltidy changes, add perl tidy diff to test output.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+  [ nick black ]
+  * Ignore po4a/pt.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 14 Jan 2025 11:20:25 +0100
+
+devscripts (2.24.10) unstable; urgency=medium
+
+  [ Niels Thykier ]
+  * wrap-and-sort: Detect `X-Style` and abort with a helpful message.
+
+  [ Philip Rinn ]
+  * Add sopv | gpgv as build-dependency (<!nocheck>). Closes: #1091596.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 31 Dec 2024 14:40:21 +0100
+
+devscripts (2.24.9) unstable; urgency=medium
+
+  [ Guilhem Moulin ]
+  * debdiff: Always call dpkg-source(1) when `--apply-patches` is set.
+    Closes: #1091228.
+
+  [ Philip Rinn ]
+  * scripts/desktop2menu.pl: remove script. Since 2017 Policy states 'If
+    a package installs a FreeDesktop desktop entry, it must not also install
+    a Debian menu entry.' so there is no use case for this script anymore.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Wed, 25 Dec 2024 17:05:05 +0100
+
+devscripts (2.24.8) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * debsign: Ensure future GnuPG interop by forcing OpenPGP compliant behavior.
+    Closes: #1070197.
+
+  [ Gioele Barabucci ]
+  * wrap-and-sort: Sort build-system packages first. Closes: #1049943.
+  * test/test_wrap-and-sort:
+    - Allow testing parameters.
+    - Test that build systems are listed first.
+
+ -- Holger Levsen <holger@debian.org>  Wed, 18 Dec 2024 13:52:45 +0100
+
+devscripts (2.24.7) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * Devscripts::Uscan::Keyring: Handle and warn on concatenated ASCII Armor
+    blocks. Closes: #1089548.
+
+  [ Jochen Sprickerhof ]
+  * debsnap: downgrade dscverify to a warning. Closes: #1089060.
+  * debrebuild: put dsc into the same directory as the buildinfo.
+
+  [ Lee Garrett ]
+  * Install devscripts man page to section 7.
+  * gitignore devscripts man page again.
+
+  [ Holger Levsen ]
+  * Add Closes: for #1064707 to 2.24.2 d/changelog entry.
+
+ -- Holger Levsen <holger@debian.org>  Thu, 12 Dec 2024 16:41:45 +0100
+
+devscripts (2.24.6) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * debrebuild: fix build path. Closes: #1089087.
+
+  [ Daniel Kahn Gillmor ]
+  * Uscan/Keyring.pm:
+    - gpgv can use /dev/null for homedir.
+    - add helper functions for OpenPGP ASCII Armor.
+    - adopt Guillem Jover's suggested improvements for perl.
+    - remove dependency on /usr/bin/gpg.
+    - add OpenPGP verification support for sop. Closes: #1010955.
+    - clean up perl nits. (thanks, Guillem Jover!)
+    - clean up references to RFC 9580.
+    - avoid bareword constructions (thanks, Guillem.)
+    - check results of writing and closing.
+    - rely on sopv instead of sop, except for "sop armor".
+    - perltidy.
+  * d/control and README, documented uscan depends:
+    - remove gnupg from dependency annotations, encourage sop.
+    - use the sopv alternatives, rather than enumerate sopv's implementations.
+
+  [ Guillem Jover ]
+  * scripts/Makefile: Use dpkg-vendor directly instead of including
+    dpkg/mk/vendor.mk. Closes: #1079186.
+
+  [ Jacob Mealey ]
+  * wnpp-alert: fix typo in --help output.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Sat, 07 Dec 2024 13:41:53 +0100
+
+devscripts (2.24.5) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * debrebuild: move dscverify to debsnap.
+
+  [ Guillem Jover ]
+  * debsign: Remove compatibility code for ancient GnuPG. Closes: #1066875
+
+ -- Holger Levsen <holger@debian.org>  Thu, 28 Nov 2024 10:30:12 +0100
+
+devscripts (2.24.4) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * debootsnap:
+    - don't set a apt proxy with --nocache.
+    - fix HTTP 302.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debrebuild: run debsnap with --verbose to attempt to better debug random
+    failures on rebuilderd.d.n.
+
+  [ Otto Kekäläinen ]
+  * salsa: Follow DEP-14 and use default branch name 'debian/latest'.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Sat, 23 Nov 2024 09:45:49 +0100
+
+devscripts (2.24.3) unstable; urgency=medium
+
+  [ Jochen Sprickerhof ]
+  * debootsnap:
+    - fix diff generation.
+    - make sure all packages are installed.
+  * debrebuild:
+    - drop epoch from buildinfo filename.
+    - debrebuild: run dpkg-buildpackage without fakeroot.
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debrebuild: update short description to match its current feature set.
+  * scripts/devscripts/test/__init__.py: list debftbfs so it gets installed.
+  * README.newscripts: add requirement to add Python scripts to SCRIPTS list
+    in scripts/devscripts/test/__init__.py
+  * debftbfs: make pylint and flake8 happy.
+
+  [ Holger Levsen ]
+  * Update po4a.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 12 Nov 2024 16:43:39 +0100
+
+devscripts (2.24.2) unstable; urgency=medium
+
+  [ Mattia Rizzolo ]
+  * Update Portuguese translation.
+    Thanks to Américo Monteiro <a_monteiro@gmx.com> (Closes: #1051711)
+  * bts: do not use backticks as quote marks. (Closes: #578997)
+  * checkbashisms: avoid false positive for "read without variable".
+    Thanks to Tim Landscheidt <tim@tim-landscheidt.de> for the patch.
+    (Closes: #1020336)
+  * debcommit: implement a new --signoff option (Closes: #524476)
+  * debdiff: Speed up debdiff for source format 3.0 (quilt) packages.
+    Thanks to Michael Gilbert <mgilbert@debian.org> for the patch.
+    (Closes: #757528)
+  * perltidy.
+  * bts: fix typo in man page. (Closes: #1082517)
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * scripts/debootsnap: always set TMPDIR for reliable behaviour of
+    equivs-build.
+  * scripts/debrebuild.pl:
+    - always call sbuild with --verbose to force output even if not connected
+      to an interactive tty.
+    - always call sbuild with --nolog now that it will always output to stdout
+      thanks to the --verbose switch.
+    - use debsnap from git if we are running from git
+    - use dscverify from git if we are running from git
+    - clean up temporary files using CLEANUP=>1 of File::Temp
+  * Unify proxy handling between debbisect and debootsnap.
+  * scripts/devscripts/proxy.py:
+    - now that snapshot.d.o is fixed, we do not need to throttle the download
+      speed anymore.
+    - do not delete *.part files to allow multiple processes sharing the same
+      cache.
+    - add process ID to partial file name.
+    - ignore failures of self.send_error()
+  * scripts/build-rdeps.pl:
+    - improve man page wording.
+    - re-arrange to align option name with option value in the same line.
+    - decompress Packages and Sources for dose-ceve
+    - add --no-ftbfs using debftbfs to prevent emitting reverse dependencies
+     that are known to ftbfs.
+    - support computing reverse dependencies for more than one binary package
+      with only a single call to dose-ceve.
+    - components other than 'main' also need 'main' being part of the binary
+      package set for correct rdep computation.
+  * scripts/reproducible-check: make black happy. Closes: #1064707.
+  * debftbfs: add a new script which lists source packages which have FTBFS
+    bugs filed against them and prints them with the bug number and title.
+
+  [ Jelmer Vernooĳ ]
+  * deb-janitor: Split out failure description in status subcommand.
+
+  [ Andrea Pappacoda ]
+  * bts: fix crash when using submissions/smtps (Closes: #1078426)
+
+  [ Holger Levsen ]
+  * scripts/devscripts/proxy.py and scripts/reproducible-check: make pylint
+    and black happy.
+  * scripts/reproducible-check: fix typo, leading to incorrect results.
+    Thanks to Oejet.
+  * Add myself to uploaders.
+
+  [ Georgios Zarkadas ]
+  * debcheckout: Stop using given/when since it is deprecated.
+    (Closes: #1060448)
+
+  [ James McCoy ]
+  * pylint: Add max-positional-arguments=10 to test config.
+  * copyright: Remove duplicate scripts/devscripts/* stanza.
+  * bts: fix warning if missing argument for "severity" command.
+    (Closes: #1014340)
+  * dget: Fix handling of folded Binary lines. (Closes: #1033041)
+
+  [ Salvatore Bonaccorso ]
+  * uscan: bash-completion: Add support for --vcs-export-uncompressed option.
+    (Closes: #1084996)
+
+  [ Vignesh Raman ]
+  * debchange: Add --date argument for specifying the changelog entry date.
+  * test: debchange: add test case for date feature.
+
+  [ Dylan Aïssi ]
+  * test: debchange: add test case for date feature.
+
+  [ Jakub Wilk ]
+  * salsa: fix typo "branch as no origin". (Closes: #1065563)
+
+  [ Jochen Sprickerhof ]
+  * scripts/debrebuild.pl: don't run piuparts.
+
+  [ kpcyrd ]
+  * debootsnap:
+    - replace generic assertion error with human readable error and diff.
+    - debootsnap: Make `1 of 226` lines more descriptive.
+
+ -- Holger Levsen <holger@debian.org>  Thu, 31 Oct 2024 14:38:24 +0100
+
+devscripts (2.24.1) unstable; urgency=medium
+
+  [ Christoph Anton Mitterer ]
+  * annotate-output: wholly overhauled the script.  Closes: #1057963
+    + Prevent variables such as `PROGNAME`, `FMT, `err` from leaking to command
+    + Use exit status `127` if no program was specified.
+    + Documente exit statuses
+    + Improve the manpage and program usage output.
+    + Add option (--raw-date-format) to allow a format string with no separator.
+    + Support `--` to end option parsing.
+    + Escape command name and arguments in the annotated output.
+    + Include annotate-output's version information and chosen prefix format
+      in the annotated output.
+
+  [ Ben Hutchings ]
+  * uscan:
+    + Allow exporting uncompressed VCS exports.  Closes: #1003251; MR: !292
+      This is to avoid useless compress/decompress/compress cycles.
+
+  [ Christoph Berg ]
+  * salsa:
+    + Exclude projects that are only shared with a group/user from --all.
+
+  [ Benjamin Drung ]
+  * debbisect:
+    + Address pylint's consider-using-min-builtin.
+
+  [ Osamu Aoki ]
+  * dget:
+    + Add deb822 *.sources support.  Closes: #976673
+
+  [ Paul Wise ]
+  * build-rdeps:
+    + Avoid Perl errors when a source has no Suite or no Codename.
+    + Set the default origin to the current vendor from dpkg.
+    + Check devel suite status based on chosen origin not dpkg vendor.
+      Allows using APT_CONFIG and an origin override to check Ubuntu chdists.
+  * chdist:
+    + Document that the dist can come first.
+    + Allow running build-rdeps, synaptic and also arbitrary commands.
+    + Allow putting the dist first for the create command
+
+  [ Yadd ]
+  * Update French translations
+  * Fix broken bash_completion for salsa(1)
+  * uscan: improve GitHub documentation
+
+  [ Johannes Schauer Marin Rodrigues ]
+  * debbisect:
+    + Properly handle network hiccups and clean-up half-downloaded files.
+    + Pipe dpkg output into cat instead of using --no-pager, to support older
+    dpkg
+    + run_bisect_qemu.sh: switch to debvm.
+      - move all the complexity to debvm, simplifying this script.
+      - add support for all release architectures.
+    + make caching proxy an actual http proxy.
+      - mirror url no longer is http://127.0.0.1:$PORT but
+        http://snapshot.debian.org, making writing test scripts less
+        surprising.
+      - set the http_proxy variable for the script.
+  * debootsnap:
+    + Always output tarball independent on how the output path is named
+    + Create merged-/usr symlinks if necessary
+    + Abort early if user does not pass a tarball name and also does not
+      redirect stdout to a file.
+    + Improve --help output.
+  * bts:
+    + status: preserve field order and otherwise sort keys.
+  * Handle some new test failures due to changed dependencies.
+  * Update copyright.
+  * build-rdeps
+    + Avoid 'Use of uninitialized value' warnings by skipping unsuitable entries
+  * debrebuild:
+    + Improve error messages.
+    + Fix typo buildresults -> buildresult.
+    + Download dsc using debsnap and verify its hash.
+    + Set SBUILD_CONFIG to prevent user's ~/.sbuildrc leaking into the build.
+    + Use mmdebstrap tar-in with --skip=tar-in/mknod to copy the tarball into
+      the chroot.
+    + Clean up temporary files.
+
+  [ Gianfranco Costamagna ]
+  * uscan:
+    + Fix mode=git to use the correct versioning sha when a branch is provided.
+    Closes: #992976
+
+  [ Otto Kekäläinen ]
+  * dget:
+    + Improve help and man page to clarify difference to modern apt-get.
+    Related: 1059551
+
+  [ Paride Legovini ]
+  * wrap-and-sort:
+    + Consistently add --no-<action> options
+    + Improve --help output by improving text consistency, always writing the
+      default option, and hide the now deprecated --externa-rts-parser.
+    + Update manpage with the new --no-<action> arguments
+    + Add support for more d/t/control DEP-8 fields: Features, Restrictions,
+      Tests.
+
+  [ cen ]
+  * debrebuild:  Closes: #1063928
+    + Avoid error in case of .buildinfo coming from binNMUs
+    + Add missing module import.
+
+  [ Sylvestre Ledru ]
+  * uscan:
+    + in find_watch_file, replace the deprecated `find -follow` in find by -L.
+
+  [ Michael Prokop ]
+  * README:
+    + Update dependencies for debootsnap
+  * d/control:
+    + Add python3-pycurl to Suggests, used by debootsnap.  Closes: #1054571
+
+  [ Agathe Porte ]
+  * uscan:
+    + Add Fossil example.
+
+  [ g0t mi1k ]
+  * chdist:
+    + Include kali-archive-keyring.gpg.
+
+  [ Lee Garrett ]
+  * d/gbp.conf: Explicitly set the Debian branch, changed from master to main.
+
+  [ Jeremy Bícha ]
+  * rmadison:
+    + Update the URL used for Ubuntu.
+
+  [ Andrea Pappacoda ]
+  * mk-origtargz:
+    + Support tarballs without .tar.* extension.
+
+  [ Lucas Nussbaum ]
+  * chdist:
+    + Fix Perl warnings about deprecated given/when.  Closes: #1065348
+
+  [ Bastien Roucariès ]
+  * uscan:
+    + Improve documentation of downloading tags and releases from GitHub.
+
+  [ James McCoy ]
+  * Switch from "setup.py test" to "unittest discover".
+    Closes: #1079650
+  * debbisect:
+    + Support redirect Location which are either paths or URLs.
+    + run_bisect_qemu.sh: Pass the architecture to debvm-create.
+
+  [ Emmanuel FARHI ]
+  * NEW SCRIPTS:
+    + deb2docker and deb2apptainer.
+      Build container images with the given packages.
+
+  [ Mattia Rizzolo ]
+  * packaging:
+    + Add lintian override for very-log-line-length-in-source.
+    + Change build-dependency from replaced pkg-config to pkgconf.
+    + Bump Standards-Version to 4.7.0, no changes needed.
+  * debuild.bash_completion: appease lintian by wrapping this very long line.
+
+ -- Mattia Rizzolo <mattia@debian.org>  Wed, 18 Sep 2024 20:41:19 +0200
 
 devscripts (2.23.7) unstable; urgency=medium
 
@@ -292,7 +1000,7 @@ devscripts (2.23.0) unstable; urgency=medium
     + Add reasons for "failing to download" errors , for easier dubug.  MR: !293
   * rmadison:
     + Add URL maps (`rmadison -u`) for archived releases ("archive") and
-      unofficial ports archive ("ports").  MR: !309
+      unofficial ports archive ("ports").  MR: !309; Closes: #431800
 
   [ Andrea Pappacoda ]
   * uscan:
@@ -424,7 +1132,7 @@ devscripts (2.22.2) unstable; urgency=medium
     + Introduce an experimental mode using the RTS parser available with
       python-debian >= 0.1.43.  This will let wrap-and-sort retain comments.
       This feature is opt-in with a new flag.  MR: !237
-    + Futher improvements to the RTS mode, now also supporting short indent
+    + Further improvements to the RTS mode, now also supporting short indent
       (-s) among others.  MR: !263
 
   [ Jelmer Vernooĳ ]
@@ -577,7 +1285,7 @@ devscripts (2.21.5) unstable; urgency=medium
       uupdate, as `gbp import-orig` or similar tools already cover that;
       mixing gbp and uupdate leads to what people would not normally expect.
     + In the examples, also drop all needless usage of the "debian" version,
-      which is the default: it is my opion that such examples only lead to
+      which is the default: it is my option that such examples only lead to
       blind cargo-culting.
   * Declaratively build-depend on dh-sequence-python3 and drop --with python3.
   * Bump debhelper compat level to 13.
@@ -638,7 +1346,7 @@ devscripts (2.21.4) unstable; urgency=medium
 
   [ Fabrice Fontaine ]
   * hardening-check:
-    + Handle emtpy symble table by returning an unknown result for the
+    + Handle empty symbol table by returning an unknown result for the
       stack-protector check.  MR: !223
 
   [ Yadd ]
@@ -1049,7 +1757,7 @@ devscripts (2.20.1) unstable; urgency=medium
     + Go back to use a real temporary file instead of a named pipe in
       chronic_sh.  This should also fix the Hurd FTBFS.
   * d/control:
-    + Use an alternative dependency to pylint | pylint3, to supprt backports.
+    + Use an alternative dependency to pylint | pylint3, to support backports.
     + Bump Standards-Version to 4.5.0, no changes needed.
   * Make the Python code compliant with pylint-2.4.4.  Closes: #945267
   * grep-excuses:
@@ -2171,7 +2879,7 @@ devscripts (2.17.10) unstable; urgency=medium
   * debian/source/options:
     + Remove the file, compression=xz has been the default for a long while.
   * debian/TODO:
-    + Remove the file, unusued (=> outdated) since 2008 and mostly empty.
+    + Remove the file, unused (=> outdated) since 2008 and mostly empty.
   * debian/rules:
     + Enable hardening build flags.  Closes: #873379
       Thanks Chris Lamb <lamby@debian.org> for the patch.
@@ -3910,7 +4618,7 @@ devscripts (2.13.3) unstable; urgency=low
     + fix "copyright ownership"
     + ignore "copyright statement"
     + ignore "copyright string"
-    + ignore coyright (claim|is|in), and fix test
+    + ignore copyright (claim|is|in), and fix test
     + ignore "copyright to"
 
  -- James McCoy <jamessan@debian.org>  Thu, 15 Aug 2013 20:00:57 -0400
@@ -4412,8 +5120,8 @@ devscripts (2.11.6) unstable; urgency=low
     (Closes: #666048, LP: #966867)
 
   [ Benjamin Drung ]
-  * cowpoke.1, deb-reversion.dbk, dscextract.1: Fix typos "occured",
-    "transfered", and "addtional". Thanks to A. Costa for the patches.
+  * cowpoke.1, deb-reversion.dbk, dscextract.1: Fix typos "occurred",
+    "transferred", and "additional". Thanks to A. Costa for the patches.
     (Closes: #655681)
   * debcommit:
     + Subversion 1.7 has only one .svn folder per working copy.
@@ -5938,7 +6646,7 @@ devscripts (2.10.40) unstable; urgency=low
   * licensecheck: Match a couple more variants on the wording of a
     3-clause BSD license. (Closes: #503378)
   * nmudiff: Require an explicit confirmation as to whether the generated
-    mail should be sent, rather than defauling to not sending it.
+    mail should be sent, rather than defaulting to not sending it.
     (Closes: #483657)
   * tagpending: Don't output a spurious empty line near the end of the
     changelog comments under some circumstances.
@@ -5961,7 +6669,7 @@ devscripts (2.10.40) unstable; urgency=low
     + add support to define custom rules for authenticated mode, this way
       personal repos can benefit from '-a' (Closes: #501568)
     + add -d/--details option to print extended information about
-      reopsitories, in machine parseable format. Implement dumping of
+      repositories, in machine parseable format. Implement dumping of
       TopGit-specific information for TopGit-enabled GIT repositories
     + initialize TopGit's automatically, for GIT repositories which are
       recognized as being managed with TopGit (Closes: #499264)
@@ -6958,7 +7666,7 @@ devscripts (2.10.17) unstable; urgency=low
   * debchange:
     + Modify --closes to use SOAP / Debbugs.pm
     + Add hardy (heron) to the list of supported Ubuntu distributions
-    + Use existing changelog data directly rather than re-using
+    + Use existing changelog data directly rather than reusing
       dpkg-parsechangelog's Changes: field and therefore don't apply any
       reformatting (Closes: #452806)
     + Use "etch-backports" instead of "Etch backports" in bpo changelog
@@ -8116,7 +8824,7 @@ devscripts (2.9.8) unstable; urgency=low
     (Closes: #328459)
   * uscan: correctly handle version 2 watchfiles with multiple groups
     (Closes: #327258)
-  * uupdate: handle csae of debian/ directory in upstream sources (Closes:
+  * uupdate: handle case of debian/ directory in upstream sources (Closes:
     #320836)
   * uupdate: fix --no-symlink option (Closes: #333390)
   * don't allow non-bash scripts in the package (Closes: #331223)
@@ -9769,7 +10477,7 @@ devscripts (1.0) unstable; urgency=low
   * release: Make scp not ask anything so release does not hang when scp
     wants a password.
   * #13908 Try to fix release so that it handles epochs.
-  * #13681 Fix manpage for release to indicate that no annoucements will be
+  * #13681 Fix manpage for release to indicate that no announcements will be
     generated when dupload is used.
   * #13777 no longer use printf in debchange (dch)
   * #13846 Output Format of release changed

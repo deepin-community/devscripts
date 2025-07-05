@@ -73,7 +73,7 @@ SKIP: {
     run(0, qr/Id.*\n\tName/s,        'forks', 'qa/qa');
     run(0, qr/^debian\/devscripts/m, 'mrs',   'debian/devscripts');
     run(0, qr/^devscripts/m,         'mrs',   'devscripts', '--group-id', 2);
-    run(0, qr/master.*Maintainer.*Developers/m,
+    run(0, qr/main.*Maintainer.*Maintainer/m,
         'protected_branches', 'debian/devscripts');
 
     # checkout

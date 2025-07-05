@@ -28,7 +28,7 @@ GETCOMMAND=""
 usage() { echo \
 "Usage: $PROGNAME [--help|-h|--version|-v|--diff|-d] [package ...]
   List all installed (or listed) packages with Request for
-  Adoption (RFA), Request for Help (RHF), or Orphaned (O)
+  Adoption (RFA), Request for Help (RFH), or Orphaned (O)
   bugs against them, as determined from the WNPP website.
   https://www.debian.org/devel/wnpp"
 }

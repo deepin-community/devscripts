@@ -416,13 +416,16 @@ If I<matching-pattern> is set to B<HEAD>, B<uscan> downloads source from the
 B<HEAD> of the git repository and the pertinent I<version> is automatically
 generated with the date and hash of the B<HEAD> of the git repository.
 
-If I<matching-pattern> is set to B<refs/heads/>I<branch>, B<uscan> downloads source
+If I<matching-pattern> is set to B<heads/>I<branch>, B<uscan> downloads source
 from the named I<branch> of the git repository.
 
-The local repository is temporarily created as a bare git repository directory
-under the destination directory where the downloaded archive is generated.  This
-is normally erased after the B<uscan> execution.  This local repository is kept
-if B<--debug> option is used.
+The local repository is created temporarily as either a bare git repository or
+a cloned git repository if B<gitmodules> is specified. The tarball is then
+generated from the temporary git repository and saved in the destination
+directory.
+
+The temporary repository is normally erased after
+B<uscan> execution but is kept if the B<--debug> option is specified.
 
 If the current directory is a git repository and the searched repository is
 listed among the registered "remotes", then uscan will use it instead of cloning
@@ -481,7 +484,7 @@ B<strftime> manpage.  The default is B<date=%Y%m%d>.
 Set the git archive export operation I<mode>. The default is
 B<gitexport=default>.  Set this to B<gitexport=all> to include all files in the
 .orig.tar archive, ignoring any I<export-ignore> git attributes defined by the
-upstream.
+upstream. This option also applies to submodules, if B<gitmodules> is specified.
 
 This option is valid only in git mode.
 
@@ -495,9 +498,17 @@ If the current directory is a git repository and the searched repository is
 listed among the registered "remotes", then uscan will use it instead of cloning
 separately.
 
+=item B<gitmodules>[=I<modules>]
+
+Clone one or more submodules after cloning the main git repository. By default,
+uscan will clone all submodules linked to the git repository.
+
+To clone selected submodules, use a semicolon-separated list. For example:
+gitmodules=m4;doc/common.
+
 =item B<pgpmode=>I<mode>
 
-Set the PGP/GPG signature verification I<mode>.
+Set the OpenPGP signature verification I<mode>.
 
 =over
 
@@ -568,7 +579,7 @@ npmjs.com:
 
 =item B<decompress>
 
-Decompress compressed archive before the pgp/gpg signature verification.
+Decompress compressed archive before the OpenPGP signature verification.
 
 =item B<bare>
 
@@ -861,8 +872,8 @@ tarball href and the signature file is tried to be downloaded from it.
 
 If the B<pgpsigurlmangle> rule doesn't exist, B<uscan> warns user if the
 matching upstream signature file is available from the same URL with their
-filename being suffixed by the 5 common suffix B<asc>, B<gpg>, B<pgp>, B<sig>
-and B<sign>. (You can avoid this warning by setting B<pgpmode=none>.)
+filename being suffixed by the 5 common suffix B<asc>, B<sig>, B<sign>,
+B<pgp> and B<gpg>. (You can avoid this warning by setting B<pgpmode=none>.)
 
 If the signature file is downloaded, the downloaded upstream tarball is checked
 for its authenticity against the downloaded signature file using the armored keyring
@@ -1248,29 +1259,60 @@ upstream releases properly named tarballs on their releases page, you can
 search for the browser download URL (API key F<browser_download_url>):
 
   version=4
-  opts="searchmode=plain" \
-      https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
-      https://github.com/<user>/<project>/releases/download/[^/]+/@PACKAGE@-@ANY_VERSION@@ARCHIVE_EXT@
+  opts=\
+  filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,\
+  downloadurlmangle=s%(api.github.com/repos/[^/]+/[^/]+)/git/refs/%$1/tarball/refs/%g,\
+  searchmode=plain \
+   https://api.github.com/repos/<user>/<project>/git/matching-refs/tags/ \
+   https://api.github.com/repos/[^/]+/[^/]+/git/refs/tags/@ANY_VERSION@
 
-If the release page only contains the auto-generated tar.gz source code tarball,
-search for the tarball URL (API key F<tarball_url>). The tarball URL uses only
-the version as the filename.  You can rename the downloaded upstream tarball
-into the standard F<< <project>-<version>.tar.gz >> using B<filenamemangle>:
+It is also possible to filter tags by prefix. For example to get only tags
+starting by C<v1>:
+
+  version=4
+  opts=\
+  filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,\
+  downloadurlmangle=s%(api.github.com/repos/[^/]+/[^/]+)/git/refs/%$1/tarball/refs/%g,\
+  searchmode=plain \
+   https://api.github.com/repos/<user>/<project>/git/matching-refs/tags/v1 \
+   https://api.github.com/repos/[^/]+/[^/]+/git/refs/tags/@ANY_VERSION@
+
+Alternatives with releases only (if upstream does not delete tag after release):
+
+  version=4
+  opts=\
+  filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,\
+  downloadurlmangle=s%api.github.com/repos/([^/]+/[^/]+)/git/refs/tags/@ANY_VERSION@%github.com/$1/archive/refs/tags/$2.tar.gz%g,\
+  searchmode=plain \
+   https://api.github.com/repos/<user>/<project>/git/matching-refs/tags/ \
+   https://api.github.com/repos/[^/]+/[^/]+/git/refs/tags/@ANY_VERSION@
+
+In case of release that does not use tags or deleted tags:
 
   version=4
   opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
       https://api.github.com/repos/<user>/<project>/releases?per_page=100 \
       https://api.github.com/repos/<user>/<project>/tarball/@ANY_VERSION@
 
-If there are no upstream releases, you can query the equivalent tags page:
-
-  version=4
-  opts="filenamemangle=s%.*/@ANY_VERSION@%@PACKAGE@-$1.tar.gz%,searchmode=plain" \
-      https://api.github.com/repos/<user>/<project>/tags?per_page=100 \
-      https://api.github.com/repos/<user>/<project>/tarball/refs/tags/@ANY_VERSION@
-
 If upstream releases alpha/beta tarballs, you will need to make use of the
 B<uversionmangle> option: F<uversionmangle=s/(a|alpha|b|beta|c|dev|pre|rc)/~$1/>
+
+If upstream forget to tag a release for instance here the C<1.2.3> version corresponding
+to commit C<0123456789abcdf01234567890abcef012345678>, you could download it,
+using the following combination of B<oversionmangle>, B<filenamemangle>,
+B<downloadurlmangle> options:
+
+  version=4
+  opts=\
+  downloadurlmangle=s%(api.github.com/repos/[^/]+/[^/]+)/git/refs/.*%$1/tarball/0123456789abcdf01234567890abcef012345678%g,\
+  oversionmangle=s/.*/1.2.3~git/g,\
+  filenamemangle=s%.*%1.2.3~git.tar.gz%,\
+  searchmode=plain \
+   https://api.github.com/repos/ImageMagick/ImageMagick/git/matching-refs/tags/ \
+   https://api.github.com/repos/[^/]+/[^/]+/git/refs/tags/@ANY_VERSION@
+
+Remember, in this case, after B<gbp> B<import-orig> B<--uscan> to revert
+the F<debian/watch> file.
 
 =head2 PyPI
 
@@ -1351,7 +1393,8 @@ In this case, the main source has to be declared as "group":
     https://registry.npmjs.org/require_optional/-/require_optional-@ANY_VERSION@@ARCHIVE_EXT@ checksum
 
 The "checksum" is made up of the separate sum of each number composing the
-component versions.  Following is an example with 3 components whose versions
+component versions and prefixed with ~cs (short for checksum).  Following is an
+example with 3 components whose versions
 are "1.2.4", "2.0.1" and "10.0", with the main tarball having version "2.0.6":
 
   Main: 2.0.6
@@ -1413,6 +1456,25 @@ behavior.
 The generation of the upstream version string may the adjusted to your taste by
 adding B<pretty> and B<date> options to the B<opts> arguments.
 
+=head2 direct access to the git repository (with submodules)
+
+If the upstream only publishes its code via a git repository and the repository
+includes submodules, you can use B<uscan> with the tags or HEAD of the git
+repository to track and package the new upstream release.
+
+Use B<gitmodules> to clone all submodules:
+
+  version=4
+  opts="mode=git, gitmode=shallow, gitmodules" \
+  https://github.com/namespace/project [refs/tags/v@ANY_VERSION@|HEAD]
+
+To clone selected submodules (and exclude others), use B<gitmodules> with
+a semicolon-separated list:
+
+  version=4
+  opts="mode=git, gitmode=shallow, gitmodules=m4;doc/common" \
+  https://github.com/namespace/project [refs/tags/v@ANY_VERSION@|HEAD]
+
 =head2 direct access to the Subversion repository (tags)
 
 If the upstream only publishes its code via the Subversion repository and its
@@ -1439,6 +1501,18 @@ automatically generated version string.
 
 By default, B<uscan> generates the new upstream version by appending the
 revision number to "0.0~svn". This can later be changed using B<uversionmangle>.
+
+=head2 Fossil
+
+For Fossil based projects, the tarball URL can be deduced from the taglist page.
+
+  version=4
+  opts=" \
+    searchmode=plain, \
+    filenamemangle=s/timeline\?t=(@ANY_VERSION@)/@PACKAGE@-$1.tar.gz/, \
+    downloadurlmangle=s#/timeline\?t=(@ANY_VERSION@)#/tarball/Grammalecte.tar.gz?r=$1#" \
+    http://grammalecte.net:8080/taglist \
+    /timeline\?t=@ANY_VERSION@
 
 =head1 COPYRIGHT FILE EXAMPLES
 
@@ -1509,7 +1583,7 @@ servers.  You must verify the downloaded OpenPGP key using its full fingerprint
 value which you know is the trusted one.
 
 The armored keyring file F<debian/upstream/signing-key.asc> can be created by
-using the B<gpg> (or B<gpg2>) command as follows.
+using the B<gpg> command as follows.
 
   $ gpg --recv-keys "C77E2D6872543FAF"
   ...
@@ -1714,6 +1788,13 @@ Specify the current upstream version rather than examine F<debian/watch> or
 F<debian/changelog> to determine it. This is ignored if a directory scan is being
 performed and more than one F<debian/watch> file is found.
 
+=item B<--vcs-export-uncompressed>
+
+Disable compression of tarballs exported from a version control system
+(Git or Subversion). This takes more space, but saves time if
+B<mk-origtargz> must repack the tarball to exclude files. It forces
+repacking of all exported tarballs.
+
 =item B<--watchfile> I<watchfile>
 
 Specify the I<watchfile> rather than perform a directory scan to determine it.
@@ -1816,12 +1897,14 @@ Instead of symlinking as described above, rename the downloaded files.
 
 =item B<--repack>
 
-After having downloaded an lzma tar, xz tar, bzip tar, gz tar, zip, jar, xpi,
-zstd archive, repack it to the specified compression (see B<--compression>).
+After having downloaded an lzma tar, xz tar, bzip tar, gz tar, lz tar, zip, jar,
+xpi, zstd archive, repack it to the specified compression
+(see B<--compression>).
 
 The unzip package must be installed in order to repack zip, jar, and xpi
 archives, the xz-utils package must be installed to repack lzma or xz tar
-archives, and zstd must be installed to repack zstd archives.
+archives, zstd must be installed to repack zstd archives, and lzip must be
+installed to repack lz tar archives.
 
 =item B<--compression> [ B<gzip> | B<bzip2> | B<lzma> | B<xz> ]
 
@@ -1929,6 +2012,12 @@ This is equivalent to the B<--no-exclusion> option.
 
 If set, the specified http header will be used if URL match. This is equivalent
 to B<--http-header> option.
+
+=item B<USCAN_VCS_EXPORT_UNCOMPRESSED>
+
+If this is set to yes, tarballs exported from a version control system
+will not be compressed. This is equivalent to the
+B<--vcs-export-uncompressed> option.
 
 =back
 

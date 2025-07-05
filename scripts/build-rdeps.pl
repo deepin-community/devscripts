@@ -25,23 +25,25 @@ build-rdeps - find packages that depend on a specific package to build (reverse 
 
 =head1 SYNOPSIS
 
-B<build-rdeps> I<package>
+B<build-rdeps> I<package> [I<package> ...]
 
 =head1 DESCRIPTION
 
-B<build-rdeps> searches for all packages that build-depend on the specified package.
+B<build-rdeps> searches for all source packages that build-depend on any of the specified binary packages.
 
-The default behaviour is to just `grep` for the given dependency in the
+The default behaviour is to just `grep` for the given dependencies in the
 Build-Depends field of apt's Sources files.
 
 If the package dose-extra >= 4.0 is installed, then a more complete reverse
-build dependency computation is carried out. In particular, with that package
-installed, build-rdeps will find transitive reverse dependencies, respect
+build dependency computation is carried out. In particular, with B<dose-extra>
+installed, B<build-rdeps> will find transitive reverse dependencies, respect
 architecture and build profile restrictions, take Provides relationships,
 Conflicts, Pre-Depends, Build-Depends-Arch and versioned dependencies into
 account and correctly resolve multiarch relationships for crossbuild reverse
-dependency resolution.  (This tends to be a slow process due to the complexity
-of the package interdependencies.)
+dependency resolution. This tends to be a slow process due to the complexity
+of the package interdependencies. If you need to find the reverse dependencies
+of more than one binary package, consider supplying all binary packages as
+additional arguments instead of calling B<build-rdeps> multiple times.
 
 =head1 OPTIONS
 
@@ -96,6 +98,11 @@ Explicitly set the build architecture. The default is the value of
 Ignore Build-Depends-Indep or Build-Depends-Arch while looking for reverse
 dependencies.
 
+=item B<--no-ftbfs>
+
+Do not output source packages which have open FTBFS bugs in the selected
+distribution. This functionality uses the B<debftbfs> utility.
+
 =item B<--old>
 
 Force the old simple behaviour without dose-ceve support even if dose-extra >=
@@ -144,9 +151,13 @@ use warnings;
 use strict;
 use File::Basename;
 use Getopt::Long qw(:config bundling permute no_getopt_compat);
+use File::Temp   qw(tempfile tempdir);
 
 use Dpkg::Control;
 use Dpkg::Vendor qw(get_current_vendor);
+use Dpkg::IPC;
+use Dpkg::Path qw(find_command);
+use English;
 
 my $progname = basename($0);
 my $version  = '1.0';
@@ -159,7 +170,7 @@ my $opt_maintainer;
 my $opt_mainonly;
 my $opt_develonly = 0;
 my $opt_distribution;
-my $opt_origin = 'Debian';
+my $opt_origin = get_current_vendor();
 my @opt_exclude_components;
 my $opt_buildarch;
 my $opt_hostarch;
@@ -167,6 +178,7 @@ my $opt_without_ceve;
 my $opt_quiet;
 my $opt_noarchall;
 my $opt_noarchany;
+my $opt_noftbfs;
 
 sub version {
     print <<"EOT";
@@ -204,10 +216,16 @@ Options:
    --build-arch                   Set the build architecture (requires dose-extra >= 4.0)
    --no-arch-all                  Ignore Build-Depends-Indep
    --no-arch-any                  Ignore Build-Depends-Arch
+   --no-ftbfs                     Ignore source packages with open FTBFS bugs (uses debftbfs)
    --old                          Use the old simple reverse dependency resolution
 
 EOT
     version;
+}
+
+sub debug {
+    my $msg = shift;
+    print STDERR "DEBUG: $msg\n" if $opt_debug;
 }
 
 sub test_ceve {
@@ -217,13 +235,12 @@ sub test_ceve {
     # ceve version
     system('dose-ceve -T debsrc debsrc:///dev/null > /dev/null 2>&1');
     if ($? == -1) {
-        print STDERR "DEBUG: dose-ceve cannot be executed: $!\n"
-          if ($opt_debug);
+        debug "dose-ceve cannot be executed: $!";
         $ceve_compatible = 0;
     } elsif ($? == 0) {
         $ceve_compatible = 1;
     } else {
-        print STDERR "DEBUG: dose-ceve is too old\n" if ($opt_debug);
+        debug 'dose-ceve is too old';
         $ceve_compatible = 0;
     }
     return $ceve_compatible;
@@ -231,7 +248,7 @@ sub test_ceve {
 
 sub is_devel_release {
     my $ctrl = shift;
-    if (get_current_vendor() eq 'Debian') {
+    if ($opt_origin eq 'Debian') {
         return $ctrl->{Suite} eq 'unstable' || $ctrl->{Codename} eq 'sid';
     } else {
         return $ctrl->{Suite} eq 'devel';
@@ -254,8 +271,7 @@ sub indextargets {
         push(@cmd, 'Component: main');
     }
 
-    print STDERR 'DEBUG: Running ' . join(' ', map { "'$_'" } @cmd) . "\n"
-      if $opt_debug;
+    debug 'Running ' . join(' ', map { "'$_'" } @cmd);
     return @cmd;
 }
 
@@ -281,10 +297,16 @@ sub collect_files {
         my $ctrl = Dpkg::Control->new(type => CTRL_UNKNOWN);
         if (!$ctrl->parse($targets, 'apt-get indextargets')) {
             next;
+        } else {
+            debug "index targets stanza parsed";
+            print STDERR $ctrl if ($opt_debug);
         }
+
         # Only need Sources/Packages stanzas
         if (   $ctrl->{'Created-By'} ne 'Packages'
             && $ctrl->{'Created-By'} ne 'Sources') {
+            debug qq("Created-By: $ctrl->{'Created-By'}" )
+              . qq(not Packages/Sources\n);
             next;
         }
 
@@ -295,17 +317,29 @@ sub collect_files {
             my $invalid_component = '(?:'
               . join('|', map { "\Q$_\E" } @opt_exclude_components) . ')';
             if ($ctrl->{Component} =~ m/$invalid_component/) {
+                debug qq("Component: $ctrl->{Component}" )
+                  . qq(not $invalid_component\n);
                 next;
             }
         }
 
         # And the provided distribution
-        if ($opt_distribution) {
+        if (   !exists $ctrl->{Suite}
+            || !exists $ctrl->{Codename}) {
+            debug "no Suite or no Codename\n";
+            next;
+        } elsif ($opt_distribution) {
             if (   $ctrl->{Suite} !~ m/\Q$opt_distribution\E/
                 && $ctrl->{Codename} !~ m/\Q$opt_distribution\E/) {
+                debug qq("Suite: $ctrl->{Suite}" and )
+                  . qq("Codename: $ctrl->{Codename}" )
+                  . qq(not $opt_distribution\n);
                 next;
             }
         } elsif ($opt_develonly && !is_devel_release($ctrl)) {
+            debug qq("Suite: $ctrl->{Suite}" and )
+              . qq("Codename: $ctrl->{Codename}" )
+              . qq(not devel release\n);
             next;
         }
 
@@ -315,46 +349,150 @@ sub collect_files {
 
         if ($ctrl->{'Created-By'} eq 'Sources') {
             $ref->{sources} = $ctrl->{Filename};
-            print STDERR "DEBUG: Added source file: $ctrl->{Filename}\n"
-              if $opt_debug;
+            debug "Added source file: $ctrl->{Filename}";
         } else {
             $ref->{ $ctrl->{Architecture} } = $ctrl->{Filename};
+            debug "Added $ctrl->{Architecture} packages "
+              . "file: $ctrl->{Filename}";
         }
+
+        print STDERR "\n"
+          if $opt_debug;
     }
     close($targets);
 
     return \%info;
 }
 
+# File::Temp has an END block which cleans up the temporary directory
+# we created with CLEANUP=>1 but we have to explicitly die() or otherwise
+# the interpreter will exit on HUP, INT, PIPE and TERM instead of calling
+# the END block
+use sigtrap qw(die normal-signals);
+
 sub findreversebuilddeps {
-    my ($package, $info) = @_;
+    my ($info, $comp, @packages) = @_;
     my $count = 0;
 
-    my $source_file = $info->{sources};
+    my %ftbfs = ();
+    # if desired, use debftbfs to prevent reverse dependencies from being
+    # printed which are currently known to be unbuildable
+    if ($opt_noftbfs) {
+        my $debftbfs_exe = "debftbfs";
+        # if build-rdeps is run from a git clone, also use debftbfs from here
+        if ($PROGRAM_NAME eq "scripts/build-rdeps.pl"
+            && -x "scripts/debftbfs") {
+            $debftbfs_exe = "scripts/debftbfs";
+        }
+        my $debftbfs;
+        my $debftbfs_pid = spawn(
+            exec => [
+                $debftbfs_exe,
+                (
+                    $opt_distribution
+                    ? ('--distribution', $opt_distribution)
+                    : ()
+                ),
+                '--source',
+                'udd.d.o'
+            ],
+            to_pipe => \$debftbfs
+        );
+        while (my $line = <$debftbfs>) {
+            my $src = (split /\s+/, $line, 2)[0];
+            $ftbfs{$src} = 1;
+        }
+        close($debftbfs);
+        wait_child($debftbfs_pid, nocheck => 1, cmdline => "debftbfs");
+    }
+
+    my $source_file = $info->{$comp}->{sources};
     if ($use_ceve) {
         die "build arch undefined" if !defined $opt_buildarch;
         die "host arch undefined"  if !defined $opt_hostarch;
 
-        my $buildarch_file = $info->{$opt_buildarch};
-        my $hostarch_file  = $info->{$opt_hostarch};
+        my $buildarch_file = $info->{$comp}->{$opt_buildarch};
+        my $hostarch_file  = $info->{$comp}->{$opt_hostarch};
+
+        my $tmpdir = tempdir('build-rdepsXXXXXX', TMPDIR => 1, CLEANUP => 1);
+        (undef, my $tmp_buildarch_file)
+          = tempfile('Packages_build.XXXXXX', OPEN => 0, DIR => $tmpdir);
+        (undef, my $tmp_hostarch_file)
+          = tempfile('Packages_host.XXXXXX', OPEN => 0, DIR => $tmpdir);
+        (undef, my $tmp_source_file)
+          = tempfile('Sources.XXXXXX', OPEN => 0, DIR => $tmpdir);
+
+        spawn(
+            exec => ['/usr/lib/apt/apt-helper', 'cat-file', $buildarch_file],
+            to_file    => $tmp_buildarch_file,
+            wait_child => 1
+        );
+        spawn(
+            exec    => ['/usr/lib/apt/apt-helper', 'cat-file', $source_file],
+            to_file => $tmp_source_file,
+            wait_child => 1
+        );
 
         my @ceve_cmd = (
-            'dose-ceve',             '-T',
-            'debsrc',                '-r',
-            $package,                '-G',
-            'pkg',                   "--deb-native-arch=$opt_buildarch",
-            "deb://$buildarch_file", "debsrc://$source_file"
+            'dose-ceve', "--deb-native-arch=$opt_buildarch",
+            '-T',        'debsrc',
+            '-r', (join ',', @packages),
+            '-G',                        'pkg',
+            "deb://$tmp_buildarch_file", "debsrc://$tmp_source_file"
         );
+
+        if ($comp ne "main") {
+            # if this is not "main", also add "main" to the mix, to resolve
+            # dependencies correctly
+            (undef, my $tmp_buildarch_file_main) = tempfile(
+                'Packages_build_main.XXXXXX',
+                OPEN => 0,
+                DIR  => $tmpdir
+            );
+            spawn(
+                exec => [
+                    '/usr/lib/apt/apt-helper', 'cat-file',
+                    $info->{main}->{$opt_buildarch}
+                ],
+                to_file    => $tmp_buildarch_file_main,
+                wait_child => 1
+            );
+            push(@ceve_cmd, "deb://$tmp_buildarch_file_main");
+        }
+
         if ($opt_buildarch ne $opt_hostarch) {
             push(@ceve_cmd,
                 "--deb-host-arch=$opt_hostarch",
                 "deb://$hostarch_file");
+            spawn(
+                exec =>
+                  ['/usr/lib/apt/apt-helper', 'cat-file', $hostarch_file],
+                to_file    => $tmp_hostarch_file,
+                wait_child => 1
+            );
+            if ($comp ne "main") {
+                # if this is not "main", also add "main" to the mix, to resolve
+                # dependencies correctly
+                (undef, my $tmp_hostarch_file_main) = tempfile(
+                    'Packages_host_main.XXXXXX',
+                    OPEN => 0,
+                    DIR  => $tmpdir
+                );
+                spawn(
+                    exec => [
+                        '/usr/lib/apt/apt-helper', 'cat-file',
+                        $info->{main}->{$opt_hostarch}
+                    ],
+                    to_file    => $tmp_hostarch_file_main,
+                    wait_child => 1
+                );
+                push(@ceve_cmd, "deb://$tmp_hostarch_file_main");
+            }
         }
         push(@ceve_cmd, "--deb-drop-b-d-indep") if ($opt_noarchall);
         push(@ceve_cmd, "--deb-drop-b-d-arch")  if ($opt_noarchany);
         my %sources;
-        print STDERR 'DEBUG: executing: ' . join(' ', @ceve_cmd)
-          if ($opt_debug);
+        debug 'executing: ' . join(' ', @ceve_cmd);
         open(SOURCES, '-|', @ceve_cmd);
         while (<SOURCES>) {
             next unless s/^Package:\s+//;
@@ -362,6 +500,9 @@ sub findreversebuilddeps {
             $sources{$_} = 1;
         }
         for my $source (sort keys %sources) {
+            if ($opt_noftbfs && exists $ftbfs{$source}) {
+                next;
+            }
             print $source;
             if ($opt_maintainer) {
                 my $maintainer
@@ -377,21 +518,23 @@ sub findreversebuilddeps {
           or die
 "$progname: Unable to run \"apt-helper cat-file '$source_file'\": $!";
 
-        my %packages;
+        my %rdeps;
         until (eof $out) {
             my $ctrl = Dpkg::Control->new(type => CTRL_INDEX_SRC);
             if (!$ctrl->parse($out, 'apt-helper cat-file')) {
                 next;
             }
             print STDERR "$ctrl\n" if ($opt_debug);
-            for my $relation (
-                qw(Build-Depends Build-Depends-Indep Build-Depends-Arch)) {
-                if (exists $ctrl->{$relation}) {
-                    if ($ctrl->{$relation}
-                        =~ m/^(.*\s)?\Q$package\E(?::[a-zA-Z0-9][a-zA-Z0-9-]*)?([\s,]|$)/
-                    ) {
-                        $packages{ $ctrl->{Package} }{Maintainer}
-                          = $ctrl->{Maintainer};
+            foreach my $package (@packages) {
+                for my $relation (
+                    qw(Build-Depends Build-Depends-Indep Build-Depends-Arch)) {
+                    if (exists $ctrl->{$relation}) {
+                        if ($ctrl->{$relation}
+                            =~ m/^(.*\s)?\Q$package\E(?::[a-zA-Z0-9][a-zA-Z0-9-]*)?([\s,]|$)/
+                        ) {
+                            $rdeps{ $ctrl->{Package} }{Maintainer}
+                              = $ctrl->{Maintainer};
+                        }
                     }
                 }
             }
@@ -399,10 +542,13 @@ sub findreversebuilddeps {
 
         close($out);
 
-        while (my $depending_package = each(%packages)) {
+        while (my $depending_package = each(%rdeps)) {
+            if ($opt_noftbfs && exists $ftbfs{$depending_package}) {
+                next;
+            }
             print $depending_package;
             if ($opt_maintainer) {
-                print " ($packages{$depending_package}->{'Maintainer'})";
+                print " ($rdeps{$depending_package}->{'Maintainer'})";
             }
             print "\n";
             $count += 1;
@@ -411,10 +557,13 @@ sub findreversebuilddeps {
 
     if (!$opt_quiet) {
         if ($count == 0) {
-            print "No reverse build-depends found for $package.\n\n";
+            print(  "No reverse build-depends found for "
+                  . (join ', ', @packages)
+                  . ".\n\n");
         } else {
-            print
-"\nFound a total of $count reverse build-depend(s) for $package.\n\n";
+            print(  "\nFound a total of $count reverse build-depend(s) for "
+                  . (join ', ', @packages)
+                  . ".\n\n");
         }
     }
 }
@@ -434,6 +583,7 @@ GetOptions(
     "build-arch=s"        => \$opt_buildarch,
     "no-arch-all"         => \$opt_noarchall,
     "no-arch-any"         => \$opt_noarchany,
+    "no-ftbfs"            => \$opt_noftbfs,
     #   "profiles=s" => \$opt_profiles, # FIXME: add build profile support
     #                                            once dose-ceve has a
     #                                            --deb-profiles option
@@ -443,13 +593,15 @@ GetOptions(
     "h|help"    => sub { usage; },
     "v|version" => sub { version; }) or do { usage; exit 1; };
 
-my $package = shift;
+my @packages = @ARGV;
 
-if (!$package) {
+if (scalar @packages == 0) {
     die "$progname: missing argument. expecting packagename\n";
 }
 
-print STDERR "DEBUG: Package => $package\n" if ($opt_debug);
+foreach my $package (@packages) {
+    debug "Package => $package";
+}
 
 if ($opt_hostarch) {
     if ($opt_without_ceve) {
@@ -488,32 +640,30 @@ if (!$use_ceve and !$opt_without_ceve) {
 }
 
 if ($use_ceve) {
-    if (system('command -v grep-dctrl >/dev/null 2>&1')) {
+    if (!find_command('grep-dctrl')) {
         die
 "$progname: Fatal error. grep-dctrl is not available.\nPlease install the 'dctrl-tools' package.\n";
     }
-
-    # set hostarch and buildarch if they have not been set yet
-    if (!$opt_hostarch) {
-        $opt_hostarch = `dpkg-architecture --query DEB_HOST_ARCH`;
-        chomp $opt_hostarch;
-    }
-    if (!$opt_buildarch) {
-        $opt_buildarch = `dpkg-architecture --query DEB_BUILD_ARCH`;
-        chomp $opt_buildarch;
-    }
-    print STDERR "DEBUG: running with dose-ceve resolver\n" if ($opt_debug);
-    print STDERR "DEBUG: buildarch=$opt_buildarch hostarch=$opt_hostarch\n"
-      if ($opt_debug);
+    debug 'running with dose-ceve resolver';
 } else {
-    print STDERR "DEBUG: running with old resolver\n" if ($opt_debug);
+    debug 'running with old resolver';
 }
+# set hostarch and buildarch if they have not been set yet
+if (!$opt_hostarch) {
+    $opt_hostarch = `dpkg-architecture --query DEB_HOST_ARCH`;
+    chomp $opt_hostarch;
+}
+if (!$opt_buildarch) {
+    $opt_buildarch = `dpkg-architecture --query DEB_BUILD_ARCH`;
+    chomp $opt_buildarch;
+}
+debug "buildarch=$opt_buildarch hostarch=$opt_hostarch";
 
 if ($opt_update) {
-    print STDERR "DEBUG: Updating apt-cache before search\n" if ($opt_debug);
+    debug 'Updating apt-cache before search';
     my @cmd;
     if ($opt_sudo) {
-        print STDERR "DEBUG: Using sudo to become root\n" if ($opt_debug);
+        debug 'Using sudo to become root';
         push(@cmd, 'sudo');
     }
     push(@cmd, 'apt-get', 'update');
@@ -530,15 +680,54 @@ if (!%{$file_info}) {
 foreach my $site (sort keys %{$file_info}) {
     foreach my $suite (sort keys %{ $file_info->{$site} }) {
         foreach my $comp (qw(main contrib non-free non-free-firmware)) {
-            if (exists $file_info->{$site}{$suite}{$comp}) {
+            next unless exists $file_info->{$site}{$suite}{$comp};
+            my $skipmsg = "I: skipping $site $suite $comp because";
+            if (!exists $file_info->{$site}{$suite}{$comp}->{sources}) {
                 if (!$opt_quiet) {
-                    my $msg = "Reverse Build-depends in $suite/$comp:";
-                    print "$msg\n";
-                    print "-" x length($msg) . "\n\n";
+                    print STDERR "$skipmsg Sources is missing\n";
                 }
-                findreversebuilddeps($package,
-                    $file_info->{$site}{$suite}{$comp});
+                next;
             }
+            if (!exists $file_info->{$site}{$suite}{$comp}->{$opt_hostarch}) {
+                if (!$opt_quiet) {
+                    print STDERR "$skipmsg binary-$opt_hostarch is missing\n";
+                }
+                next;
+            }
+            if (!exists $file_info->{$site}{$suite}{$comp}->{$opt_buildarch}) {
+                if (!$opt_quiet) {
+                    print STDERR "$skipmsg binary-$opt_buildarch is missing\n";
+                }
+                next;
+            }
+            # for all components that are not "main", the component "main"
+            # must exist as well for the build and host architectures
+            if ($comp ne "main") {
+                $skipmsg .= " for associated component \"main\",";
+                if (!exists $file_info->{$site}{$suite}{"main"}
+                    ->{$opt_hostarch}) {
+                    if (!$opt_quiet) {
+                        print STDERR
+                          "$skipmsg binary-$opt_hostarch is missing\n";
+                    }
+                    next;
+                }
+                if (!exists $file_info->{$site}{$suite}{"main"}
+                    ->{$opt_buildarch}) {
+                    if (!$opt_quiet) {
+                        print STDERR
+                          "$skipmsg binary-$opt_buildarch is missing\n";
+                    }
+                    next;
+                }
+            }
+            if (!$opt_quiet) {
+                my $msg = "Reverse Build-depends in $suite/$comp:";
+                print STDERR "$msg\n";
+                print STDERR "-" x length($msg) . "\n\n";
+            }
+            findreversebuilddeps($file_info->{$site}{$suite}, $comp,
+                @packages);
         }
     }
 }

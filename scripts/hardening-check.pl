@@ -11,21 +11,22 @@ use Symbol qw(gensym);
 use Term::ANSIColor;
 use IO::Select;
 
-my $skip_pie            = 0;
-my $skip_stackprotector = 0;
-my $skip_fortify        = 0;
-my $skip_relro          = 0;
-my $skip_bindnow        = 0;
-my $skip_cfprotection   = 0;
-my $report_functions    = 0;
-my $find_libc_functions = 0;
-my $color               = 0;
-my $lintian             = 0;
-my $verbose             = 0;
-my $debug               = 0;
-my $quiet               = 0;
-my $help                = 0;
-my $man                 = 0;
+my $skip_pie              = 0;
+my $skip_stackprotector   = 0;
+my $skip_fortify          = 0;
+my $skip_relro            = 0;
+my $skip_bindnow          = 0;
+my $skip_cfprotection     = 0;
+my $skip_branchprotection = 0;
+my $report_functions      = 0;
+my $find_libc_functions   = 0;
+my $color                 = 0;
+my $lintian               = 0;
+my $verbose               = 0;
+my $debug                 = 0;
+my $quiet                 = 0;
+my $help                  = 0;
+my $man                   = 0;
 
 GetOptions(
     "nopie|p+"               => \$skip_pie,
@@ -34,6 +35,7 @@ GetOptions(
     "norelro|r+"             => \$skip_relro,
     "nobindnow|b+"           => \$skip_bindnow,
     "nocfprotection|x+"      => \$skip_cfprotection,
+    "nobranchprotection|B+"  => \$skip_branchprotection,
     "report-functions|R!"    => \$report_functions,
     "find-libc-functions|F!" => \$find_libc_functions,
     "color|c!"               => \$color,
@@ -493,6 +495,15 @@ foreach my $file (@ARGV) {
             $skip_cfprotection);
     }
 
+    # For branch protection look for AArch64 feature: BTI, PAC
+    $name = " Branch Protection";
+    if ($NOTES =~ /^\s+Properties: AArch64 feature: BTI, PAC/m) {
+        good($name, "yes");
+    } else {
+        bad("no-branchprotection", $file, $name, "no, not found!",
+            $skip_branchprotection);
+    }
+
     if (!$lintian && (!$quiet || $rc != 0)) {
         print $report, "\n";
     }
@@ -588,6 +599,15 @@ relocations before starting program execution. When combined with RELRO
 above, this further reduces the regions of memory available to memory
 corruption attacks.
 
+=item B<Branch Protection>
+
+This indicates the executable was built with -mbranch-protection=standard.
+On ARM processors, this provides additional control flow protections using
+Branch Target Instructions (BTI) that mark all valid branch locations and
+Pointer Authentication Codes (PAC) that sign and verify indirect branch
+targets. This helps prevent the use of exploits that work by causing
+a program to start executing code at an arbitrary location in memory.
+
 =back
 
 =head1 OPTIONS
@@ -614,9 +634,13 @@ Do not require that the checked binaries be built with RELRO.
 
 Do not require that the checked binaries be built with BIND_NOW.
 
-=item B<--nocfprotection>, B<-b>
+=item B<--nocfprotection>, B<-x>
 
 Do not require that the checked binaries be built with control flow protection.
+
+=item B<--nobranchprotection>, B<-B>
+
+Do not require that the checked binaries be built with branch protection.
 
 =item B<--quiet>, B<-q>
 

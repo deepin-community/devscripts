@@ -109,6 +109,7 @@ sub fetch_json_page {
     return unless defined $content;
     my $json = JSON::PP->new();
 
+    verbose "Received json:\n$content\n";
     # these are some nice json options to relax restrictions a bit:
     my $json_text = $json->allow_nonref->utf8->relaxed->decode($content);
 
@@ -413,6 +414,16 @@ if ($opt{list}) {
                 $mkDestDir->();
                 LWP::Simple::mirror($file_url, "$opt{destdir}/$file_name");
             }
+        }
+
+        if ($dsc_name) {
+            my $dscverifyexe = 'dscverify';
+            if ($progname eq "scripts/debsnap.pl" && -x "scripts/dscverify.pl")
+            {
+                $dscverifyexe = "scripts/dscverify.pl";
+            }
+
+            system $dscverifyexe, ("$opt{destdir}/$dsc_name");
         }
     }
 }

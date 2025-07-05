@@ -1,0 +1,5 @@
+Source: foo
+Build-Depends: zz-pkg, debhelper-compat (= 13), aa-pkg, ${misc:Build-Depends}, bb-pkg
+
+Package: bar
+Description: foo

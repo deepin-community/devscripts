@@ -1,0 +1,389 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright 2024 Johannes Schauer Marin Rodrigues <josch@debian.org>
+
+import argparse
+import csv
+import json
+import logging
+import shutil
+import subprocess
+import tempfile
+import urllib.request
+from collections import defaultdict
+from itertools import islice
+from pathlib import Path
+
+from debian.deb822 import Sources
+from debian.debian_support import Version
+
+
+# FIXME: replace with itertools.batched once python 3.12 is in Debian stable
+def batched(iterable, num):
+    # batched('ABCDEFG', 3) → ABC DEF G
+    if num < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(islice(iterator, num)):
+        yield batch
+
+
+def process_data(bugnum, source, affects, title):
+    yield f"{source} {bugnum} {title}"
+    for affected in affects:
+        if not affected.startswith("src:"):
+            continue
+        source = affected.removeprefix("src:")
+        yield f"{source} {bugnum} {title}"
+
+
+def run_psql(dist):
+    # the below replicates the sql command used by the udd cgi
+    # it uses bugs instead of all_bugs as we are not interested in archived bugs
+    # it uses the bugs_rt_affects_unstable table instead of the affects_unstable
+    # column as the former has all the release team logic about xx-ignore BTS tags
+    # the severity column is an enum so we can compare with greater-equal
+    query = f"""
+    COPY (SELECT id, source, affected_packages, title
+    FROM bugs
+    where id in (select id from bugs_rt_affects_{dist})
+    and id in (select id from bugs_tags where tag='ftbfs')
+    and not (id not in (select id from bugs_packages, sources
+    where bugs_packages.source = sources.source and component='main'))
+    AND (severity >= 'serious')
+    ) TO STDOUT
+    """
+    csv_data = subprocess.check_output(
+        [
+            "psql",
+            "--host=udd-mirror.debian.net",
+            "--user=udd-mirror",
+            "udd",
+            "-c",
+            query,
+        ],
+        env={"PGPASSWORD": "udd-mirror"},
+        # encoding="UTF-8",
+        text=True,
+    )
+    output = []
+    for bugnum, pkg, affects, title in csv.reader(
+        csv_data.splitlines(), delimiter="\t"
+    ):
+        output.extend(
+            process_data(
+                bugnum, pkg, affects.split(","), title.encode("latin-1").decode("utf-8")
+            )
+        )
+    print("\n".join(sorted(output)))
+
+
+def run_json(dist):
+    # the 'release' argument requires codenames, not suite names
+    codename = None
+    with urllib.request.urlopen(
+        f"http://deb.debian.org/debian/dists/{dist}/Release"
+    ) as f:
+        for line in f:
+            if not line.startswith(b"Codename: "):
+                continue
+            line = line.removeprefix(b"Codename: ")
+            codename = line.rstrip(b"\n").decode()
+            break
+    if codename is None:
+        raise ValueError(f"unable to find Codename field in Release file for {dist}")
+    with urllib.request.urlopen(
+        f"https://udd.debian.org/bugs/?release={codename}&ftbfs=only"
+        "&notmain=ign&merged=&fnewerval=7&flastmodval=7&rc=1&sortby=id"
+        "&caffected_packages=1&sorto=asc&format=json"
+    ) as response:
+        output = []
+        for entry in json.load(response):
+            bugnum = entry["id"]
+            pkg = entry["source"]
+            affects = entry["affected_packages"].split(",")
+            title = (
+                entry["title"]
+                .encode("latin-1")
+                .decode("utf-8")
+                .replace("\\", "\\\\")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n")
+                .replace("\t", "\\t")
+            )
+            output.extend(process_data(bugnum, pkg, affects, title))
+    print("\n".join(sorted(output)))
+
+
+def soap_check_vers(verlist, source, package, sources, affects, src2ver, bin2src):
+    for ver in verlist:
+        if "/" in ver:
+            # best case scenario: the version comes
+            # with its associated source package name
+            src, fver = ver.split("/")
+        elif source and "," not in source:
+            # if it does not, maybe the "source" field is set
+            src = source
+            fver = ver
+        elif len(sources) == 1:
+            # if it is not, maybe there is only a single
+            # source package in the package field
+            src = next(iter(sources))
+            fver = ver
+        elif len(bin2src.get(package, [])) == 1:
+            # if it is not, maybe the binary package can be
+            # mapped to a single source package
+            src = next(iter(bin2src[package]))
+            fver = ver
+        elif len(affects) == 1:
+            # if it is not, maybe there is only a single
+            # affected package
+            src = next(iter(affects))
+            fver = ver
+        else:
+            # otherwise, we give up
+            continue
+        if src in src2ver and src2ver[src] >= Version(fver):
+            return True
+    return False
+
+
+# pylint: disable=too-many-branches,too-many-statements,too-many-locals
+def run_soap(dist):
+    # Do not import debianbts in the toplevel so that this script can be used
+    # with the other data sources without having to install python3-debianbts
+    # pylint: disable=import-outside-toplevel,import-error
+    import debianbts
+
+    src2ver = {}
+    bin2src = defaultdict(set)
+    with tempfile.TemporaryDirectory(prefix="debftbfs") as tmpdir:
+        # download a Sources file from a mirror
+        subprocess.check_call(
+            ["chdist", "--data-dir", tmpdir, "create", "debftbfs"],
+            stdout=subprocess.DEVNULL,
+        )
+        Path(f"{tmpdir}/debftbfs/etc/apt/sources.list").write_text(
+            f"deb-src http://deb.debian.org/debian/ {dist} main", encoding="utf-8"
+        )
+        subprocess.check_call(
+            ["chdist", "--data-dir", tmpdir, "debftbfs", "apt-get", "update"],
+            stdout=subprocess.DEVNULL,
+        )
+        sources_fname = subprocess.check_output(
+            [
+                "chdist",
+                "--data-dir",
+                tmpdir,
+                "debftbfs",
+                "apt-get",
+                "indextargets",
+                "Component: main",
+                "Created-By: Sources",
+                f"Suite: {dist}",
+                "--format",
+                "$(FILENAME)",
+            ]
+        )
+
+        # fill bin2src and src2ver dicts
+        with open(sources_fname.removesuffix(b"\n"), encoding="utf-8") as sources:
+            for src in Sources.iter_paragraphs(sources):
+                for binpkg in src["Binary"].split(","):
+                    bin2src[binpkg.strip()].add(src["Package"])
+                ver = Version(src["Version"])
+                # when there are multiple versions of the source package, only
+                # keep the highest version
+                if src["Package"] in src2ver and src2ver[src["Package"]] > ver:
+                    continue
+                src2ver[src["Package"]] = ver
+
+    output = set()
+    ftbfs_bugs = sorted(
+        debianbts.get_bugs(
+            tag="ftbfs",
+            severity=("critical", "grave", "serious"),
+            # In rare cases, even archived bugs can affect packages, skipping
+            # them is a heuristic
+            archive="0",
+        )
+    )
+    for batch in batched(ftbfs_bugs, 64):
+        for bug in debianbts.get_status(batch):
+            # We must not exclude bugs that are done because they might be
+            # fixed in one suite but still affect another.
+            # if bug.done:
+            #    continue
+
+            # Guess the assigned source packages to find out whether the
+            # version of the source package in the chosen distro is affected.
+            # As bugs are allowed to carry information which does not align
+            # with the archive contents, this is a heuristic.
+            sources = set()
+            for pkg in bug.package.split(","):
+                pkg = pkg.strip()
+                if pkg.startswith("src:"):
+                    sources.add(pkg.removeprefix("src:"))
+                elif len(bin2src.get(pkg, [])) == 1:
+                    sources.add(next(iter(bin2src[pkg])))
+            affects = set()
+            for pkg in bug.affects:
+                if pkg.startswith("src:"):
+                    affects.add(pkg.removeprefix("src:"))
+                elif len(bin2src.get(pkg, [])) == 1:
+                    affects.add(next(iter(bin2src[pkg])))
+
+            # Guess whether the bug is supposedly found
+            found = False
+            # if the bug has no documented found versions, consider it
+            # found in this suite
+            if not bug.found_versions:
+                found = True
+            if soap_check_vers(
+                bug.found_versions,
+                bug.source,
+                bug.package,
+                sources,
+                affects,
+                src2ver,
+                bin2src,
+            ):
+                found = True
+            # we are only interested in bugs where the version in the
+            # given distribution is equal or greater than the version
+            # in which the bug was found
+            if not found:
+                logging.debug("skipping %s as it is not found", bug.bug_num)
+                continue
+
+            # Guess whether the bug is supposedly fixed
+            fixed = False
+            if soap_check_vers(
+                bug.fixed_versions,
+                bug.source,
+                bug.package,
+                sources,
+                affects,
+                src2ver,
+                bin2src,
+            ):
+                fixed = True
+            # we are only interested in bugs where the version in the
+            # given distribution is less than the version in which
+            # the bug was fixed
+            if fixed:
+                logging.debug("skipping %s as it is fixed", bug.bug_num)
+                continue
+
+            # in case a binary package is associated with multiple source
+            # packages, the source field has to be split
+            for src in [
+                src for src in bug.package.split(",") if src.startswith("src:")
+            ] + (bug.source.split(",") if bug.source else []):
+                src = src.strip().removeprefix("src:")
+                if src not in src2ver:
+                    continue
+                output.update(
+                    process_data(
+                        bug.bug_num,
+                        src,
+                        bug.affects,
+                        bug.subject.replace("\\", "\\\\")
+                        .replace("\r", "\\r")
+                        .replace("\n", "\\n")
+                        .replace("\t", "\\t"),
+                    )
+                )
+    print("\n".join(sorted(output)))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""\
+
+Query udd or bugs.debian.org for all source packages which currently have FTBFS
+bugs filed against them for a given distribution (default: unstable) in "main".
+If the psql utility is installed, the data will be queried from
+udd-mirror.debian.net. Otherwise it will come from udd.debian.org. Querying
+the former is a bit faster but the data might be not 100% up to date. The
+result is a line-based list of source package names, their FTBFS bug and the
+bug title, separated by a space.  Only bugs tagged 'ftbfs' and with a severity
+greater or equal to 'serious' are selected.  The result is sorted by source
+package name, alphabetically ascending.
+
+The three available data sources differ in how fast it is to retrieve the data,
+how up-to-date the data is and in the chosen heuristic to decide which ftbfs
+bugs affect which source package in a given distribution. The fastest two
+data sources are udd-mirror.debian.net and udd.debian.org with the former being
+around 20% faster than the latter but either finish in under a second. The
+former will be more outdated than the latter though at is is only a mirror.
+The slowest method is directly querying bugs.debian.org via its SOAP interface.
+While querying bugs.debian.org will retrieve the most up-to-date information,
+the heuristics chosen to decide whether a source package is affected by an
+ftbfs bug slightly differs to the heuristic used by udd. Differences mostly
+occur for bugs that were re-assigned to different source packages or have
+otherwise missing or incorrect metadata stored.
+
+""",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        help="Enable output of debugging messages",
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
+        default=logging.WARNING,
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="Print verbose output",
+        action="store_const",
+        dest="loglevel",
+        const=logging.INFO,
+    )
+    parser.add_argument(
+        "--distribution",
+        help="Pick the distribution affected by the FTBFS issue",
+        choices=["stable", "testing", "unstable", "experimental"],
+        default="unstable",
+        type=str,
+    )
+    parser.add_argument(
+        "--source",
+        help=(
+            "Choose the UDD source between udd-mirror.debian.net, "
+            "udd.debian.org and bugs.debian.org."
+        ),
+        choices=["auto", "udd-mirror.d.n", "udd.d.o", "bugs.d.o"],
+        default="auto",
+        type=str,
+    )
+    args = parser.parse_args()
+    logging.basicConfig(level=args.loglevel)
+
+    match args.source:
+        case "auto":
+            # The default method is querying udd-mirror.debian.net with psql
+            # because
+            #  - it's about 20% faster than downloading json from udd.debian.org.
+            #  - precise control over SQL statement
+            #  - no suite to codename translation required
+            # The method has the disadvantage that the data might be a
+            # outdated and that the psql utility needs to be installed.
+            if shutil.which("psql") is not None:
+                run_psql(args.distribution)
+            else:
+                run_json(args.distribution)
+        case "bugs.d.o":
+            run_soap(args.distribution)
+        case "udd-mirror.d.n":
+            run_psql(args.distribution)
+        case "udd.d.o":
+            run_json(args.distribution)
+
+
+if __name__ == "__main__":
+    main()

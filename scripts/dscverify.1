@@ -7,7 +7,8 @@ dscverify \- verify the validity of a Debian package
 \fBdscverify\fR checks that the GPG signatures on the given
 \fI.changes\fR, \fI.buildinfo\fP or \fI.dsc\fR files are good signatures
 made by keys in the current Debian keyrings, found in the \fIdebian-keyring\fR
-package.  (Additional keyrings can be specified using the
+and \fIdebian-tag2upload-keyring\fR
+packages.  (Additional keyrings can be specified using the
 \fB--keyring\fR option any number of times.)  It then checks that the
 other files listed in the \fI.changes\fR, \fI.buildinfo\fP or \fI.dsc\fR
 files have the
@@ -72,12 +73,13 @@ locations:
 
 - /usr/share/keyrings/debian-keyring.gpg
 
+- /usr/share/keyrings/debian-tag2upload.pgp
+
 - /usr/share/keyrings/debian-maintainers.gpg
 
 - /usr/share/keyrings/debian-nonupload.gpg
 .SH "SEE ALSO"
 .BR gpg (1),
-.BR gpg2 (1),
 .BR devscripts.conf (5)
 
 .SH AUTHOR

@@ -8,6 +8,7 @@ OUR_TESTS= \
 	debdiff \
 	debrepro \
 	debsign \
+	mass_bug \
 	mergechanges \
 	mk-origtargz \
 	package_lifecycle \

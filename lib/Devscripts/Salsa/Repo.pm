@@ -17,6 +17,8 @@ sub get_repo {
         $options->{order_by} = 'name';
         $options->{sort}     = 'asc';
         $options->{archived} = 'false' if not $self->config->all_archived;
+        $options->{with_shared}
+          = 'false';    # do not operate on foreign projects shared with us
         my $projects;
         # This rule disallow trying to configure all "Debian" projects:
         #  - Debian id is 2

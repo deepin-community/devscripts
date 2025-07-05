@@ -1,17 +1,18 @@
-Tests: shunit2
+Tests:
+ shunit2,
 Depends:
- build-essential,
  debhelper,
+ build-essential,
  fakeroot,
  faketime,
  git,
  gnupg,
  libdistro-info-perl,
  libgitlab-api-v4-perl,
- libipc-run-perl,
  libjson-perl,
  libtest-output-perl,
  libwww-perl,
+ lzip,
  python3-debian,
  python3-pyftpdlib,
  shunit2,
@@ -21,13 +22,17 @@ Depends:
  zip,
  zstd,
  @,
-Restrictions: allow-stderr
+Restrictions:
+ allow-stderr,
 
-Tests: destructive
+Tests:
+ destructive,
 Depends:
  apt,
  libdpkg-perl,
- libipc-run-perl,
  perl,
  @,
-Restrictions: allow-stderr, breaks-testbed, needs-root
+Restrictions:
+ allow-stderr,
+ breaks-testbed,
+ needs-root,

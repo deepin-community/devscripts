@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright © 2014-2020 Johannes Schauer Marin Rodrigues <josch@debian.org>
+# Copyright © 2014-2024 Johannes Schauer Marin Rodrigues <josch@debian.org>
 # Copyright © 2020      Niels Thykier <niels@thykier.net>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,16 +20,20 @@ use autodie;
 use Getopt::Long qw(:config gnu_getopt no_bundling no_auto_abbrev);
 
 use Dpkg::Control;
+use Dpkg::Control::FieldsCore;
 use Dpkg::Index;
 use Dpkg::Deps;
 use Dpkg::Source::Package;
+use Dpkg::Version;
 use File::Temp qw(tempfile tempdir);
 use File::Path qw(make_path);
 use File::HomeDir;
 use JSON::PP;
 use Time::Piece;
 use File::Basename;
+use File::Spec;
 use List::Util qw(any none);
+use English;
 
 my $progname;
 
@@ -69,10 +73,16 @@ BEGIN {
 
 }
 
+# Make sure that each print statement flushes standard output.
+# This avoid having to manually flush when printing strings that do not end
+# in a newline.
+STDOUT->autoflush(1);
+
 my $respect_build_path = 1;
 my $use_tor            = 0;
 my $outdir             = './';
 my $builder            = 'none';
+my $cache;
 
 my %OPTIONS = (
     'help|h'              => sub { usage(0); },
@@ -80,6 +90,7 @@ my %OPTIONS = (
     'respect-build-path!' => \$respect_build_path,
     'buildresult=s'       => \$outdir,
     'builder=s'           => \$builder,
+    'cache=s'             => \$cache,
 );
 
 sub usage {
@@ -89,9 +100,11 @@ sub usage {
 Usage: $progname [options] <buildinfo>
        $progname <--help|-h>
 
-Given a buildinfo file from a Debian package, generate instructions for
-attempting to reproduce the binary packages built from the associated source
-and build information.
+Given a buildinfo file, builds the referenced source package in an environment
+documented in the provided buildinfo file. The build can be performed by
+sbuild or other builders in a chroot environment created by debootsnap.  The
+generated artifacts will be verified against the hashes from the buildinfo
+file.
 
 Options:
  --help, -h                 Show this help and exit
@@ -99,7 +112,7 @@ Options:
                             Assumes "apt-transport-tor" is installed both in host + chroot
  --[no-]respect-build-path  Whether to setup the build to use the Build-Path from the
                             provided .buildinfo file.
- --buildresults             Directory for the build artifacts (default: ./)
+ --buildresult              Directory for the build artifacts (default: ./)
  --builder=BUILDER          Which building software should be used. Possible values are
                             none, sbuild, mmdebstrap, dpkg and sbuild+unshare. The default
                             is none. See section BUILDER for details.
@@ -112,7 +125,7 @@ dscverify.
 
 EXAMPLES
 
-    \$ $progname --buildresults=./artifacts --builder=mmdebstrap hello_2.10-2_amd64.buildinfo
+    \$ $progname --buildresult=./artifacts --builder=mmdebstrap hello_2.10-2_amd64.buildinfo
 
 BUILDERS
 
@@ -156,7 +169,7 @@ EOF
     exit($exit_code);
 }
 
-GetOptions(%OPTIONS);
+GetOptions(%OPTIONS) or usage(1);
 
 my $buildinfo = shift @ARGV;
 if (not defined($buildinfo)) {
@@ -204,8 +217,8 @@ if (not $cdata->load($buildinfo)) {
 }
 
 if ($cdata->get_option('is_pgp_signed')) {
-    print
-"$buildinfo contained a GPG signature; it has NOT been validated (debrebuild does not support this)!\n";
+    print(
+        "$buildinfo contains a GPG signature which has NOT been validated\n");
 } else {
     print "$buildinfo was unsigned\n";
 }
@@ -230,7 +243,10 @@ if (not defined($host_arch)) {
 
 my $srcpkgname = $cdata->{Source};
 my $srcpkgver  = $cdata->{Version};
-{
+
+# in some cases the source field contains a version in the form: name (version)
+# for example: binclock (1.5-6)
+if ($srcpkgname =~ / /) {
     # make $@ local, so we don't print "Undefined subroutine" error message
     # in other parts where we evaluate $@
     local $@ = '';
@@ -247,8 +263,16 @@ my $srcpkgver  = $cdata->{Version};
     }
 }
 
+if (!defined $srcpkgname) {
+    die "unable to obtain source package name from buildinfo\n";
+}
+if (!defined $srcpkgver) {
+    die "unable to obtain source package version from buildinfo\n";
+}
+
 my $srcpkgbinver
   = $cdata->{Version};    # this version will include the binmu suffix
+$srcpkgbinver =~ s/^\d+://;
 
 my $new_buildinfo;
 {
@@ -268,7 +292,10 @@ if (-e $new_buildinfo) {
     my ($dev2, $ino2) = (lstat $new_buildinfo)[0, 1]
       or die "cannot lstat $new_buildinfo: $!\n";
     if ($dev1 == $dev2 && $ino1 == $ino2) {
-        die "refusing to overwrite the input buildinfo file\n";
+        die(    "E: refusing to overwrite the input buildinfo file\n"
+              . "E: Either pass an output directory via --buildresult "
+              . "or call debrebuild from a directory that does not include $buildinfo"
+        );
     }
 }
 
@@ -310,6 +337,31 @@ $srcpkg->{fields}{'Version'} = $srcpkgver;
 my $dsc_fname
   = (dirname($buildinfo)) . '/' . $srcpkg->get_basename(1) . ".dsc";
 
+my $debsnapexe = 'debsnap';
+if ($PROGRAM_NAME eq "scripts/debrebuild.pl" && -x "scripts/debsnap.pl") {
+    $debsnapexe = "scripts/debsnap.pl";
+}
+
+if (!-e $dsc_fname) {
+    print(  "I: obtaining dsc using: $debsnapexe --force"
+          . " --destdir . $srcpkgname $srcpkgver\n");
+    0 == system $debsnapexe, '--force', '--verbose', '--destdir',
+      dirname($buildinfo), $srcpkgname, $srcpkgver
+      or die "$debsnapexe failed\n";
+}
+if (!-e $dsc_fname) {
+    die(    "$debsnapexe failed to download "
+          . $srcpkg->get_basename(1)
+          . ".dsc\n");
+}
+
+print "I: verifying dsc...";
+my $buildinfo_checksums = Dpkg::Checksums->new();
+$buildinfo_checksums->add_from_control($cdata);
+$buildinfo_checksums->add_from_file($dsc_fname,
+    key => $srcpkg->get_basename(1) . ".dsc");
+print " successful!\n";
+
 my $environment = $cdata->{"Environment"};
 if (not defined($environment)) {
     die "need Environment field\n";
@@ -330,6 +382,7 @@ foreach my $line (split /\n/, $cdata->{"Environment"}) {
 
 # gather all installed build-depends and figure out the version of base-files
 my $base_files_version;
+my $dpkg_version;
 my @inst_build_deps = ();
 $inst_build_deps
   = deps_parse($inst_build_deps, reduce_arch => 0, build_dep => 0);
@@ -359,6 +412,11 @@ foreach my $pkg ($inst_build_deps->get_deps()) {
             die "more than one base-files\n";
         }
         $base_files_version = $pkg->{version};
+    } elsif ($pkg->{package} eq "dpkg") {
+        if (defined($dpkg_version)) {
+            die "more than one dpkg\n";
+        }
+        $dpkg_version = $pkg->{version};
     }
     push @inst_build_deps,
       {
@@ -406,18 +464,34 @@ foreach my $pkg (@inst_build_deps) {
     }
 }
 
+my $debootsnapexe = 'debootsnap';
+if ($PROGRAM_NAME eq "scripts/debrebuild.pl" && -x "scripts/debootsnap.py") {
+    $debootsnapexe = "scripts/debootsnap.py";
+}
+
+# File::Temp has an END block which cleans up the temporary directory
+# we created with CLEANUP=>1 but we have to explicitly die() or otherwise
+# the interpreter will exit on HUP, INT, PIPE and TERM instead of calling
+# the END block
+use sigtrap qw(die normal-signals);
+
+# with CLEANUP=>1 this directory will automatically be removed once the
+# program exits
+my $tmpdir = tempdir('debrebuildXXXXXX', TMPDIR => 1, CLEANUP => 1);
+
 my $tarballpath = '';
 my $sourceslist = '';
 if (any { $_ eq $builder } ('none', 'dpkg')) {
-    open my $fh, '-|', 'debootsnap', "--buildinfo=$buildinfo",
-      '--sources-list-only' // die "cannot exec debootsnap";
+    open my $fh, '-|', $debootsnapexe, "--buildinfo=$buildinfo",
+      '--sources-list-only' // die "cannot exec $debootsnapexe";
     $sourceslist = do { local $/; <$fh> };
     close $fh;
 } elsif (any { $_ eq $builder } ('mmdebstrap', 'sbuild', 'sbuild+unshare')) {
     (undef, $tarballpath)
-      = tempfile('debrebuild.tar.XXXXXXXXXXXX', OPEN => 0, TMPDIR => 1);
-    0 == system 'debootsnap', "--buildinfo=$buildinfo", $tarballpath
-      or die "debootsnap failed";
+      = tempfile('debrebuild.tar.XXXXXXXXXXXX', OPEN => 0, DIR => $tmpdir);
+    0 == system $debootsnapexe, ($cache ? "--cache=$cache" : ()),
+      "--buildinfo=$buildinfo", $tarballpath
+      or die "$debootsnapexe failed";
 } else {
     die "unsupported builder: $builder\n";
 }
@@ -519,7 +593,7 @@ if ($builder eq "none") {
     unlink $config  or die "failed to unlink $config\n";
     make_path(dirname $custom_build_path);
     0 == system 'dpkg-source', '--no-check', '--extract',
-      $srcpkg->get_basename(1) . '.dsc', $custom_build_path
+      $dsc_fname, $custom_build_path
       or die "dpkg-source failed\n";
 
     if ($cdata->{"Binary-Only-Changes"}) {
@@ -552,8 +626,20 @@ if ($builder eq "none") {
       . "/${srcpkgname}_${srcpkgbinver}_$changesarch.changes", $outdir
       or die "dcmd failed\n";
 } elsif ($builder eq "sbuild" or $builder eq "sbuild+unshare") {
-
-    my @cmd = ('env', "--chdir=$outdir", @environment, 'sbuild');
+    # we set SBUILD_CONFIG to make sure that the user's ~/.sbuildrc is not
+    # being used
+    my ($fh, $sbuildrc)
+      = tempfile('debrebuild.sbuildrc.XXXXXXXXXXXX', DIR => $tmpdir);
+    # there might be no apt inside the chroot and we should have all the build
+    # dependencies installed, so make running apt-get and apt-cache a no-op
+    print $fh "\$apt_get = '/bin/true';\n";
+    print $fh "\$apt_cache = '/bin/true';\n";
+    print $fh "\$build_as_root_when_needed = 1;\n";
+    close $fh;
+    my @cmd = (
+        'env', "--chdir=$outdir", @environment, "SBUILD_CONFIG=$sbuildrc",
+        'sbuild'
+    );
     push @cmd, "--build=$build_arch";
     push @cmd, "--host=$host_arch";
 
@@ -579,18 +665,44 @@ if ($builder eq "none") {
     push @cmd, "--chroot-mode=unshare";
     push @cmd, "--dist=unstable";
     push @cmd, "--no-run-lintian";
+    push @cmd, "--no-run-piuparts";
     push @cmd, "--no-run-autopkgtest";
+    push @cmd, "--no-apt-update";
     push @cmd, "--no-apt-upgrade";
     push @cmd, "--no-apt-distupgrade";
+    # Buildinfo files do not indicate whether fakeroot was installed,
+    # so it is not included in the recreated chroot.
+    # Since most packages build without issues,
+    # this simply forces dpkg-buildpackage to run without fakeroot.
+    # the default was switched in 1.22.13 so no longer needed afterwards.
+    if ($dpkg_version < Dpkg::Version->new("1.22.13")) {
+        push @cmd,
+            "--starting-build-commands="
+          . 'grep -iq "^Rules-Requires-Root:" "%p/debian/control" || '
+          . 'sed -i "1iRules-Requires-Root: no" "%p/debian/control"';
+    }
+    # without --verbose, the log will be suppressed by default if sbuild is
+    # not run on an interactive tty, so we make sure the behaviour is always
+    # the same independent how debrebuild is run
+    push @cmd, "--verbose";
+    # since sbuild will always output to stdout, thanks to --verbose, we
+    # do not need to put the log file to disk anymore. Those interested in the
+    # log, can just capture stdout of debrebuild
+    push @cmd, "--nolog";
     # disable the explainer
     push @cmd, "--bd-uninstallable-explainer=";
 
     if ($custom_build_path) {
-        push @cmd, "--build-path=$custom_build_path";
+        my @dirs       = File::Spec->splitdir($custom_build_path);
+        my $build_path = File::Spec->catdir(@dirs[0 .. $#dirs - 1]);
+        push @cmd, "--build-path=$build_path";
+        push @cmd, "--dsc-dir=$dirs[-1]";
     }
-    push @cmd, "${srcpkgname}_$srcpkgver";
+    push @cmd, (File::Spec->rel2abs($dsc_fname));
     print((join " ", @cmd) . "\n");
     0 == system @cmd or die "sbuild failed\n";
+
+    unlink $sbuildrc;
 } elsif ($builder eq "mmdebstrap") {
 
     my @binnmucmds = ();
@@ -618,10 +730,15 @@ if ($builder eq "none") {
         '--skip=setup',
         '--skip=update',
         '--skip=cleanup',
-        "--setup-hook=tar --exclude=\"./dev/*\" -C \"\$1\" -xf "
-          . (String::ShellQuote::shell_quote $tarballpath),
+        '--skip=tar-in/mknod',
+        "--setup-hook=tar-in "
+          . (String::ShellQuote::shell_quote $tarballpath) . ' /',
         '--setup-hook=rm "$1"/etc/apt/sources.list',
-"--customize-hook=debsnap --force --destdir \"\$1\" $srcpkgname $srcpkgver",
+        (
+                "--customize-hook=dcmd cp "
+              . (String::ShellQuote::shell_quote $dsc_fname)
+              . " \"\$1\""
+        ),
         '--customize-hook=chroot "$1" sh -c "'
           . (
             join ' && ',
