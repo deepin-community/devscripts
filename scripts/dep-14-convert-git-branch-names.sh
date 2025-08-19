@@ -132,6 +132,8 @@ find_salsa_remote() {
 find_debian_branch() {
   local debian_branch=""
 
+  debug "Running find_debian_branch()"
+
   # if debian/gbp.conf exists, use value of debian-branch
   if [[ -f debian/gbp.conf ]] && grep -q "^debian-branch" debian/gbp.conf
   then
@@ -187,10 +189,15 @@ find_upstream_branch() {
   local branches=$(git branch --list --format="%(refname:short)")
   local upstream_branch=""
 
+  debug "Running find_upstream_branch()"
+
   # if debian/gbp.conf exists on debian branch, use value of upstream-branch
   if [[ -n "$debian_branch" ]] && git show "$debian_branch:debian/gbp.conf" 2>/dev/null | grep "^upstream-branch" > /dev/null
   then
     upstream_branch=$(git show "$debian_branch:debian/gbp.conf" | grep -oP "^upstream-branch[[:space:]]*=[[:space:]]*\K.*")
+
+    debug "Check debian/gbp.conf upstream-branch '$upstream_branch'"
+
     if git rev-parse --verify "$upstream_branch" >/dev/null 2>&1
     then
       echo "$upstream_branch"
@@ -206,6 +213,8 @@ find_upstream_branch() {
   # Iterate through the merge commits
   for commit in $merge_commits
   do
+    debug "Check parents of merge commit '$merge_commits'"
+
     # Get the two parent commits
     parent1=$(git rev-parse $commit^1)
     parent2=$(git rev-parse $commit^2)
@@ -255,6 +264,15 @@ find_upstream_branch() {
       return
     fi
   done
+
+  debug "No merge commits found on the Debian packaging branch '$debian_branch'"
+
+  if git rev-parse --verify "upstream" > /dev/null 2>&1
+  then
+    debug "Using 'upstream' branch despite it not having merge commits on '$debian_branch'"
+    echo "upstream"
+    return
+  fi
 }
 
 # Parse command line arguments

@@ -1,0 +1,80 @@
+=pod
+
+=head1 NAME
+
+uscan templates - Available templates for L<uscan(1)>.
+
+=head1 USING TEMPLATES
+
+Templates simplify the B<debian/watch> file. You just have to indicate the
+template to use and the specific arguments. Example:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+
+Other parameters can be added as usual. Example:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+  Version-Mangle: auto
+
+=head1 AVAILABLE TEMPLATES
+
+Here is the list of available templates:
+
+=over
+
+=item * L</Github>
+
+=item * L</Metacpan>
+
+=back
+
+=head2 Github
+
+This template uses GitHub API to find archives to download.
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Owner>
+
+=item * B<Project>
+
+=back
+
+=head3 Example
+
+Example for https://github.com/guimard/llng-docker:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+
+=head2 Metacpan
+
+This template uses L<MetaCPAN::Client(3pm)> to download package.
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Dist>: distribution name I<(with "::" or "-")>
+
+=back
+
+=head3 Example
+
+  Version: 5
+
+  Template: Metacpan
+  Dist: MetaCPAN-Client

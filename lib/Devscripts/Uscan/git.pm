@@ -1,7 +1,7 @@
 package Devscripts::Uscan::git;
 
 use strict;
-use Cwd qw/abs_path/;
+use Cwd qw/abs_path cwd/;
 use Devscripts::Uscan::Output;
 use Devscripts::Uscan::Utils;
 use Devscripts::Uscan::_vcs;
@@ -14,68 +14,55 @@ use Moo::Role;
 ######################################################
 sub git_search {
     my ($self) = @_;
-    my ($newfile, $newversion);
+    my ($newfile, $newversion, $mangled_newversion);
     if ($self->versionless) {
         $newfile = $self->parse_result->{filepattern}; # HEAD or heads/<branch>
+        my @args   = ();
+        my $curdir = cwd();
+
+        push(@args, '--quiet') if not $verbose;
+        push(@args, '--bare')  if not $self->git->{modules};
+
         if ($self->pretty eq 'describe') {
             $self->git->{mode} = 'full';
         }
-        if (    $self->git->{mode} eq 'shallow'
-            and $self->parse_result->{filepattern} eq 'HEAD') {
-            uscan_exec(
-                'git',
-                'clone',
-                '--quiet',
-                '--bare',
-                '--depth=1',
-                $self->parse_result->{base},
-                "$self->{downloader}->{destdir}/" . $self->gitrepo_dir
-            );
-            $self->downloader->gitrepo_state(1);
-        } elsif ($self->git->{mode} eq 'shallow'
-            and $self->parse_result->{filepattern} ne 'HEAD')
-        {    # heads/<branch>
-            $newfile =~ s&^heads/&&;    # Set to <branch>
-            uscan_exec(
-                'git',
-                'clone',
-                '--quiet',
-                '--bare',
-                '--depth=1',
-                '-b',
-                "$newfile",
-                $self->parse_result->{base},
-                "$self->{downloader}->{destdir}/" . $self->gitrepo_dir
-            );
+
+        if ($self->git->{mode} eq 'shallow') {
+            push(@args, '--depth=1');
             $self->downloader->gitrepo_state(1);
         } else {
-            uscan_exec(
-                'git', 'clone', '--quiet', '--bare',
-                $self->parse_result->{base},
-                "$self->{downloader}->{destdir}/" . $self->gitrepo_dir
-            );
             $self->downloader->gitrepo_state(2);
         }
-        if ($self->pretty eq 'describe') {
 
+        if ($newfile ne 'HEAD') {
+            $newfile = s&^heads/&&;    # Set to <branch>
+            push(@args, '-b', "$newfile");
+        }
+
+        # clone main repository
+        uscan_exec(
+            'git', 'clone', @args,
+            $self->parse_result->{base},
+            "$self->{downloader}->{destdir}/" . $self->gitrepo_dir
+        );
+
+        chdir "$self->{downloader}->{destdir}/$self->{gitrepo_dir}";
+
+        if ($self->pretty eq 'describe') {
             # use unannotated tags to be on safe side
+            uscan_debug "git describe --tags";
             spawn(
-                exec => [
-                    'git',
-"--git-dir=$self->{downloader}->{destdir}/$self->{gitrepo_dir}",
-                    'describe',
-                    '--tags'
-                ],
+                exec       => ['git', 'describe', '--tags'],
                 wait_child => 1,
                 to_string  => \$newversion
             );
             $newversion =~ s/-/./g;
             chomp($newversion);
+            $mangled_newversion = $newversion;
             if (
                 mangle(
-                    $self->watchfile,  \$self->line,
-                    'uversionmangle:', \@{ $self->uversionmangle },
-                    \$newversion
+                    $self->watchfile,            'uversionmangle:',
+                    \@{ $self->uversionmangle }, \$mangled_newversion
                 )
             ) {
                 return undef;
@@ -83,41 +70,23 @@ sub git_search {
         } else {
             my $tmp = $ENV{TZ};
             $ENV{TZ} = 'UTC';
-            $newfile
-              = $self->parse_result->{filepattern};    # HEAD or heads/<branch>
-            if ($self->parse_result->{filepattern} eq 'HEAD') {
-                spawn(
-                    exec => [
-                        'git',
-"--git-dir=$self->{downloader}->{destdir}/$self->{gitrepo_dir}",
-                        'log',
-                        '-1',
-                        "--date=format-local:$self->{date}",
-                        "--pretty=$self->{pretty}"
-                    ],
-                    wait_child => 1,
-                    to_string  => \$newversion
-                );
-            } else {
-                $newfile =~ s&^heads/&&;    # Set to <branch>
-                spawn(
-                    exec => [
-                        'git',
-"--git-dir=$self->{downloader}->{destdir}/$self->{gitrepo_dir}",
-                        'log',
-                        '-1',
-                        '-b',
-                        "$newfile",
-                        "--date=format-local:$self->{date}",
-                        "--pretty=$self->{pretty}"
-                    ],
-                    wait_child => 1,
-                    to_string  => \$newversion
-                );
-            }
+            @args = ('-1');
+            push(@args, '-b', $newfile) if ($newfile ne 'HEAD');
+            push(@args, "--date=format-local:$self->{date}");
+            push(@args, "--pretty=$self->{pretty}");
+
+            uscan_debug "git log " . join(' ', @args);
+
+            spawn(
+                exec       => ['git', 'log', @args],
+                wait_child => 1,
+                to_string  => \$newversion
+            );
             $ENV{TZ} = $tmp;
             chomp($newversion);
+            $mangled_newversion = $newversion;
         }
+        chdir "$curdir";
     }
     ################################################
     # search $newfile $newversion (git mode w/tag)
@@ -149,11 +118,11 @@ sub git_search {
                 @args = ('show-ref');
             }
         }
-        ($newversion, $newfile)
+        ($mangled_newversion, $newversion, $newfile)
           = get_refs($self, ['git', @args], qr/^\S+\s+([^\^\{\}]+)$/, 'git');
         return undef if !defined $newversion;
     }
-    return ($newversion, $newfile);
+    return ($mangled_newversion, $newversion, $newfile);
 }
 
 sub git_upstream_url {

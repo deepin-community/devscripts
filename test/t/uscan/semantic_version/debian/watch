@@ -1,0 +1,6 @@
+Version: 5
+
+Source: https://foo
+Version-Regex: .*?@SEMANTIC_VERSION@@ARCHIVE_EXT@
+Uversion-Mangle: s/(\d)[_\.\-\+]?((?:RC|rc|pre|dev|beta|alpha)\d*)$/$1~$2/
+Pgp-Mode: none

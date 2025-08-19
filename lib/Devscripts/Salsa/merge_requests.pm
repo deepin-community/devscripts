@@ -8,6 +8,7 @@ use Moo::Role;
 sub merge_requests {
     my ($self, @reponames) = @_;
     my $res = 1;
+    @reponames = ($self->localPath2projectPath) unless @reponames;
     unless (@reponames) {
         ds_warn "project name is missing";
         return 1;

@@ -31,6 +31,7 @@ BEGIN {
 use Moo;
 use File::Basename;
 use File::Path qw(make_path);
+use Dpkg::IPC;
 
 # Command aliases
 use constant cmd_aliases => {
@@ -305,6 +306,38 @@ sub id2username {
     ds_verbose "$id is $res";
     $self->cache->{user}->{$id} = $res;
     return $res;
+}
+
+sub localPath2projectPath {
+    my ($self, $path) = @_;
+    if (defined $path and !-d $path) {
+        ds_die "$path isn't a directory";
+        return;
+    }
+    $path ||= '.';
+    unless (-e "$path/.git") {
+        ds_verbose 'Not a git repository';
+        return;
+    }
+    my $out;
+    spawn(
+        exec       => [qw(git remote -v)],
+        chdir      => $path,
+        to_string  => \$out,
+        wait_child => 1,
+        nocheck    => 0,
+    );
+    if ($@) {
+        ds_verbose "git error: $@";
+        return;
+    }
+    my $base = $self->config->git_server_url;
+
+    if ($out =~ /\Q$base\E(.*?)\.git/) {
+        return $1;
+    }
+    ds_verbose "$base not found in git remote";
+    return;
 }
 
 =item B<group2id>: convert group name to id

@@ -24,6 +24,9 @@ salsa - tool to manipulate salsa projects, repositories and group members
         --desc-pattern "Package %p"
   salsa update_safe --all --desc --desc-pattern "Debian package %p" \
         --group js-team
+  salsa update_watch5 debian/devscripts
+  salsa update_watch5 --group js-team --all
+
 
 =head1 DESCRIPTION
 
@@ -421,6 +424,19 @@ Launch B<check_projects> and ask before launching B<update_projects> (unless B<-
   salsa --group js-team update_safe --all
   salsa --group js-team --rename-head update_safe test1 test2 test3
   salsa update_safe js-team/node-mongodb --kgb --irc debian-js
+
+=item B<update_watch5>
+
+Update C<debian/watch> file for each given project to L<version 5|debian-watch(5)>.
+
+Options B<--all> and B<--debian-branch> are usable here.
+
+=item B<path>
+
+Little subcommand to get salsa path from a local git repo:
+
+  salsa path
+  salsa path ./directory
 
 =back
 
@@ -936,6 +952,11 @@ C<.devscripts> value: B<SALSA_DEST_BRANCH>
 Enable, ignore or disable "tagpending" webhook.
 
 C<.devscripts> value: B<SALSA_TAGPENDING> (yes/ignore/no, default: ignore)
+
+=item B<--debian-branch>
+
+Set the branch to update for B<update_watch5> command. Default to project's
+default branch.
 
 =back
 

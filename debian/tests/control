@@ -1,4 +1,5 @@
 Tests:
+ metacpan,
  shunit2,
 Depends:
  debhelper,
@@ -7,9 +8,12 @@ Depends:
  faketime,
  git,
  gnupg,
+ gpgv,
  libdistro-info-perl,
  libgitlab-api-v4-perl,
+ libio-string-perl,
  libjson-perl,
+ liblwp-protocol-psgi-perl,
  libtest-output-perl,
  libwww-perl,
  lzip,
@@ -36,3 +40,19 @@ Restrictions:
  allow-stderr,
  breaks-testbed,
  needs-root,
+
+Tests:
+ metacpan,
+Depends:
+ debhelper,
+ libfile-dirlist-perl,
+ libfile-homedir-perl,
+ libfile-touch-perl,
+ libio-string-perl,
+ libjson-perl,
+ liblwp-protocol-psgi-perl,
+ libmetacpan-client-perl,
+ libwww-perl,
+Restrictions:
+ needs-internet,
+ allow-stderr,

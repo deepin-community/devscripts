@@ -24,9 +24,8 @@ sub _xtp_newfile_base {
         uscan_verbose "Matching target for filenamemangle: $newfile_base";
         if (
             mangle(
-                $self->watchfile,  \$self->line,
-                'filenamemangle:', \@{ $self->filenamemangle },
-                \$newfile_base
+                $self->watchfile,            'filenamemangle:',
+                \@{ $self->filenamemangle }, \$newfile_base
             )
         ) {
             $self->status(1);
@@ -38,13 +37,14 @@ sub _xtp_newfile_base {
         if ($cmp eq $newfile_base) {
             uscan_die "filenamemangle failed for $cmp";
         }
-        unless ($self->search_result->{newversion}) {
+        unless ($self->search_result->{mangled_newversion}) {
 
-            # uversionmanglesd version is '', make best effort to set it
+            # uversionmangled version is '', make best effort to set it
             $newfile_base
               =~ m/^.+?[-_]?(\d[\-+\.:\~\da-zA-Z]*)(?:\.tar\.(gz|bz2|xz|zstd?)|\.zip)$/i;
-            $self->search_result->{newversion} = $1;
-            unless ($self->search_result->{newversion}) {
+            $self->search_result->{newversion}
+              = $self->search_result->{mangled_newversion} = $1;
+            unless ($self->search_result->{mangled_newversion}) {
                 uscan_warn
 "Fix filenamemangle to produce a filename with the correct version";
                 $self->status(1);

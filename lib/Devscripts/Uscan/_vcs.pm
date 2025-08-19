@@ -18,13 +18,44 @@ sub _vcs_newfile_base {
     if (!$self->config->{vcs_export_uncompressed}) {
         $newfile_base .= '.' . get_suffix($self->compression);
     }
+    if (@{ $self->filenamemangle }) {
+        my $cmp = $newfile_base;
+        uscan_verbose "Matching target for filenamemangle: $newfile_base";
+        if (
+            mangle(
+                $self->watchfile,            'filenamemangle:',
+                \@{ $self->filenamemangle }, \$newfile_base
+            )
+        ) {
+            $self->status(1);
+            return undef;
+        }
+        if ($cmp eq $newfile_base) {
+            uscan_die "filenamemangle failed for $cmp";
+        }
+        if ($self->versionless) {
+            # set version from filenamemangling result
+            $newfile_base
+              =~ m/^.+?[-_]?(\d[\-+\.:\~\da-zA-Z]*)(?:\.tar(\..*)?)$/i;
+            $self->search_result->{newversion}
+              = $self->search_result->{mangled_newversion} = $1;
+            unless ($self->search_result->{mangled_newversion}) {
+                uscan_warn
+"Fix filenamemangle to produce a filename with the correct version";
+                $self->status(1);
+                return undef;
+            }
+            uscan_verbose
+"Newest upstream tarball version from the filenamemangled filename: $self->{search_result}->{newversion}";
+        }
+    }
     return $newfile_base;
 }
 
 sub get_refs {
     my ($self, $command, $ref_pattern, $package) = @_;
     my @command = @$command;
-    my ($newfile, $newversion);
+    my ($newfile, $newversion, $mangled_newversion);
     {
         local $, = ' ';
         uscan_verbose "Execute: @command";
@@ -34,24 +65,24 @@ sub get_refs {
     my @refs;
     my $ref;
     my $version;
+    my $mangled_version;
     while (<REFS>) {
         chomp;
         uscan_debug "$_";
         if ($_ =~ $ref_pattern) {
             $ref = $1;
             foreach my $_pattern (@{ $self->patterns }) {
-                $version = join(".",
+                $mangled_version = $version = join(".",
                     map { $_ if defined($_) } $ref =~ m&^$_pattern$&);
                 if (
                     mangle(
-                        $self->watchfile,  \$self->line,
-                        'uversionmangle:', \@{ $self->uversionmangle },
-                        \$version
+                        $self->watchfile,            'uversionmangle:',
+                        \@{ $self->uversionmangle }, \$mangled_version
                     )
                 ) {
                     return undef;
                 }
-                push @refs, [$version, $ref];
+                push @refs, [$mangled_version, $version, $ref];
             }
         }
     }
@@ -59,7 +90,7 @@ sub get_refs {
         @refs = Devscripts::Versort::upstream_versort(@refs);
         my $msg = "Found the following matching refs:\n";
         foreach my $ref (@refs) {
-            $msg .= "     $$ref[1] ($$ref[0])\n";
+            $msg .= "     $$ref[2] ($$ref[0])\n";
         }
         uscan_verbose "$msg";
         if ($self->shared->{download_version}
@@ -67,9 +98,9 @@ sub get_refs {
 
 # extract ones which has $version in the above loop matched with $download_version
             my @vrefs
-              = grep { $$_[0] eq $self->shared->{download_version} } @refs;
+              = grep { $$_[1] eq $self->shared->{download_version} } @refs;
             if (@vrefs) {
-                ($newversion, $newfile) = @{ $vrefs[0] };
+                ($mangled_newversion, $newversion, $newfile) = @{ $vrefs[0] };
             } else {
                 uscan_warn
                   "$progname warning: In $self->{watchfile} no matching"
@@ -81,7 +112,7 @@ sub get_refs {
             }
 
         } else {
-            ($newversion, $newfile) = @{ $refs[0] };
+            ($mangled_newversion, $newversion, $newfile) = @{ $refs[0] };
         }
     } else {
         uscan_warn "$progname warning: In $self->{watchfile},\n"
@@ -89,7 +120,7 @@ sub get_refs {
           . " $self->{line}";
         return undef;
     }
-    return ($newversion, $newfile);
+    return ($mangled_newversion, $newversion, $newfile);
 }
 
 1;

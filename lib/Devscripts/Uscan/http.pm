@@ -64,7 +64,7 @@ sub http_search {
             my $baseUrl = $1;
             my $hdr     = $2;
             if ($self->parse_result->{base} =~ m#^\Q$baseUrl\E(?:/.*)?$#) {
-                $request->header($hdr => $self->headers->{$k});
+                $request->header($hdr => $self->downloader->headers->{$k});
                 uscan_verbose "Set per-host custom header $hdr for "
                   . $self->parse_result->{base};
             } else {
@@ -95,6 +95,16 @@ sub http_search {
     uscan_extra_debug
       "received content:\n$content\n[End of received content] by HTTP";
 
+    # pagenmangle: should not abuse this slow operation
+    if (
+        mangle(
+            $self->watchfile,         'pagemangle:\n',
+            [@{ $self->pagemangle }], \$content
+        )
+    ) {
+        return undef;
+    }
+
     my @hrefs;
     if (!$self->searchmode or $self->searchmode eq 'html') {
         @hrefs = $self->html_search($content, $self->patterns);
@@ -114,30 +124,33 @@ sub http_search {
         }
         uscan_verbose $msg;
     }
-    my ($newversion, $newfile);
+    my ($mangled_newversion, $newversion, $newfile);
     if (defined $self->shared->{download_version}
         and not $self->versionmode eq 'ignore') {
 
         # extract ones which has $match in the above loop defined
         my @vhrefs = grep { $$_[3] } @hrefs;
         if (@vhrefs) {
-            (undef, $newversion, $newfile, undef) = @{ $vhrefs[0] };
+            (undef, $mangled_newversion, $newfile, undef, $newversion)
+              = @{ $vhrefs[0] };
         } else {
             uscan_warn
 "In $self->{watchfile} no matching hrefs for version $self->{shared}->{download_version}"
-              . " in watch line\n  $self->{line}";
+              . " in watch source\n  $self->{watchSource}->{source}";
             return undef;
         }
     } else {
         if (@hrefs) {
-            (undef, $newversion, $newfile, undef) = @{ $hrefs[0] };
+            (undef, $mangled_newversion, $newfile, undef, $newversion)
+              = @{ $hrefs[0] };
         } else {
             uscan_warn
-"In $self->{watchfile} no matching files for watch line\n  $self->{line}";
+              "In $self->{watchfile} no matching files for watch source\n  "
+              . $self->{watchSource}->{source};
             return undef;
         }
     }
-    return ($newversion, $newfile);
+    return ($mangled_newversion, $newversion, $newfile);
 }
 
 #######################################################################
@@ -211,9 +224,8 @@ sub http_upstream_url {
     if (@{ $self->downloadurlmangle }) {
         if (
             mangle(
-                $self->watchfile,     \$self->line,
-                'downloadurlmangle:', \@{ $self->downloadurlmangle },
-                \$upstream_url
+                $self->watchfile,               'downloadurlmangle:',
+                \@{ $self->downloadurlmangle }, \$upstream_url
             )
         ) {
             $self->status(1);
@@ -225,7 +237,7 @@ sub http_upstream_url {
 
 sub http_newdir {
     my ($https, $line, $site, $dir, $pattern, $dirversionmangle,
-        $watchfile, $lineptr, $download_version)
+        $watchfile, $download_version)
       = @_;
 
     my $downloader = $line->downloader;
@@ -373,17 +385,6 @@ sub url_canonicalize_dots {
 
 sub html_search {
     my ($self, $content, $patterns, $mangle) = @_;
-
-    # pagenmangle: should not abuse this slow operation
-    if (
-        mangle(
-            $self->watchfile, \$self->line,
-            'pagemangle:\n',  [@{ $self->pagemangle }],
-            \$content
-        )
-    ) {
-        return undef;
-    }
     if (   !$self->shared->{bare}
         and $content =~ m%^<[?]xml%i
         and $content =~ m%xmlns="http://s3.amazonaws.com/doc/2006-03-01/"%
@@ -464,13 +465,13 @@ sub parse_href {
     my ($self, $href, $_pattern, $match, $mangle) = @_;
     $mangle //= 'uversionmangle';
 
-    my $mangled_version;
+    my ($mangled_version, $version);
     if ($self->watch_version == 2) {
 
         # watch_version 2 only recognised one group; the code
         # below will break version 2 watch files with a construction
         # such as file-([\d\.]+(-\d+)?) (bug #327258)
-        $mangled_version
+        $version = $mangled_version
           = ref $match eq 'ARRAY'
           ? $match->[0]
           : $match;
@@ -486,12 +487,12 @@ sub parse_href {
                 map { $_ if defined($_) }
                   ref $match eq 'ARRAY' ? @$match : $href =~ m&^$_pattern$&);
         }
+        $version = $mangled_version;
 
         if (
             mangle(
-                $self->watchfile, \$self->line,
-                "$mangle:",       \@{ $self->$mangle },
-                \$mangled_version
+                $self->watchfile,     "$mangle:",
+                \@{ $self->$mangle }, \$mangled_version
             )
         ) {
             return ();
@@ -499,12 +500,12 @@ sub parse_href {
     }
     $match = '';
     if (defined $self->shared->{download_version}) {
-        if ($mangled_version eq $self->shared->{download_version}) {
+        if ($version eq $self->shared->{download_version}) {
             $match = "matched with the download version";
         }
     }
     my $priority = $mangled_version . '-' . get_priority($href);
-    return [$priority, $mangled_version, $href, $match];
+    return [$priority, $mangled_version, $href, $match, $version];
 }
 
 1;

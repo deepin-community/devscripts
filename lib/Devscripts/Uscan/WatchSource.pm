@@ -3,7 +3,7 @@
 
 =head1 NAME
 
-Devscripts::Uscan::WatchLine - watch line object for L<uscan>
+Devscripts::Uscan::WatchSource - watch source object for L<uscan>
 
 =head1 DESCRIPTION
 
@@ -13,7 +13,7 @@ Uscan class to parse watchfiles.
 
 =cut
 
-package Devscripts::Uscan::WatchLine;
+package Devscripts::Uscan::WatchSource;
 
 use strict;
 use Cwd qw/abs_path/;
@@ -39,7 +39,7 @@ use Text::ParseWords;
 
 =over
 
-=item B<shared>: ref to hash containing line options shared between lines. See
+=item B<shared>: ref to hash containing watch source options shared between lines. See
 L<Devscripts::Uscan::WatchFile> code to see required keys.
 
 =item B<keyring>: L<Devscripts::Uscan::Keyring> object
@@ -48,7 +48,9 @@ L<Devscripts::Uscan::WatchFile> code to see required keys.
 
 =item B<downloader>: L<Devscripts::Uscan::Downloader> object
 
-=item B<line>: search line (assembled in one line)
+=item B<watchSource>: hash containing whatch sources options (built by
+L<Devscripts::Uscan::WatchFile> using L<Descripts::Uscan::WatchSource::Parser>
+and L<Devscripts::Uscan::WatchSource::Transform>
 
 =item B<pkg>: Debian package name
 
@@ -71,7 +73,7 @@ foreach (
 
     # Other
     'downloader',   # Devscripts::Uscan::Downloader object
-    'line',         # watch line string (concatenated line over the tailing \ )
+    'watchSource',  # watch line string (concatenated line over the tailing \ )
     'pkg',          # source package name found in debian/changelog
     'pkg_dir',      # usually .
     'pkg_version',  # last source package version
@@ -158,7 +160,7 @@ foreach (qw(force_repack type upstream_url newfile_base)) {
     has $_ => (is => 'rw');
 }
 
-# 3.1 - Attributes initialized with default value, modified by line content
+# 3.1 - Attributes initialized with default value, modified by watch source options
 has date => (
     is      => 'rw',
     default => sub { '%Y%m%d' },
@@ -231,7 +233,7 @@ If one method returns a non 0 value, it stops and return this error code.
 sub process {
     my ($self) = @_;
 
-    #  - parse line
+    #  - parse options
     $self->parse
 
       #  - search newfile and newversion
@@ -269,7 +271,7 @@ sub process {
 
 =head3 parse()
 
-Parse the line and return 0 if nothing bad happen. It populates
+Parse the watch source options and return 0 if nothing bad happen. It populates
 C<$self-E<gt>parse_result> accessor with a hash that contains the
 following keys:
 
@@ -333,22 +335,16 @@ following keys:
 sub BUILD {
     my ($self, $args) = @_;
     if ($self->watch_version > 3) {
-        my $line = $self->line;
-        if ($line =~ s/^opt(?:ion)?s\s*=\s*//) {
-            unless ($line =~ s/^".*?"(?:\s+|$)//) {
-                $line =~ s/^[^"\s]\S*(?:\s+|$)//;
-            }
-        }
-        my ($base, $filepattern, $lastversion, $action) = split /\s+/, $line,
-          4;
-        $self->type($lastversion);
+        $self->type($self->watchSource->{versionschema});
     }
     return $self;
 }
 
 sub parse {
     my ($self) = @_;
-    uscan_debug "parse line $self->{line}";
+    uscan_debug "parse options: << ==EOF==\n"
+      . $self->{watchSource}->{_raw}
+      . "==EOF==\n";
 
     # Need to clear remembered redirection URLs so we don't try to build URLs
     # from previous watch files or watch lines
@@ -358,404 +354,305 @@ sub parse {
     my ($action, $base, $basedir, $filepattern, $lastversion, $pattern, $site);
     $dehs_tags->{package} = $self->pkg;
 
-    # Start parsing the watch line
-    if ($self->watch_version == 1) {
-        my ($dir);
-        ($site, $dir, $filepattern, $lastversion, $action) = split ' ',
-          $self->line, 5;
-        if (  !$lastversion
-            or $site =~ /\(.*\)/
-            or $dir  =~ /\(.*\)/) {
-            uscan_warn <<EOF;
-there appears to be a version 2 format line in
-the version 1 watch file $watchfile;
-Have you forgotten a 'version=2' line at the start, perhaps?
-Skipping the line: $self->{line}
-EOF
-            return $self->status(1);
-        }
-        if ($site !~ m%\w+://%) {
-            $site = "ftp://$site";
-            if ($filepattern !~ /\(.*\)/) {
+    # Start parsing the watch source
+    # version 2/3/4 watch file
+    my $opts = $self->watchSource;
 
-                # watch_version=1 and old style watch file;
-                # pattern uses ? and * shell wildcards; everything from the
-                # first to last of these metachars is the pattern to match on
-                $filepattern =~ s/(\?|\*)/($1/;
-                $filepattern =~ s/(\?|\*)([^\?\*]*)$/$1)$2/;
-                $filepattern =~ s/\./\\./g;
-                $filepattern =~ s/\?/./g;
-                $filepattern =~ s/\*/.*/g;
-                $self->style('old');
-                uscan_warn
-                  "Using very old style of filename pattern in $watchfile\n"
-                  . "  (this might lead to incorrect results): $3";
-            }
-        }
-
-        # Merge site and dir
-        $base = "$site/$dir/";
-        $base =~ s%(?<!:)//%/%g;
-        $base =~ m%^(\w+://[^/]+)%;
-        $site    = $1;
-        $pattern = $filepattern;
-
-        # Check $filepattern is OK
-        if ($filepattern !~ /\(.*\)/) {
-            uscan_warn "Filename pattern missing version delimiters ()\n"
-              . "  in $watchfile, skipping:\n  $self->{line}";
-            return $self->status(1);
-        }
-    } else {
-        # version 2/3/4 watch file
-        if ($self->{line} =~ s/^opt(?:ion)?s\s*=\s*//) {
-            my $opts;
-            if ($self->{line} =~ s/^"(.*?)"(?:\s+|$)//) {
-                $opts = $1;
-            } elsif ($self->{line} =~ s/^([^"\s]\S*)(?:\s+|$)//) {
-                $opts = $1;
-            } else {
-                uscan_warn
-"malformed opts=... in watch file, skipping line:\n$self->{line}";
-                return $self->status(1);
-            }
-
-            # $opts	string extracted from the argument of opts=
-            uscan_verbose "opts: $opts";
-
-            # $self->line watch line string without opts=... part
-            uscan_verbose "line: $self->{line}";
-
-            # user-agent strings has ,;: in it so special handling
-            if (   $opts =~ /^\s*user-agent\s*=\s*(.+?)\s*$/
-                or $opts =~ /^\s*useragent\s*=\s*(.+?)\s*$/) {
-                my $user_agent_string = $1;
-                $user_agent_string = $self->config->user_agent
-                  if $self->config->user_agent ne
-                  &Devscripts::Uscan::Config::default_user_agent;
-                $self->downloader->user_agent->agent($user_agent_string);
-                uscan_verbose "User-agent: $user_agent_string";
-                $opts = '';
-            }
-            my @opts = split /,/, $opts;
-            foreach my $opt (@opts) {
-                next unless ($opt =~ /\S/);
-                uscan_verbose "Parsing $opt";
-                if ($opt =~ /^\s*pasv\s*$/ or $opt =~ /^\s*passive\s*$/) {
-                    $self->downloader->pasv(1);
-                } elsif ($opt =~ /^\s*active\s*$/
-                    or $opt =~ /^\s*nopasv\s*$/
-                    or $opt =~ /^\s*nopassive\s*$/) {
-                    $self->downloader->pasv(0);
-                }
-
-                # Line option "compression" is ignored if "--compression"
-                # was set in command-line
-                elsif ($opt =~ /^\s*compression\s*=\s*(.+?)\s*$/
-                    and not $self->compression) {
-                    $self->compression(get_compression($1));
-                } elsif ($opt =~ /^\s*bare\s*$/) {
-
-                    # persistent $bare
-                    ${ $self->shared->{bare} } = 1;
-                }
-
-                # Boolean line parameter
-                #
-                # $ regexp-assemble <<EOF
-                # gitmodules
-                # decompress
-                # repack
-                # EOF
-                elsif ($opt =~ /^\s*gitmodules\s*$/) {
-                    $self->git->{modules} = ['.'];
-                } elsif ($opt =~ /^\s*(decompress|repack)\s*$/) {
-                    $self->$1(1);
-                }
-
-                # Line parameter with a value
-                #
-                # $ regexp-assemble <<EOF
-                # component
-                # ctype
-                # date
-                # gitexport
-                # gitmode
-                # gitmodules
-                # hrefdecode
-                # mode
-                # pgpmode
-                # pretty
-                # repacksuffix
-                # searchmode
-                # unzipopt
-                # EOF
-                elsif ($opt
-                    =~ /^\s*((?:(?:(?:(?:search)?m|hrefdec)od|dat)e|c(?:omponent|type)|p(?:gpmode|retty)|repacksuffix|unzipopt))\s*=\s*(.+?)\s*$/
-                ) {
-                    $self->$1($2);
-                } elsif ($opt =~ /^\s*git(export|mode)\s*=\s*(.+?)\s*$/) {
-                    $self->git->{$1} = $2;
-                } elsif ($opt =~ /^\s*gitmodules\s*=\s*(.+?)\s*$/) {
-                    $self->git->{modules} = [split /;/, $1];
-                } elsif ($opt =~ /^\s*versionmangle\s*=\s*(.+?)\s*$/) {
-                    $self->uversionmangle([split /;/, $1]);
-                    $self->dversionmangle([split /;/, $1]);
-                } elsif ($opt =~ /^\s*pgpsigurlmangle\s*=\s*(.+?)\s*$/) {
-                    $self->pgpsigurlmangle([split /;/, $1]);
-                    $self->pgpmode('mangle');
-                } elsif ($opt =~ /^\s*dversionmangle\s*=\s*(.+?)\s*$/) {
-
-                    $self->dversionmangle([
-                            map {
-
-                                # If dversionmangle is "auto", replace it by
-                                # DEB_EXT removal
-                                $_ eq 'auto'
-                                  ? ('s/'
-                                      . &Devscripts::Uscan::WatchFile::DEB_EXT
-                                      . '//')
-                                  : ($_)
-                            } split /;/,
-                            $1
-                        ]);
-                }
-
-                # Handle other *mangle:
-                #
-                # $ regexp-assemble <<EOF
-                # pagemangle
-                # dirversionmangle
-                # uversionmangle
-                # downloadurlmangle
-                # filenamemangle
-                # oversionmangle
-                # EOF
-                elsif ($opt
-                    =~ /^\s*((?:d(?:ownloadurl|irversion)|(?:filenam|pag)e|[ou]version)mangle)\s*=\s*(.+?)\s*$/
-                ) {
-                    $self->$1([split /;/, $2]);
-                } else {
-                    uscan_warn "unrecognized option $opt";
-                }
-            }
-
-            # $self->line watch line string when no opts=...
-            uscan_verbose "line: $self->{line}";
-        }
-
-        if ($self->line eq '') {
-            uscan_verbose "watch line only with opts=\"...\" and no URL";
-            return $self->status(1);
-        }
-
-        # 4 parameter watch line
-        ($base, $filepattern, $lastversion, $action) = split /\s+/,
-          $self->line, 4;
-
-        # 3 parameter watch line (override)
-        if ($base =~ s%/([^/]*\([^/]*\)[^/]*)$%/%) {
-
-            # Last component of $base has a pair of parentheses, so no
-            # separate filepattern field; we remove the filepattern from the
-            # end of $base and rescan the rest of the line
-            $filepattern = $1;
-            (undef, $lastversion, $action) = split /\s+/, $self->line, 3;
-        }
-
-        # Always define "" if not defined
-        $lastversion //= '';
-        $action      //= '';
-        if ($self->mode eq 'LWP') {
-            if ($base =~ m%^https?://%) {
-                $self->mode('http');
-            } elsif ($base =~ m%^ftp://%) {
-                $self->mode('ftp');
-            } else {
-                uscan_warn "unknown protocol for LWP: $base";
-                return $self->status(1);
-            }
-        }
-
-        # compression is persistent
-        $self->compression('default') unless ($self->compression);
-
-        # Set $lastversion to the numeric last version
-        # Update $self->versionmode (its default "newer")
-        if (!length($lastversion)
-            or $lastversion =~ /^(group|checksum|debian)$/) {
-            if (!defined $self->pkg_version) {
-                uscan_warn "Unable to determine the current version\n"
-                  . "  in $watchfile, skipping:\n  $self->{line}";
-                return $self->status(1);
-            }
-            $lastversion = $self->pkg_version;
-        } elsif ($lastversion eq 'ignore') {
-            $self->versionmode('ignore');
-            $lastversion = $minversion;
-        } elsif ($lastversion eq 'same') {
-            $self->versionmode('same');
-            $lastversion = $minversion;
-        } elsif ($lastversion =~ m/^prev/) {
-            $self->versionmode('previous');
-
-            # set $lastversion = $previous_newversion later
-        }
-
-        # Check $filepattern has ( ...)
-        if ($filepattern !~ /\([^?].*\)/) {
-            if (($self->mode eq 'git' or $self->mode eq 'svn')
-                and $filepattern eq 'HEAD') {
-                $self->versionless(1);
-            } elsif ($self->mode eq 'git'
-                and $filepattern =~ m&^heads/&) {
-                $self->versionless(1);
-            } elsif ($self->mode eq 'http'
-                and @{ $self->filenamemangle }) {
-                $self->versionless(1);
-            } else {
-                uscan_warn
-                  "Tag pattern missing version delimiters () in $watchfile"
-                  . ", skipping:\n  $self->{line}";
-                return $self->status(1);
-            }
-        }
-
-        # Check validity of options
-        if ($self->mode eq 'ftp'
-            and @{ $self->downloadurlmangle }) {
-            uscan_warn "downloadurlmangle option invalid for ftp sites,\n"
-              . "  ignoring downloadurlmangle in $watchfile:\n"
-              . "  $self->{line}";
-            return $self->status(1);
-        }
-        if ($self->mode ne 'git' and $self->git->{export} ne 'default') {
-            uscan_warn "gitexport option is valid only in git mode,\n"
-              . "  ignoring gitexport in $watchfile:\n"
-              . "  $self->{line}";
-            return $self->status(1);
-        }
-
-        # Limit use of opts="repacksuffix" to the single upstream package
-        if ($self->repacksuffix and @{ $self->shared->{components} }) {
+    if ($opts->{useragent}) {
+        my $user_agent_string = $opts->{useragent};
+        $user_agent_string = $self->config->user_agent
+          if $self->config->user_agent ne
+          &Devscripts::Uscan::Config::default_user_agent;
+        $self->downloader->user_agent->agent($user_agent_string);
+        uscan_verbose "User-agent: $user_agent_string";
+        delete $opts->{useragent};
+    }
+    foreach my $optName (sort keys %$opts) {
+        next
+          if $optName
+          =~ /(?:source|version|versionschema|matchingpattern|_raw|updatescript)$/;
+        my $optVal = $opts->{$optName};
+        uscan_verbose "Parsing $optName=$optVal";
+        if ($optName =~ /^(?:nopas(?:sive|v)|pas(?:sive|v)|active)$/) {
             uscan_warn
-"repacksuffix is not compatible with the multiple upstream tarballs;\n"
-              . "  use oversionmangle";
-            return $self->status(1);
+              "Option $optName is deprecated, only passive mode is available";
         }
 
-        # Allow 2 char shorthands for opts="pgpmode=..." and check
-        if ($self->pgpmode =~ m/^au/) {
-            $self->pgpmode('auto');
-            if (@{ $self->pgpsigurlmangle }) {
-                uscan_warn "Ignore pgpsigurlmangle because pgpmode=auto";
-                $self->pgpsigurlmangle([]);
+        # Line option "compression" is ignored if "--compression"
+        # was set in command-line
+        elsif ($optName eq 'compression' and not $self->compression) {
+            $self->compression(get_compression($optVal));
+        } elsif ($optName eq 'bare') {
+
+            # persistent $bare
+            ${ $self->shared->{bare} } = _booleanVal($optVal, $optName);
+        }
+
+        # Boolean line parameter
+        #
+        # $ regexp-assemble <<EOF
+        # decompress
+        # repack
+        # EOF
+        elsif ($optName =~ /^(?:decompress|repack)$/) {
+            $self->setBooleanValue($optName, $optVal);
+        }
+
+        # Line parameter with a value
+        #
+        # $ regexp-assemble <<EOF
+        # component
+        # ctype
+        # date
+        # gitexport
+        # gitmode
+        # gitmodules
+        # hrefdecode
+        # mode
+        # pgpmode
+        # pretty
+        # repacksuffix
+        # searchmode
+        # unzipopt
+        # EOF
+        elsif ($optName
+            =~ /^((?:(?:(?:(?:search)?m|hrefdec)od|dat)e|c(?:omponent|type)|p(?:gpmode|retty)|repacksuffix|unzipopt))$/
+        ) {
+            $self->$optName($optVal);
+        } elsif ($optName =~ /^git(export|mode)$/) {
+            $self->git->{$1} = $optVal;
+        } elsif ($optName eq 'gitmodules') {
+            if ($optVal eq 'all' or 'yes') {
+                $self->git->{modules} = ['.'];
+            } else {
+                $self->git->{modules} = [split /;/, $optVal];
             }
-        } elsif ($self->pgpmode =~ m/^ma/) {
+        } elsif ($optName eq 'versionmangle') {
+            $self->uversionmangle([split /;/, $optVal]);
+            $self->dversionmangle([split /;/, $optVal]);
+        } elsif ($optName eq 'pgpsigurlmangle') {
+            $self->pgpsigurlmangle([split /;/, $optVal]);
             $self->pgpmode('mangle');
-            if (not @{ $self->pgpsigurlmangle }) {
-                uscan_warn "Missing pgpsigurlmangle.  Setting pgpmode=default";
-                $self->pgpmode('default');
-            }
-        } elsif ($self->pgpmode =~ m/^no/) {
-            $self->pgpmode('none');
-        } elsif ($self->pgpmode =~ m/^ne/) {
-            $self->pgpmode('next');
-        } elsif ($self->pgpmode =~ m/^pr/) {
-            $self->pgpmode('previous');
-            $self->versionmode('previous');    # no other value allowed
-                # set $lastversion = $previous_newversion later
-        } elsif ($self->pgpmode =~ m/^se/) {
-            $self->pgpmode('self');
-        } elsif ($self->pgpmode =~ m/^git/) {
-            $self->pgpmode('gittag');
+        }
+        # Handle other *mangle:
+        #
+        # $ regexp-assemble <<EOF
+        # dirversionmangle
+        # downloadurlmangle
+        # dversionmangle
+        # filenamemangle
+        # oversionmangle
+        # pagemangle
+        # uversionmangle
+        # EOF
+        elsif ($optName
+            =~ /^(?:d(?:(?:ir)?version|ownloadurl)|(?:filenam|pag)e|[ou]version)mangle$/
+        ) {
+            $self->$optName([split /;/, $optVal]);
+        } elsif ($optName eq 'versionschema') {
+            $self->versionmode($optVal);
         } else {
+            uscan_warn "unrecognized option $optName: $optVal";
+        }
+    }
+
+    uscan_extra_debug "watchSource: << ==EOF==\n"
+      . $self->{watchSource}->{_raw}
+      . "==EOF==\n";
+
+    # 4 parameter watch line
+    ($base, $filepattern, $lastversion, $action) = (
+        $opts->{source},
+        $opts->{matchingpattern},
+        $opts->{versionconstraint} // '',
+        $opts->{updatescript}      // ''
+    );
+
+    if ($self->mode eq 'LWP') {
+        if ($base =~ m%^https?://%) {
+            $self->mode('http');
+        } elsif ($base =~ m%^ftp://%) {
+            $self->mode('ftp');
+        } else {
+            uscan_warn "unknown protocol for LWP: $base";
+            return $self->status(1);
+        }
+    }
+
+    # compression is persistent
+    $self->compression('default') unless ($self->compression);
+
+    # Set $lastversion to the numeric last version
+    # Update $self->versionmode (its default "newer")
+    if (!length($lastversion)
+        or $self->versionmode =~ /^(group|checksum)$/) {
+        if (!defined $self->pkg_version) {
+            uscan_warn "Unable to determine the current version\n"
+              . "  in $watchfile, skipping:\n  $self->{watchSource}->{source}";
+            return $self->status(1);
+        }
+        $lastversion = $self->pkg_version;
+    } elsif ($self->versionmode eq 'ignore') {
+        $lastversion = $minversion;
+    } elsif ($lastversion eq 'same') {
+        $self->versionmode('same');
+        $lastversion = $minversion;
+    } elsif ($self->versionmode eq 'previous') {
+        # set $lastversion = $previous_newversion later
+    }
+
+    # Check $filepattern has ( ...)
+    if ($filepattern !~ /\([^?].*\)/) {
+        if (($self->mode eq 'git' or $self->mode eq 'svn')
+            and $filepattern eq 'HEAD') {
+            $self->versionless(1);
+        } elsif ($self->mode eq 'git'
+            and $filepattern =~ m&^heads/&) {
+            $self->versionless(1);
+        } elsif ($self->mode eq 'http'
+            and @{ $self->filenamemangle }) {
+            $self->versionless(1);
+        } else {
+            uscan_warn
+              "Tag pattern missing version delimiters () in $watchfile"
+              . ", skipping:";
+            return $self->status(1);
+        }
+    }
+
+    # Check validity of options
+    if ($self->mode eq 'ftp'
+        and @{ $self->downloadurlmangle }) {
+        uscan_warn "downloadurlmangle option invalid for ftp sites,\n"
+          . "  ignoring downloadurlmangle in $watchfile:\n"
+          . "  $self->{watchSource}->{source}";
+        return $self->status(1);
+    }
+    if ($self->mode ne 'git' and $self->git->{export} ne 'default') {
+        uscan_warn "gitexport option is valid only in git mode,\n"
+          . "  ignoring gitexport in $watchfile:\n"
+          . "  $self->{watchSource}->{source}";
+        return $self->status(1);
+    }
+
+    # Limit use of opts="repacksuffix" to the single upstream package
+    if ($self->repacksuffix and @{ $self->shared->{components} }) {
+        uscan_warn
+"repacksuffix is not compatible with the multiple upstream tarballs;\n"
+          . "  use oversionmangle";
+        return $self->status(1);
+    }
+
+    # Allow 2 char shorthands for opts="pgpmode=..." and check
+    if ($self->pgpmode =~ m/^au/) {
+        $self->pgpmode('auto');
+        if (@{ $self->pgpsigurlmangle }) {
+            uscan_warn "Ignore pgpsigurlmangle because pgpmode=auto";
+            $self->pgpsigurlmangle([]);
+        }
+    } elsif ($self->pgpmode =~ m/^ma/) {
+        $self->pgpmode('mangle');
+        if (not @{ $self->pgpsigurlmangle }) {
+            uscan_warn "Missing pgpsigurlmangle.  Setting pgpmode=default";
             $self->pgpmode('default');
         }
+    } elsif ($self->pgpmode =~ m/^no/) {
+        $self->pgpmode('none');
+    } elsif ($self->pgpmode =~ m/^ne/) {
+        $self->pgpmode('next');
+    } elsif ($self->pgpmode =~ m/^pr/) {
+        $self->pgpmode('previous');
+        $self->versionmode('previous');    # no other value allowed
+            # set $lastversion = $previous_newversion later
+    } elsif ($self->pgpmode =~ m/^se/) {
+        $self->pgpmode('self');
+    } elsif ($self->pgpmode =~ m/^git/) {
+        $self->pgpmode('gittag');
+    } else {
+        $self->pgpmode('default');
+    }
 
-        # For mode=svn, make pgpmode=none the default
-        if ($self->mode eq 'svn') {
-            if ($self->pgpmode eq 'default') {
-                $self->pgpmode('none');
-            } elsif ($self->pgpmode ne 'none') {
-                uscan_die "Only pgpmode=none can be used with mode=svn.\n";
+    # For mode=svn, make pgpmode=none the default
+    if ($self->mode eq 'svn') {
+        if ($self->pgpmode eq 'default') {
+            $self->pgpmode('none');
+        } elsif ($self->pgpmode ne 'none') {
+            uscan_die "Only pgpmode=none can be used with mode=svn.\n";
+        }
+    }
+
+    # If PGP used, check required programs and generate files
+    if (@{ $self->pgpsigurlmangle }) {
+        my $pgpsigurlmanglestring = join(";", @{ $self->pgpsigurlmangle });
+        uscan_debug "\$self->{'pgpmode'}=$self->{'pgpmode'}, "
+          . "\$self->{'pgpsigurlmangle'}=$pgpsigurlmanglestring";
+    } else {
+        uscan_debug "\$self->{'pgpmode'}=$self->{'pgpmode'}, "
+          . "\$self->{'pgpsigurlmangle'}=undef";
+    }
+
+    # Check component for duplication and set $orig to the proper
+    # extension string
+    if ($self->pgpmode ne 'previous') {
+        if ($self->component) {
+            if (grep { $_ eq $self->component }
+                @{ $self->shared->{components} }) {
+                uscan_warn "duplicate component name: $self->{component}";
+                return $self->status(1);
+            }
+            push @{ $self->shared->{components} }, $self->component;
+        } else {
+            $self->shared->{origcount}++;
+            if ($self->shared->{origcount} > 1) {
+                uscan_warn "more than one main upstream tarballs listed.";
+
+                # reset variables
+                @{ $self->shared->{components} } = ();
+                $self->{shared}->{common_newversion}           = undef;
+                $self->{shared}->{common_mangled_newversion}   = undef;
+                $self->{shared}->{previous_newversion}         = undef;
+                $self->{shared}->{previous_newfile_base}       = undef;
+                $self->{shared}->{previous_sigfile_base}       = undef;
+                $self->{shared}->{previous_download_available} = undef;
+                $self->{shared}->{uscanlog}                    = undef;
             }
         }
+    }
 
-        # If PGP used, check required programs and generate files
-        if (@{ $self->pgpsigurlmangle }) {
-            my $pgpsigurlmanglestring = join(";", @{ $self->pgpsigurlmangle });
-            uscan_debug "\$self->{'pgpmode'}=$self->{'pgpmode'}, "
-              . "\$self->{'pgpsigurlmangle'}=$pgpsigurlmanglestring";
-        } else {
-            uscan_debug "\$self->{'pgpmode'}=$self->{'pgpmode'}, "
-              . "\$self->{'pgpsigurlmangle'}=undef";
-        }
+    # Allow 2 char shorthands for opts="gitmode=..." and check
+    if ($self->git->{mode} =~ m/^sh/) {
+        $self->git->{mode} = 'shallow';
+    } elsif ($self->git->{mode} =~ m/^fu/) {
+        $self->git->{mode} = 'full';
+    } else {
+        uscan_warn "Unknown gitmode, defaulting to 'shallow'";
+        $self->git->{mode} = 'shallow';
+    }
 
-        # Check component for duplication and set $orig to the proper
-        # extension string
-        if ($self->pgpmode ne 'previous') {
-            if ($self->component) {
-                if (grep { $_ eq $self->component }
-                    @{ $self->shared->{components} }) {
-                    uscan_warn "duplicate component name: $self->{component}";
-                    return $self->status(1);
-                }
-                push @{ $self->shared->{components} }, $self->component;
-            } else {
-                $self->shared->{origcount}++;
-                if ($self->shared->{origcount} > 1) {
-                    uscan_warn "more than one main upstream tarballs listed.";
+    # Handle sf.net addresses specially
+    if (!$self->shared->{bare} and $base =~ m%^https?://sf\.net/%) {
+        uscan_verbose "sf.net redirection to qa.debian.org/watch/sf.php";
+        $base =~ s%^https?://sf\.net/%https://qa.debian.org/watch/sf.php/%;
+        $filepattern .= '(?:\?.*)?';
+    }
 
-                    # reset variables
-                    @{ $self->shared->{components} } = ();
-                    $self->{shared}->{common_newversion}           = undef;
-                    $self->{shared}->{common_mangled_newversion}   = undef;
-                    $self->{shared}->{previous_newversion}         = undef;
-                    $self->{shared}->{previous_newfile_base}       = undef;
-                    $self->{shared}->{previous_sigfile_base}       = undef;
-                    $self->{shared}->{previous_download_available} = undef;
-                    $self->{shared}->{uscanlog}                    = undef;
-                }
-            }
-        }
+    # Handle pypi.python.org addresses specially
+    if (   !$self->shared->{bare}
+        and $base =~ m%^https?://pypi\.python\.org/packages/source/%) {
+        uscan_verbose "pypi.python.org redirection to pypi.debian.net";
+        $base
+          =~ s%^https?://pypi\.python\.org/packages/source/./%https://pypi.debian.net/%;
+    }
 
-        # Allow 2 char shorthands for opts="gitmode=..." and check
-        if ($self->git->{mode} =~ m/^sh/) {
-            $self->git->{mode} = 'shallow';
-        } elsif ($self->git->{mode} =~ m/^fu/) {
-            $self->git->{mode} = 'full';
-        } else {
-            uscan_warn "Unknown gitmode, defaulting to 'shallow'";
-            $self->git->{mode} = 'shallow';
-        }
-
-        # Handle sf.net addresses specially
-        if (!$self->shared->{bare} and $base =~ m%^https?://sf\.net/%) {
-            uscan_verbose "sf.net redirection to qa.debian.org/watch/sf.php";
-            $base =~ s%^https?://sf\.net/%https://qa.debian.org/watch/sf.php/%;
-            $filepattern .= '(?:\?.*)?';
-        }
-
-        # Handle pypi.python.org addresses specially
-        if (   !$self->shared->{bare}
-            and $base =~ m%^https?://pypi\.python\.org/packages/source/%) {
-            uscan_verbose "pypi.python.org redirection to pypi.debian.net";
-            $base
-              =~ s%^https?://pypi\.python\.org/packages/source/./%https://pypi.debian.net/%;
-        }
-
-        # Handle pkg-ruby-extras gemwatch addresses specially
-        if ($base
-            =~ m%^https?://pkg-ruby-extras\.alioth\.debian\.org/cgi-bin/gemwatch%
-        ) {
-            uscan_warn
+    # Handle pkg-ruby-extras gemwatch addresses specially
+    if ($base
+        =~ m%^https?://pkg-ruby-extras\.alioth\.debian\.org/cgi-bin/gemwatch%)
+    {
+        uscan_warn
 "redirecting DEPRECATED pkg-ruby-extras.alioth.debian.org/cgi-bin/gemwatch"
-              . " to gemwatch.debian.net";
-            $base
-              =~ s%^https?://pkg-ruby-extras\.alioth\.debian\.org/cgi-bin/gemwatch%https://gemwatch.debian.net%;
-        }
-
+          . " to gemwatch.debian.net";
+        $base
+          =~ s%^https?://pkg-ruby-extras\.alioth\.debian\.org/cgi-bin/gemwatch%https://gemwatch.debian.net%;
     }
 
     if ($self->ctype) {
@@ -803,9 +700,8 @@ EOF
     my $mangled_lastversion = $lastversion;
     if (
         mangle(
-            $watchfile,        \$self->line,
-            'dversionmangle:', \@{ $self->dversionmangle },
-            \$mangled_lastversion
+            $watchfile,                  'dversionmangle:',
+            \@{ $self->dversionmangle }, \$mangled_lastversion
         )
     ) {
         return $self->status(1);
@@ -815,22 +711,12 @@ EOF
     if ($self->versionmode eq 'ignore' and $self->config->download_version) {
         uscan_verbose 'Ignore --download_version for component with "ignore"';
     } elsif ($self->config->download_version) {
-        my $mangled_downloadversion = $self->config->download_version;
-        if (
-            mangle(
-                $watchfile,        \$self->line,
-                'uversionmangle:', \@{ $self->uversionmangle },
-                \$mangled_downloadversion
-            )
-        ) {
-            return $self->status(1);
-        }
-        $self->shared->{download_version} = $mangled_downloadversion;
+        $self->shared->{download_version} = $self->config->download_version;
         $self->shared->{download}         = 2
           if $self->shared->{download} == 1;    # Change default 1 -> 2
         $self->badversion(1);
         uscan_verbose "Download the --download-version specified version: "
-          . "(uversionmangled): $self->{shared}->{download_version}";
+          . "$self->{shared}->{download_version}";
     } elsif ($self->config->download_debversion) {
         $self->shared->{download_version} = $mangled_lastversion;
         $self->shared->{download}         = 2
@@ -851,7 +737,7 @@ EOF
             uscan_warn
 "Unable to set versionmode=prev for the line without opts=pgpmode=prev\n"
               . "  in $watchfile, skipping:\n"
-              . "  $self->{line}";
+              . "  $self->{watchSource}->{source}";
             return $self->status(1);
         }
         $self->shared->{download_version} = $self->shared->{common_newversion};
@@ -866,11 +752,11 @@ EOF
             if ($self->shared->{download}) {
                 uscan_warn
 "Unable to set versionmode=prev for the line without opts=pgpmode=prev\n"
-                  . "  in $watchfile, skipping:\n  $self->{line}";
+                  . "  in $watchfile, skipping:\n  $self->{watchSource}->{source}";
             } else {
                 uscan_verbose
                   "Nothing was downloaded before, skipping pgp check";
-                uscan_verbose "  line " . $self->line;
+                uscan_verbose "  line " . $self->{watchSource}->{source};
             }
             return $self->status(1);
         }
@@ -900,14 +786,14 @@ EOF
             } else {
                 uscan_warn "Can't determine protocol and site in\n"
                   . "  $watchfile, skipping:\n"
-                  . "  $self->{line}";
+                  . "  $self->{watchSource}->{source}";
                 return $self->status(1);
             }
 
             # Find the path with the greatest version number matching the regex
             $base
               = recursive_regex_dir($self, $base,
-                $self->dirversionmangle, $watchfile, \$self->line,
+                $self->dirversionmangle, $watchfile,
                 $self->shared->{download_version});
             if ($base eq '') {
                 return $self->status(1);
@@ -984,8 +870,9 @@ It populates B<$self-E<gt>search_result> hash ref with the following keys:
 
 =over
 
-=item B<newversion>: URL/tag pointing to the file to be downloaded
-=item B<newfile>: version number to be used for the downloaded file
+=item B<mangled_newversion>: mangled version number for comparisons
+=item B<newversion>: version number to be used for the downloaded file
+=item B<newfile>: URL/tag pointing to the file to be downloaded
 
 =back
 
@@ -994,19 +881,22 @@ It populates B<$self-E<gt>search_result> hash ref with the following keys:
 sub search {
     my ($self) = @_;
     uscan_debug "line: search()";
-    my ($newversion, $newfile) = $self->_do('search');
-    unless ($newversion and $newfile) {
+    my ($mangled_newversion, $newversion, $newfile) = $self->_do('search');
+    unless ($mangled_newversion and $newversion and $newfile) {
         return $self->status(1);
     }
     $self->status and return $self->status;
-    uscan_verbose "Looking at \$base = $self->{parse_result}->{base} with\n"
-      . "    \$filepattern = $self->{parse_result}->{filepattern} found\n"
-      . "    \$newfile     = $newfile\n"
-      . "    \$newversion  = $newversion\n"
-      . "    \$lastversion = $self->{parse_result}->{mangled_lastversion}";
+    uscan_verbose
+      "Looking at \$base        = $self->{parse_result}->{base} with\n"
+      . "    \$filepattern        = $self->{parse_result}->{filepattern} found\n"
+      . "    \$newfile            = $newfile\n"
+      . "    \$mangled_newversion = $mangled_newversion\n"
+      . "    \$newversion         = $newversion\n"
+      . "    \$lastversion        = $self->{parse_result}->{mangled_lastversion}";
     $self->search_result({
-        newversion => $newversion,
-        newfile    => $newfile,
+        mangled_newversion => $mangled_newversion,
+        newversion         => $newversion,
+        newfile            => $newfile,
     });
 
     # The original version of the code didn't use (...) in the watch
@@ -1017,13 +907,13 @@ sub search {
     if ($self->style eq 'old') {
 
         # Old-style heuristics
-        if ($newversion =~ /^\D*(\d+\.(?:\d+\.)*\d+)\D*$/) {
-            $self->search_result->{newversion} = $1;
+        if ($mangled_newversion =~ /^\D*(\d+\.(?:\d+\.)*\d+)\D*$/) {
+            $self->search_result->{mangled_newversion} = $1;
         } else {
             uscan_warn <<"EOF";
 $progname warning: In $self->{watchfile}, couldn\'t determine a
   pure numeric version number from the file name for watch line
-  $self->{line}
+  $self->{watchSource}->{source}
   and file name $newfile
   Please use a new style watch file instead!
 EOF
@@ -1136,7 +1026,7 @@ sub cmp_versions {
     my $mangled_ver
       = Dpkg::Version->new("1:${mangled_lastversion}-0", check => 0);
     my $upstream_ver
-      = Dpkg::Version->new("1:$self->{search_result}->{newversion}-0",
+      = Dpkg::Version->new("1:$self->{search_result}->{mangled_newversion}-0",
         check => 0);
     my $compver;
     if ($mangled_ver == $upstream_ver) {
@@ -1156,11 +1046,11 @@ sub cmp_versions {
           . "$self->{search_result}->{newversion}, "
           . "specified download version is $self->{shared}->{download_version}";
         $found++ unless ($self->versionmode =~ /(?:same|ignore)/);
-    } elsif ($self->versionmode eq 'newer') {
+    } elsif ($self->versionmode =~ /(?:newer|group|checksum$)/) {
         if ($compver eq 'newer') {
             uscan_msg "Newest version of $name on remote site is "
               . "$self->{search_result}->{newversion}, "
-              . "local version is $self->{parse_result}->{mangled_lastversion}\n"
+              . "local version is $self->{parse_result}->{lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
@@ -1176,7 +1066,7 @@ sub cmp_versions {
         } elsif ($compver eq 'same') {
             uscan_verbose "Newest version of $name on remote site is "
               . $self->search_result->{newversion}
-              . ", local version is $self->{parse_result}->{mangled_lastversion}\n"
+              . ", local version is $self->{parse_result}->{lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
@@ -1197,7 +1087,7 @@ sub cmp_versions {
         } else {    # $compver eq 'old'
             uscan_verbose "Newest version of $name on remote site is "
               . $self->search_result->{newversion}
-              . ", local version is $self->{parse_result}->{mangled_lastversion}\n"
+              . ", local version is $self->{parse_result}->{lastversion}\n"
               . (
                 $mangled_lastversion eq $self->parse_result->{lastversion}
                 ? ""
@@ -1233,7 +1123,7 @@ Download file and, if available and needed, signature files.
 
 =cut
 
-my %already_downloaded;
+our %already_downloaded;
 
 sub download_file_and_sig {
     my ($self) = @_;
@@ -1437,9 +1327,8 @@ sub download_file_and_sig {
         $pgpsig_url = $self->upstream_url;
         if (
             mangle(
-                $self->watchfile,   \$self->line,
-                'pgpsigurlmangle:', \@{ $self->pgpsigurlmangle },
-                \$pgpsig_url
+                $self->watchfile,             'pgpsigurlmangle:',
+                \@{ $self->pgpsigurlmangle }, \$pgpsig_url
             )
         ) {
             return $self->status(1);
@@ -1572,12 +1461,11 @@ sub download_file_and_sig {
         uscan_warn "strange ... unknown pgpmode = $self->{pgpmode}";
         return $self->status(1);
     }
-    my $mangled_newversion = $self->search_result->{newversion};
+    my $mangled_newversion = $self->search_result->{mangled_newversion};
     if (
         mangle(
-            $self->watchfile,  \$self->line,
-            'oversionmangle:', \@{ $self->oversionmangle },
-            \$mangled_newversion
+            $self->watchfile,            'oversionmangle:',
+            \@{ $self->oversionmangle }, \$mangled_newversion
         )
     ) {
         return $self->status(1);
@@ -1846,6 +1734,19 @@ sub _do {
         $self->status(1);
     }
     return $self->$sub;
+}
+
+sub setBooleanValue {
+    my ($self, $key, $value) = @_;
+    $self->$key(_booleanVal($value, $key));
+}
+
+sub _booleanVal {
+    uscan_warn 'Option '
+      . ucfirst($_[1] // 'Unkwown')
+      . " should be yes or no, not '$_[0]'. Set it to 'no'"
+      if $_[0] !~ /^(?:1|0|yes|no)$/i;
+    return $_[0] =~ /^(?:1|yes)$/ ? 1 : 0;
 }
 
 1;

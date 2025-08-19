@@ -163,10 +163,10 @@ Options:
          distribution name
   --bpo
          Increment the Debian release number for a backports upload
-         to "bookworm-backports"
+         to "trixie-backports"
   --sloppy
          Increment the Debian release number for a sloppy backports upload
-         to "bullseye-backports-sloppy"
+         to "bookworm-backports-sloppy"
   --stable
          Increment the Debian release number for a stable upload.
   -l, --local <suffix>
@@ -526,7 +526,7 @@ if (
 if (defined $opt_D) {
     if ($vendor eq 'Debian') {
         unless ($opt_D
-            =~ /^(experimental|unstable|sid|UNRELEASED|((old){0,2}stable|testing|buster|bullseye|bookworm|trixie)(-proposed-updates|-security)?|proposed-updates)$/
+            =~ /^(experimental|unstable|sid|UNRELEASED|((old){0,2}stable|testing|buster|bullseye|bookworm|trixie|forky)(-proposed-updates|-security)?|proposed-updates)$/
         ) {
             my $deb_info = get_debian_distro_info();
             my ($oldstable_backports, $stable_backports) = ("", "");
@@ -549,9 +549,9 @@ if (defined $opt_D) {
                   if $oldstable_backports;
                 warn "$progname warning: Recognised distributions are: \n"
                   . "experimental, unstable, testing, stable, oldstable, oldoldstable,\n"
-                  . "{trixie,bookworm,bullseye,buster}-proposed-updates,\n"
+                  . "{forky,trixie,bookworm,bullseye,buster}-proposed-updates,\n"
                   . "{testing,stable,oldstable,oldoldstable}-proposed-updates,\n"
-                  . "{trixie,bookworm,bullseye,buster}-security,\n"
+                  . "{forky,trixie,bookworm,bullseye,buster}-security,\n"
                   . "{testing,stable,oldstable,oldoldstable}}-security$oldstable_backports$stable_backports and UNRELEASED.\n"
                   . "Using your request anyway.\n";
                 $warnings++ if not $opt_force_dist;
@@ -688,8 +688,9 @@ my $MAINTAINER   = 'MAINTAINER';
 my $EMAIL        = 'EMAIL';
 my $DISTRIBUTION = 'UNRELEASED';
 # when updating the lines below also update the help text, the manpage and the testcases.
-my %dists       = (10, 'buster', 11, 'bullseye', 12, 'bookworm', 13, 'trixie');
-my $latest_dist = '12';
+my %dists
+  = (10, 'buster', 11, 'bullseye', 12, 'bookworm', 13, 'trixie', 14, 'forky');
+my $latest_dist = '13';
 my $old_dist    = $latest_dist - 1;
 my $lts_dist    = '11';
 # dist guessed from backports, SRU, security uploads...

@@ -1,7 +1,7 @@
 
 =head1 NAME
 
-Devscripts::Uscan::WatchFile - watchfile object for L<uscan>
+Devscripts::Uscan::WatchFile - watchsources object for L<uscan>
 
 =head1 SYNOPSIS
 
@@ -35,7 +35,7 @@ Uscan class to parse watchfiles.
 
 =head2 new() I<(Constructor)>
 
-Parse watch file and creates L<Devscripts::Uscan::WatchLine> objects for
+Parse watch file and creates L<Devscripts::Uscan::WatchSource> objects for
 each line.
 
 =head3 Required parameters
@@ -56,7 +56,7 @@ each line.
 
 =over
 
-=item watchlines: ref to the array that contains watchlines objects
+=item watchSources ref to the array that contains watchSources objects
 
 =item watch_version: format version of the watchfile
 
@@ -64,11 +64,11 @@ each line.
 
 =head2 process_lines()
 
-Method that launches Devscripts::Uscan::WatchLine::process() on each watchline.
+Method that launches Devscripts::Uscan::WatchSource::process() on each watchSource.
 
 =head1 SEE ALSO
 
-L<uscan>, L<Devscripts::Uscan::WatchLine>, L<Devscripts::Uscan::Config>,
+L<uscan>, L<Devscripts::Uscan::WatchSource>, L<Devscripts::Uscan::Config>,
 L<Devscripts::Uscan::FindFiles>
 
 =head1 AUTHOR
@@ -97,19 +97,14 @@ package Devscripts::Uscan::WatchFile;
 use strict;
 use Devscripts::Uscan::Downloader;
 use Devscripts::Uscan::Output;
-use Devscripts::Uscan::WatchLine;
+use Devscripts::Uscan::WatchSource;
 use Dpkg::Version;
 use File::Copy qw/copy move/;
 use List::Util qw/first/;
 use Moo;
 
-use constant {
-    ANY_VERSION => '(?:[-_]?[Vv]?(\d[\-+\.:\~\da-zA-Z]*))',
-    ARCHIVE_EXT =>
-      '(?i)(?:\.(?:tar\.xz|tar\.bz2|tar\.gz|tar\.zstd?|zip|tgz|tbz|txz))',
-    DEB_EXT => '(?:[\+~](debian|dfsg|ds|deb)(\.)?(\d+)?$)',
-};
-use constant SIGNATURE_EXT => ARCHIVE_EXT . '(?:\.(?:asc|pgp|gpg|sig|sign))';
+with 'Devscripts::Uscan::WatchSource::Parser',
+  'Devscripts::Uscan::WatchSource::Transform';
 
 # Required new() parameters
 has config      => (is => 'rw', required => 1);
@@ -131,7 +126,6 @@ has downloader => (
         Devscripts::Uscan::Downloader->new({
             timeout => $_[0]->config->timeout,
             agent   => $_[0]->config->user_agent,
-            pasv    => $_[0]->config->pasv,
             destdir => $_[0]->config->destdir,
             headers => $_[0]->config->http_header,
         });
@@ -150,7 +144,9 @@ has origcount     => (is => 'rw');
 has origtars      => (is => 'rw', default => sub { [] });
 has status        => (is => 'rw', default => sub { 0 });
 has watch_version => (is => 'rw');
-has watchlines    => (is => 'rw', default => sub { [] });
+has commonOpts    => (is => 'rw', default => sub { {} });
+has watchSources  => (is => 'rw', default => sub { [] });
+has watchOptions  => (is => 'rw', default => sub { [] });
 
 # Values shared between lines
 has shared => (
@@ -186,6 +182,36 @@ sub BUILD {
     my $watch_version = 0;
     my $nextline;
     $dehs_tags = {};
+    my $watchFileHandle;
+
+    if ($self->config->{update_watchfile}) {
+        require Devscripts::Uscan::Version4;
+        eval {
+            $watchFileHandle
+              = Devscripts::Uscan::Version4->new($args->{watchfile},
+                $self->config);
+        };
+        if ($@) {
+            uscan_die
+              "Unable to load $args->{watchfile} with Version4.pm:\n$@";
+        } else {
+            local $/ = undef;
+            my $content = <$watchFileHandle>;
+            $watchFileHandle->close;
+            $watchFileHandle = undef;
+            if (open $watchFileHandle, '>', $args->{watchfile}) {
+                print $watchFileHandle $content;
+                $watchFileHandle->close;
+                uscan_warn "$args->{watchfile} is now converted to version 5.";
+                uscan_warn
+                  'BE CAREFUL, some default values changed in version 5, '
+                  . "you shouldn't commit this without test.";
+            } else {
+                uscan_warn "Unable to write $args->{watchfile}: $!";
+            }
+        }
+        return;
+    }
 
     uscan_verbose "Process watch file at: $args->{watchfile}\n"
       . "    package = $args->{package}\n"
@@ -193,90 +219,48 @@ sub BUILD {
       . "    pkg_dir = $args->{pkg_dir}";
 
     $self->origcount(0);    # reset to 0 for each watch file
-    unless (open WATCH, $args->{watchfile}) {
+    unless (open $watchFileHandle, $args->{watchfile}) {
         uscan_warn "could not open $args->{watchfile}: $!";
         return 1;
     }
 
+    eval { $self->parseWatchFile($watchFileHandle, $args) };
+    my $error;
+    if ($@) {
+        uscan_debug "Version 5 parser returned: $@";
+        # TODO: later, increase log level to uscan_warn
+        uscan_verbose
+          "$args->{watchfile} isn't formatted in version 5, trying version 4";
+        $error = $@;
+        $watchFileHandle->close;
+        require Devscripts::Uscan::Version4;
+        eval {
+            $watchFileHandle
+              = Devscripts::Uscan::Version4->new($args->{watchfile});
+        };
+        if ($@) {
+            uscan_warn "Unable to read $args->{watchfile}:\n"
+              . " - version  5: $error\n"
+              . " - version <5: $@\n";
+            return;
+        }
+        $self->parseWatchFile($watchFileHandle, $args);
+        uscan_verbose 'Reset watch_version to 4 because '
+          . 'default value may change in version 5';
+        $self->watch_version(4);
+    }
+    close $watchFileHandle
+      or $self->status(1),
+      uscan_warn "problems reading $$args->{watchfile}: $!";
+
+    unless ($self->transformWatchSource($args)) {
+        uscan_die "Unable to read watchSource";
+        return;
+    }
+
     my $lineNumber = 0;
-    while (<WATCH>) {
-        next if /^\s*\#/;
-        next if /^\s*$/;
-        s/^\s*//;
-
-      CHOMP:
-
-        # Reassemble lines split using \
-        chomp;
-        if (s/(?<!\\)\\$//) {
-            if (eof(WATCH)) {
-                uscan_warn
-                  "$args->{watchfile} ended with \\; skipping last line";
-                $self->status(1);
-                last;
-            }
-            if ($watch_version > 3) {
-
-                # drop leading \s only if version 4
-                $nextline = <WATCH>;
-                $nextline =~ s/^\s*//;
-                $_ .= $nextline;
-            } else {
-                $_ .= <WATCH>;
-            }
-            goto CHOMP;
-        }
-
-        # "version" must be the first field
-        if (!$watch_version) {
-
-            # Looking for "version" field.
-            if (/^version\s*=\s*(\d+)(\s|$)/) {    # Found
-                $watch_version = $1;
-
-                # Note that version=1 watchfiles have no "version" field so
-                # authorizated values are >= 2 and <= CURRENT_WATCHFILE_VERSION
-                if (   $watch_version < 2
-                    or $watch_version
-                    > $Devscripts::Uscan::Config::CURRENT_WATCHFILE_VERSION) {
-                    # "version" field found but has no authorizated value
-                    uscan_warn
-"$args->{watchfile} version number is unrecognised; skipping watch file";
-                    last;
-                }
-
-                # Next line
-                next;
-            }
-
-            # version=1 is deprecated
-            else {
-                $watch_version = 1;
-            }
-        }
-        if ($watch_version < 3) {
-            uscan_warn
-"$args->{watchfile} is an obsolete version $watch_version watch file;\n"
-              . "   please upgrade to a higher version\n"
-              . "   (see uscan(1) for details).";
-        }
-
-        # "version" is fixed, parsing lines now
-
-        # Are there any warnings from this part to give if we're using dehs?
-        dehs_output if ($dehs);
-
-        # Handle shell \\ -> \
-        s/\\\\/\\/g if $watch_version == 1;
-
-        # Handle @PACKAGE@ @ANY_VERSION@ @ARCHIVE_EXT@ substitutions
-        s/\@PACKAGE\@/$args->{package}/g;
-        s/\@ANY_VERSION\@/ANY_VERSION/ge;
-        s/\@ARCHIVE_EXT\@/ARCHIVE_EXT/ge;
-        s/\@SIGNATURE_EXT\@/SIGNATURE_EXT/ge;
-        s/\@DEB_EXT\@/DEB_EXT/ge;
-
-        my $line = Devscripts::Uscan::WatchLine->new({
+    foreach my $watchSource (@{ $self->watchOptions }) {
+        my $line = Devscripts::Uscan::WatchSource->new({
                 # Shared between lines
                 config     => $self->config,
                 downloader => $self->downloader,
@@ -284,29 +268,24 @@ sub BUILD {
                 keyring    => $self->keyring,
 
                 # Other parameters
-                line          => $_,
+                watchSource   => $watchSource,
                 pkg           => $self->package,
                 pkg_dir       => $self->pkg_dir,
                 pkg_version   => $self->pkg_version,
-                watch_version => $watch_version,
+                watch_version => $self->watch_version,
                 watchfile     => $self->watchfile,
         });
         push @{ $self->group }, $lineNumber
           if ($line->type and $line->type =~ /^(?:group|checksum)$/);
-        push @{ $self->watchlines }, $line;
+        push @{ $self->watchSources }, $line;
         $lineNumber++;
     }
-
-    close WATCH
-      or $self->status(1),
-      uscan_warn "problems reading $$args->{watchfile}: $!";
-    $self->watch_version($watch_version);
 }
 
 sub process_lines {
     my ($self) = shift;
     return $self->process_group if (@{ $self->group });
-    foreach (@{ $self->watchlines }) {
+    foreach (@{ $self->watchSources }) {
 
         # search newfile and newversion
         my $res = $_->process;
@@ -316,10 +295,13 @@ sub process_lines {
 }
 
 sub process_group {
-    my ($self) = @_;
-    my $saveDconfig = $self->config->download_version;
+    my ($self)           = @_;
+    my $saveDconfig      = $self->config->download_version;
+    my $versionSeparator = $self->commonOpts->{versionseparator}
+      || $self->{config}->{version_separator};
+    my $rsep = qr/\Q$versionSeparator\E/;
     # Build version
-    my @cur_versions = split /\+~/, $self->pkg_version;
+    my @cur_versions = split $rsep, $self->pkg_version;
     my $checksum     = 0;
     my $newChecksum  = 0;
     if (    $cur_versions[$#cur_versions]
@@ -334,11 +316,15 @@ sub process_group {
     my @ck_versions;
     # Isolate component and following lines
     if (my $v = $self->config->download_version) {
-        @dversion = map { s/\+.*$//; /^cs/ ? () : $_ } split /\+~/, $v;
+        @dversion = map { s/\+.*$//; /^cs/ ? () : $_ }
+          split $rsep, $v;
     }
-    foreach my $line (@{ $self->watchlines }) {
-        if (   $line->type and $line->type eq 'group'
-            or $line->type eq 'checksum') {
+    foreach my $line (@{ $self->watchSources }) {
+        if (
+            $line->type
+            and (  $line->type eq 'group'
+                or $line->type eq 'checksum')
+        ) {
             $last_shared       = $self->new_shared;
             $last_comp_version = shift @cur_versions if $line->type eq 'group';
         }
@@ -349,8 +335,10 @@ sub process_group {
         $line->pkg_version($last_comp_version || 0);
     }
     # Check if download is needed
-    foreach my $line (@{ $self->watchlines }) {
-        next unless ($line->type eq 'group' or $line->type eq 'checksum');
+    foreach my $line (@{ $self->watchSources }) {
+        next
+          unless ($line->type
+            and ($line->type eq 'group' or $line->type eq 'checksum'));
         # Stop on error
         $self->config->download_version($line->{groupDversion})
           if $line->{groupDversion};
@@ -368,17 +356,18 @@ sub process_group {
           if $line->shared->{download} > $download
           and ($line->type eq 'group' or $line->ctype);
     }
-    foreach my $line (@{ $self->watchlines }) {
-        next unless $line->type eq 'checksum';
+    foreach my $line (@{ $self->watchSources }) {
+        next unless $line->type and $line->type eq 'checksum';
         $newChecksum
-          = $self->sum($newChecksum, $line->search_result->{newversion});
-        push @ck_versions, $line->search_result->{newversion};
+          = $self->sum($newChecksum,
+            $line->search_result->{mangled_newversion});
+        push @ck_versions, $line->search_result->{mangled_newversion};
     }
-    foreach my $line (@{ $self->watchlines }) {
-        next unless ($line->type eq 'checksum');
+    foreach my $line (@{ $self->watchSources }) {
+        next unless ($line->type and $line->type eq 'checksum');
         $line->parse_result->{mangled_lastversion} = $checksum;
-        my $tmp = $line->search_result->{newversion};
-        $line->search_result->{newversion} = $newChecksum;
+        my $tmp = $line->search_result->{mangled_newversion};
+        $line->search_result->{mangled_newversion} = $newChecksum;
         unless ($line->ctype) {
             if ($line->cmp_versions) {
                 $self->{status} += $line->status;
@@ -387,17 +376,18 @@ sub process_group {
             $download = $line->shared->{download}
               if $line->shared->{download} > $download;
         }
-        $line->search_result->{newversion} = $tmp;
+        $line->search_result->{mangled_newversion} = $tmp;
         if ($line->component) {
             pop @{ $dehs_tags->{'component-upstream-version'} };
             push @{ $dehs_tags->{'component-upstream-version'} }, $tmp;
         }
     }
-    foreach my $line (@{ $self->watchlines }) {
+    foreach my $line (@{ $self->watchSources }) {
         # Set same $download for all
         $line->shared->{download} = $download;
         # Non "group" lines where not initialized
-        unless ($line->type eq 'group' or $line->type eq 'checksum') {
+        unless ($line->type
+            and ($line->type eq 'group' or $line->type eq 'checksum')) {
             if (   $line->parse
                 or $line->search
                 or $line->get_upstream_url
@@ -415,7 +405,7 @@ sub process_group {
             $self->{status} += $line->status;
             return $self->{status};
         }
-        if ($line->type eq 'group') {
+        if ($line->type and $line->type eq 'group') {
             push @new_versions, $line->shared->{common_mangled_newversion}
               || $line->shared->{common_newversion}
               || ();
@@ -424,18 +414,18 @@ sub process_group {
               $line->parse_result->{mangled_lastversion};
         }
     }
-    my $new_version = join '+~', @new_versions;
+    my $new_version = join $versionSeparator, @new_versions;
     if ($newChecksum) {
-        $new_version .= "+~cs$newChecksum";
+        $new_version .= "${versionSeparator}cs$newChecksum";
     }
     if ($checksum) {
         push @last_versions,                 "cs$newChecksum";
         push @last_debian_mangled_uversions, "cs$checksum";
     }
     $dehs_tags->{'upstream-version'} = $new_version;
-    $dehs_tags->{'debian-uversion'}  = join('+~', @last_versions)
+    $dehs_tags->{'debian-uversion'}  = join($versionSeparator, @last_versions)
       if (grep { $_ } @last_versions);
-    $dehs_tags->{'debian-mangled-uversion'} = join '+~',
+    $dehs_tags->{'debian-mangled-uversion'} = join $versionSeparator,
       @last_debian_mangled_uversions
       if (grep { $_ } @last_debian_mangled_uversions);
     my $mangled_ver
@@ -450,7 +440,7 @@ sub process_group {
     } else {
         $dehs_tags->{'status'} = "newer package available";
     }
-    foreach my $line (@{ $self->watchlines }) {
+    foreach my $line (@{ $self->watchSources }) {
         my $path = $line->destfile or next;
         my $ver  = $line->shared->{common_mangled_newversion};
         $path =~ s/\Q$ver\E/$new_version/;
@@ -480,11 +470,12 @@ sub process_group {
         }
     }
     if (@ck_versions) {
-        my $v = join '+~', @ck_versions;
+        my $v = join $versionSeparator, @ck_versions;
         if ($dehs) {
             $dehs_tags->{'decoded-checksum'} = $v;
         } else {
-            uscan_verbose 'Checksum ref: ' . join('+~', @ck_versions) . "\n";
+            uscan_verbose 'Checksum ref: '
+              . join($versionSeparator, @ck_versions) . "\n";
         }
     }
     return 0;

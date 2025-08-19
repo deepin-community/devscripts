@@ -28,12 +28,10 @@ sub fix_href ($) {
     return $href;
 }
 
-sub recursive_regex_dir ($$$$$$) {
+sub recursive_regex_dir ($$$$$) {
 
     # If return '', parent code to cause return 1
-    my ($line, $base, $dirversionmangle, $watchfile, $lineptr,
-        $download_version)
-      = @_;
+    my ($line, $base, $dirversionmangle, $watchfile, $download_version) = @_;
 
     $base =~ m%^(\w+://[^/]+)/(.*)$%;
     my $site = $1;
@@ -47,7 +45,7 @@ sub recursive_regex_dir ($$$$$$) {
         if ($dirpattern =~ /\(.*\)/) {
             uscan_verbose "dir=>$dir  dirpattern=>$dirpattern";
             my $newest_dir = newest_dir($line, $site, $dir, $dirpattern,
-                $dirversionmangle, $watchfile, $lineptr, $download_version);
+                $dirversionmangle, $watchfile, $download_version);
             uscan_verbose "newest_dir => '$newest_dir'";
             if ($newest_dir ne '') {
                 $dir .= "$newest_dir";
@@ -63,12 +61,12 @@ sub recursive_regex_dir ($$$$$$) {
 }
 
 # very similar to code above
-sub newest_dir ($$$$$$$$) {
+sub newest_dir ($$$$$$$) {
 
     # return string $newdir as success
     # return string '' if error, to cause grand parent code to return 1
     my ($line, $site, $dir, $pattern, $dirversionmangle, $watchfile,
-        $lineptr, $download_version)
+        $download_version)
       = @_;
     my ($newdir);
     uscan_verbose "Requesting URL:\n   $site$dir";
@@ -444,19 +442,18 @@ sub safe_replace($$) {
 }
 
 # call this as
-#    if mangle($watchfile, \$line, 'uversionmangle:',
+#    if mangle($watchfile, 'uversionmangle:',
 #	    \@{$options{'uversionmangle'}}, \$version) {
 #	return 1;
 #    }
-sub mangle($$$$$) {
-    my ($watchfile, $lineptr, $name, $rulesptr, $verptr) = @_;
+sub mangle($$$$) {
+    my ($watchfile, $name, $rulesptr, $verptr) = @_;
     foreach my $pat (@{$rulesptr}) {
         if (!safe_replace($verptr, $pat)) {
             uscan_warn "In $watchfile, potentially"
               . " unsafe or malformed $name"
               . " pattern:\n  '$pat'"
-              . " found. Skipping watchline\n"
-              . "  $$lineptr";
+              . " found. Skipping watchSource\n";
             return 1;
         }
         uscan_debug "After $name $$verptr";
