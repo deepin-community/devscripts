@@ -1,0 +1,22 @@
+[
+  {
+    "commit": {
+      "message": "release as 0.1.1",
+      "title": "release as 0.1.1",
+      "web_url": "https://salsa.debian.org/debian/devscripts/-/commit/32a79fc4a73458de4c6ae926e1d75f98156a8412"
+    },
+    "message": "released as 0.1.1",
+    "name": "v2.25.5",
+    "target": "5dafbe9f9d5f4379a88041e5dccfe543f72cda35"
+  },
+  {
+    "commit": {
+      "message": "release as 0.1.0",
+      "title": "release as 0.1.0",
+      "web_url": "https://salsa.debian.org/debian/devscripts/-/commit/b0164dffdaffa35ce367b8fcf8a680e14e949b57"
+    },
+    "message": "released as 0.1.0",
+    "name": "v2.25.4",
+    "target": "45c904b7c17b1db11b882e5f525ed25d3a36d350"
+  }
+]

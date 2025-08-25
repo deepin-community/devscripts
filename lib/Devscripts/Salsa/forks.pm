@@ -8,6 +8,7 @@ use Moo::Role;
 sub forks {
     my ($self, @reponames) = @_;
     my $res = 0;
+    @reponames = ($self->localPath2projectPath) unless @reponames;
     unless (@reponames) {
         ds_warn "Project name is missing";
         return 1;

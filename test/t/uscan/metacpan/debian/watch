@@ -1,0 +1,5 @@
+Version: 5
+
+Template: Metacpan
+Dist: MetaCPAN-Client
+Pgp-Mode: none

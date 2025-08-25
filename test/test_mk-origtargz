@@ -557,18 +557,54 @@ END
     expected_files=$(LC_ALL=C sort <<END
 $expected_files_after_removal
 foo-0.1/vendor/
-foo-0.1/vendor/a-subdir/
 foo-0.1/vendor/includeme/
 foo-0.1/vendor/includeme/important.go
 END
 )
 
 	run_mk_origtargz foo "$expected_stderr_after_removal" \
-		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 21 files from it." \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 22 files from it." \
 		 ../foo-0.1.tar.gz
 	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
 	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
 	assertEquals "file contents" "$expected_files" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testGoVendorComponentIncludeIgnore () {
+    makeGolangLikeVendorFiles
+    tar --create --auto-compress --file "$TMPDIR/foo-0.1.tar.gz" --directory "$TMPDIR" foo-0.1
+    rm -rf "$TMPDIR/foo-0.1"
+
+    makeDebianDir
+    makeDebianCopyright
+
+    # adjust existing test cases slightly
+    cat <<'END' >> $TMPDIR/foo/debian/copyright
+Files-Excluded-Comp:
+ vendor
+Files-Included:
+ vendor/includeme
+Files-Included-Comp:
+ vendor/a-subdir
+ exclude-dir2/
+Files-Included-AnotherComp:
+ vensor/a-file
+END
+
+    expected_files=$(LC_ALL=C sort <<END
+foo-0.1/
+foo-0.1/vendor/
+foo-0.1/vendor/a-subdir/
+foo-0.1/vendor/a-subdir/a-file
+END
+)
+
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig-comp.tar.xz, deleting 3 files from it." \
+		 --component comp ../foo-0.1.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig-comp.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig-comp.tar.xz
+	assertEquals "file contents" "$expected_files" "$(tar taf $TMPDIR/foo_0.1.orig-comp.tar.xz | sort)"
 }
 
 testExcludeXZ() {

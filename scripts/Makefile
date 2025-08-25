@@ -56,7 +56,12 @@ GEN_MAN1S += \
 	reproducible-check.1 \
 	uscan.1 \
 
-all: $(SCRIPTS) $(GEN_MAN1S) $(COMPLETION)
+GEN_MAN5S += \
+	debian-watch.5 \
+	debian-watch-4.5 \
+	uscan-templates.5
+
+all: $(SCRIPTS) $(GEN_MAN1S) $(GEN_MAN5S) $(COMPLETION)
 
 scripts: $(SCRIPTS)
 
@@ -89,6 +94,9 @@ endif
 %.1: %.pod
 	podchecker $<
 	pod2man --utf8 --center=" " --release="Debian Utilities" $< > $@
+%.5: %.pod
+	podchecker $<
+	pod2man --utf8 --center=" " --release="Debian Utilities" --section=5 $< > $@
 %.1: %.dbk
 	xsltproc --nonet -o $@ \
 	  /usr/share/sgml/docbook/stylesheet/xsl/nwalsh/manpages/docbook.xsl $<

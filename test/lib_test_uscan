@@ -123,3 +123,8 @@ killHttpServer () {
         unset TEMP_PKG_DIR
     fi
 }
+
+containsName (){
+  echo "$1" | grep -qF "$2"
+  echo $?
+}

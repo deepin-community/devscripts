@@ -27,7 +27,7 @@ foreach (qw(
     irker disable_irker irker_host irker_port
     kgb disable_kgb kgb_options
     tagpending disable_tagpending
-    rename_head source_branch dest_branch
+    rename_head source_branch dest_branch debian_branch
     enable_remove_branch disable_remove_branch
     build_timeout ci_config_path
     schedule_desc schedule_ref schedule_cron schedule_tz schedule_enable
@@ -315,7 +315,8 @@ use constant keys => [
     # Branch
     ['rename-head!',    'SALSA_RENAME_HEAD',   'bool'],
     ['source-branch=s', 'SALSA_SOURCE_BRANCH', undef, 'master'],
-    ['dest-branch=s',   'SALSA_DEST_BRANCH',   undef, 'debian/latest'],
+    ['debian-branch=s', 'SALSA_DEBIAN_BRANCH'],
+    ['dest-branch=s',   'SALSA_DEST_BRANCH', undef, 'debian/latest'],
     [
         'enable-remove-source-branch!',
         undef,
@@ -405,7 +406,7 @@ use constant rules => [
         return (0, "No command given, aborting") unless (@ARGV);
         $_[0]->command(shift @ARGV);
         return (0, "Malformed command: " . $_[0]->command)
-          unless ($_[0]->command =~ /^[a-z_]+$/);
+          unless ($_[0]->command =~ /^[a-z_][a-z0-9_]+$/);
         return 1;
     },
     sub {

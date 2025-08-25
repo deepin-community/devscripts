@@ -25,7 +25,7 @@ use Moo;
 
 extends 'Devscripts::Config';
 
-our $CURRENT_WATCHFILE_VERSION = 4;
+our $CURRENT_WATCHFILE_VERSION = 5;
 
 use constant default_user_agent => "Debian uscan"
   . ($main::uscan_version ? " $main::uscan_version" : '');
@@ -47,10 +47,10 @@ has download_current_version => (is => 'rw');
 has download_debversion      => (is => 'rw');
 has download_version         => (is => 'rw');
 has exclusion                => (is => 'rw');
+has version_separator        => (is => 'rw');
 has log                      => (is => 'rw');
 has orig                     => (is => 'rw');
 has package                  => (is => 'rw');
-has pasv                     => (is => 'rw');
 has http_header              => (is => 'rw', default => sub { {} });
 
 # repack to .tar.$zsuffix if 1
@@ -113,6 +113,7 @@ use constant keys => [
     ['uversion|upstream-version=s'],
     ['vcs-export-uncompressed', 'USCAN_VCS_EXPORT_UNCOMPRESSED', 'bool'],
     ['watchfile=s'],
+    ['update-watchfile', undef, 'bool', 0],
     # 2.3 - More complex options
     # http headers (#955268)
     ['http-header=s', 'USCAN_HTTP_HEADER', undef, sub { {} }],
@@ -151,22 +152,16 @@ use constant keys => [
     ['no-download',        undef, sub { $_[0]->download(0); return 1; }],
     ['overwrite-download', undef, sub { $_[0]->download(3) }],
 
-    # "pasv"
+    # Deprecated "pasv"
     [
         'pasv|passive',
-        'USCAN_PASV',
+        undef,
         sub {
-            return $_[0]->pasv('default')
-              unless ($_[1] =~ /^(yes|0|1|no)$/);
-            $_[0]->pasv({
-                    yes => 1,
-                    1   => 1,
-                    no  => 0,
-                    0   => 0,
-                }->{$1});
+            warn 'Useless option: only passive mode is available'
+              if defined $_[1];
             return 1;
         },
-        0
+        undef,
     ],
 
     # "safe" and "symlink" and their aliases
@@ -216,7 +211,9 @@ use constant keys => [
         sub {
             if ($_[1]) { $_[0]->version; exit 0 }
         }
-    ]];
+    ],
+    ['version-separator', 'USCAN_VERSION_SEPARATOR', undef, '+~'],
+];
 
 use constant rules => [
     sub {
@@ -327,8 +324,6 @@ Options:
                    redirections and page content alterations.
     --no-exclusion Disable automatic exclusion of files mentioned in
                    debian/copyright field Files-Excluded and Files-Excluded-*
-    --pasv         Use PASV mode for FTP connections
-    --no-pasv      Don\'t use PASV mode for FTP connections (default)
     --no-symlink   Don\'t rename nor repack upstream tarball
     --timeout N    Specifies how much time, in seconds, we give remote
                    servers to respond (default 20 seconds)
