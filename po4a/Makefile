@@ -7,11 +7,12 @@ DESC_fr/ = Utilitaires Debian
 DESC_pt/ = Utilitários Debian
 
 GEN_TR_MAN1S := $(sort $(foreach lang,$(LANGS),$(patsubst %.1,$(lang)/%.$(lang).1,$(GEN_MAN1S))))
+GEN_TR_MAN5S := $(sort $(foreach lang,$(LANGS),$(patsubst %.5,$(lang)/%.$(lang).5,$(GEN_MAN5S))))
 
 all: translate
 # GEN_TR_MAN1S needs translate finished, serialize the calls
 	@$(MAKE) transform
-transform: $(GEN_TR_MAN1S)
+transform: $(GEN_TR_MAN1S) $(GEN_TR_MAN5S)
 
 translate: ../doc/devscripts.7
 	po4a --previous --no-backups --keep=0 devscripts-po4a.conf
@@ -33,6 +34,16 @@ clean: ../doc/devscripts.7
 	-podchecker $<
 	pod2man --utf8 --center=" " --release="$(DESC_$(dir $@))" $< > $@
 %.1:: %.dbk translate
+	mkdir -p $(LANGS)
+	xsltproc --nonet -o $@ \
+	  /usr/share/sgml/docbook/stylesheet/xsl/nwalsh/manpages/docbook.xsl $<
+%.5:: %.pl translate
+	-podchecker $<
+	pod2man --utf8 --center=" " --release="$(DESC_$(dir $@))" $< > $@
+%.5:: %.pod translate
+	-podchecker $<
+	pod2man --utf8 --center=" " --release="$(DESC_$(dir $@))" $< > $@
+%.5:: %.dbk translate
 	mkdir -p $(LANGS)
 	xsltproc --nonet -o $@ \
 	  /usr/share/sgml/docbook/stylesheet/xsl/nwalsh/manpages/docbook.xsl $<

@@ -1,3 +1,17 @@
+devscripts (2.25.18) unstable; urgency=medium
+
+  A fix (see #1100020) for archive naming issues in uscan required breaking
+  changes affecting a few debian/watch files:
+
+  - in default (LWP) mode, dirversionmangle rules that duplicate (implicit or
+    explicit) uversionmangle rules must now be removed
+
+  - in vcs (git and svn) HEAD modes, filenamemangle must now be used instead
+    of uversionmangle (as was previously suggested by the documentation) to
+    set a version number.
+
+ -- Julien Plissonneau Duquène <sre4ever@free.fr>  Wed, 13 Aug 2025 09:49:22 +0000
+
 devscripts (2.16.10) unstable; urgency=medium
 
   debuild's target mode (i.e. where it runs the specified debian/rules

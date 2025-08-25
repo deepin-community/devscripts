@@ -1,10 +1,10 @@
-package Devscripts::Uscan::ftp;
+package Devscripts::Uscan::Modes::Ftp;
 
 use strict;
 use Cwd qw/abs_path/;
 use Devscripts::Uscan::Output;
 use Devscripts::Uscan::Utils;
-use Devscripts::Uscan::_xtp;
+use Devscripts::Uscan::Modes::_xtp;
 use Moo::Role;
 
 #######################################################################
@@ -43,13 +43,13 @@ sub ftp_search {
             =~ m/(?:<\s*a\s+[^>]*href\s*=\s*\")((?-i)$self->{parse_result}->{pattern})\"/gi
         ) {
             my $file = fix_href($1);
-            my $mangled_version
+            my $version
               = join(".", $file =~ m/^$self->{parse_result}->{pattern}$/);
+            my $mangled_version = $version;
             if (
                 mangle(
-                    $self->watchfile,  \$self->line,
-                    'uversionmangle:', \@{ $self->uversionmangle },
-                    \$mangled_version
+                    $self->watchfile,            'uversionmangle:',
+                    \@{ $self->uversionmangle }, \$mangled_version
                 )
             ) {
                 return undef;
@@ -57,12 +57,13 @@ sub ftp_search {
             my $match = '';
             if (defined $self->shared->{download_version}
                 and not $self->versionmode eq 'ignore') {
-                if ($mangled_version eq $self->shared->{download_version}) {
+                if ($version eq $self->shared->{download_version}) {
                     $match = "matched with the download version";
                 }
             }
             my $priority = $mangled_version . '-' . get_priority($file);
-            push @files, [$priority, $mangled_version, $file, $match];
+            push @files,
+              [$priority, $mangled_version, $file, $match, $version];
         }
     } else {
         uscan_verbose "Standard FTP listing.";
@@ -77,59 +78,28 @@ sub ftp_search {
                 my $file            = $1;
                 my $mangled_version = join(".",
                     $file =~ m/^$self->{parse_result}->{filepattern}$/);
+                my $version = $mangled_version;
                 if (
                     mangle(
-                        $self->watchfile,  \$self->line,
-                        'uversionmangle:', \@{ $self->uversionmangle },
-                        \$mangled_version
+                        $self->watchfile,            'uversionmangle:',
+                        \@{ $self->uversionmangle }, \$mangled_version
                     )
                 ) {
                     return undef;
                 }
                 my $match = '';
                 if (defined $self->shared->{download_version}) {
-                    if ($mangled_version eq $self->shared->{download_version})
-                    {
+                    if ($version eq $self->shared->{download_version}) {
                         $match = "matched with the download version";
                     }
                 }
                 my $priority = $mangled_version . '-' . get_priority($file);
-                push @files, [$priority, $mangled_version, $file, $match];
+                push @files,
+                  [$priority, $mangled_version, $file, $match, $version];
             }
         }
     }
-    if (@files) {
-        @files = Devscripts::Versort::versort(@files);
-        my $msg
-          = "Found the following matching files on the web page (newest first):\n";
-        foreach my $file (@files) {
-            $msg .= "   $$file[2] ($$file[1]) index=$$file[0] $$file[3]\n";
-        }
-        uscan_verbose $msg;
-    }
-    my ($newversion, $newfile);
-    if (defined $self->shared->{download_version}) {
-
-        # extract ones which has $match in the above loop defined
-        my @vfiles = grep { $$_[3] } @files;
-        if (@vfiles) {
-            (undef, $newversion, $newfile, undef) = @{ $vfiles[0] };
-        } else {
-            uscan_warn
-"In $self->{watchfile} no matching files for version $self->{shared}->{download_version}"
-              . " in watch line\n  $self->{line}";
-            return undef;
-        }
-    } else {
-        if (@files) {
-            (undef, $newversion, $newfile, undef) = @{ $files[0] };
-        } else {
-            uscan_warn
-"In $self->{watchfile} no matching files for watch line\n  $self->{line}";
-            return undef;
-        }
-    }
-    return ($newversion, $newfile);
+    return sortAndMangle($self, @files);
 }
 
 sub ftp_upstream_url {
@@ -137,11 +107,11 @@ sub ftp_upstream_url {
     return $self->parse_result->{base} . $self->search_result->{newfile};
 }
 
-*ftp_newfile_base = \&Devscripts::Uscan::_xtp::_xtp_newfile_base;
+*ftp_newfile_base = \&Devscripts::Uscan::Modes::_xtp::_xtp_newfile_base;
 
 sub ftp_newdir {
     my ($line, $site, $dir, $pattern, $dirversionmangle, $watchfile,
-        $lineptr, $download_version)
+        $download_version)
       = @_;
     my $downloader = $line->downloader;
 
@@ -182,9 +152,8 @@ sub ftp_newdir {
             my $mangled_version = join(".", $dir =~ m/^$pattern$/);
             if (
                 mangle(
-                    $watchfile,          $lineptr,
-                    'dirversionmangle:', \@{$dirversionmangle},
-                    \$mangled_version
+                    $watchfile,            'dirversionmangle:',
+                    \@{$dirversionmangle}, \$mangled_version
                 )
             ) {
                 return 1;
@@ -222,9 +191,8 @@ sub ftp_newdir {
                 my $mangled_version = join(".", $dir =~ m/^$pattern$/);
                 if (
                     mangle(
-                        $watchfile,          $lineptr,
-                        'dirversionmangle:', \@{$dirversionmangle},
-                        \$mangled_version
+                        $watchfile,            'dirversionmangle:',
+                        \@{$dirversionmangle}, \$mangled_version
                     )
                 ) {
                     return 1;

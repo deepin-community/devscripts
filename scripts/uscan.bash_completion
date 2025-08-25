@@ -17,7 +17,7 @@ _uscan_completion () {
     opts+=" --upstream-version --download-version --download-debversion"
     opts+=" --download-current-version --bare"
     opts+=" --check-dirname-level --check-dirname-regex"
-    opts+=" --no-pasv --pasv --timeout --user-agent --useragent"
+    opts+=" --timeout --user-agent --useragent"
     opts+=" --no-verbose --verbose --debug -vv --extra-debug -vvv"
     opts+=" --no-dehs --dehs --no-conf --noconf --watchfile --destdir"
     opts+=" --package --no-exclusion --vcs-export-uncompressed"

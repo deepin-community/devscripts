@@ -1,0 +1,148 @@
+=pod
+
+=head1 NAME
+
+uscan templates - Available templates for L<uscan(1)>.
+
+=head1 USING TEMPLATES
+
+Templates simplify the B<debian/watch> file. You just have to indicate the
+template to use and the specific arguments. Example:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+
+Other parameters can be added as usual. Example:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+  Version-Mangle: auto
+
+=head1 AVAILABLE TEMPLATES
+
+Here is the list of available templates:
+
+=over
+
+=item * L</Github>
+
+=item * L</Metacpan>
+
+=item * L</Npmregistry>
+
+=item * L<Gitlab>
+
+=back
+
+=head2 Github
+
+This template uses GitHub API to find archives to download.
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Owner> I<< <owner> >>
+
+=item * B<Project> I<< <project> >>
+
+=item * B<Release-Only> I<< <yes> >>: when set, search only in "/release" instead of "/tags"
+
+=back
+
+=head3 Example
+
+Example for https://github.com/guimard/llng-docker:
+
+  Version: 5
+
+  Template: Github
+  Owner: guimard
+  Project: llng-docker
+
+=head2 Metacpan
+
+This template uses L<MetaCPAN::Client(3pm)> to download package.
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Dist>: distribution name I<(with "::" or "-")>
+
+=back
+
+=head3 Example
+
+  Version: 5
+
+  Template: Metacpan
+  Dist: MetaCPAN-Client
+
+=head2 Npmregistry
+
+This template just replaces:
+
+  Version: 5
+
+  Template: Npmregistry
+  Dist: @lemonldapng/handler
+
+by:
+
+  Version: 5
+
+  Source: https://registry.npmjs.org/@lemonldapng/handler
+  Matching-Pattern: https://registry.npmjs.org/@lemonldapng/handler/-/handler-@ANY_VERSION@@ARCHIVE_EXT@
+  Searchmode: plain
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Dist>: distribution name
+
+=back
+
+=head2 Gitlab
+
+This template uses B<Mode: gitlab> to download package.
+
+=head3 Specific parameters
+
+=over
+
+=item * B<Dist>: URL to the project
+
+=item * B<Release-Only> I<< <yes> >>: when set, search only in "/release" instead of "/tags"
+
+=back
+
+=head3 Example
+
+  Version: 5
+
+  Template: Gitlab
+  Dist: https://salsa.debian.org/debian/devscripts
+
+=head1 Adding templates
+
+If you want to add a template in uscan, you can find the documentation here:
+
+  $ perldoc /usr/share/perl5/Devscripts/Uscan/Templates.pod
+
+Then build a merge-request into the L<devscripts project|https://salsa.debian.org/debian/devscripts>.
+
+=head1 Authors
+
+=over
+
+=item * Xavier Guimard E<lt>yadd@debian.orgE<gt>
+
+=back

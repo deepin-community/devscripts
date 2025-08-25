@@ -52,11 +52,6 @@ tearDown(){
 
 trap tearDown EXIT
 
-containsName(){
-  echo "$1" | grep -qF "$2"
-  echo $?
-}
-
 . "${0%/*}/shunit2-helper-functions.sh"
 
 # The following tests do the following: (1) create a minimal Debian package
@@ -332,7 +327,7 @@ helperWatch() {
         cd "$TEMP_PKG_DIR"/${PKG}-${PREFIX}${VERNEW_MANGLED}
         assertTrue 'pristine tarball is not extracted' "[ -f debian/changelog ]"
         DVERSION=`dpkg-parsechangelog -ldebian/changelog -SVersion`
-        assertEquals "uscan: Version should be ${PREFIX}${VERNEW}-$SUFFIX but $DVERSION" "$DVERSION" "${PREFIX}${VERNEW_MANGLED}-$SUFFIX"
+        assertEquals "uscan: Version should be ${PREFIX}${VERNEW_MANGLED}-$SUFFIX but $DVERSION found" "$DVERSION" "${PREFIX}${VERNEW_MANGLED}-$SUFFIX"
         if [ "$FILEEXCLUDE" != "3" ]; then
         # main is dummy
         assertTrue 'file that must be present is excluded in the tarball' '[ -f include-this ]'
@@ -876,7 +871,7 @@ testWatch4NonNativeDlUversion_uversionmangle() {
     VERNEW_MANGLED='1.0~rc-1'
     WATCHVER=4
     XCOMMAND="$COMMAND --download-version 1.0-rc-1"
-    WATCHLINE='opts="dirversionmangle=s/-([a-z]+-)/~$1/,uversionmangle=s/-([a-z]+-)/~$1/" @@@url@@@/([\d][\d\.a-z-]+)/@PACKAGE@/ooo/ @PACKAGE@@ANY_VERSION@@ARCHIVE_EXT@ debian uupdate'
+    WATCHLINE='opts="uversionmangle=s/-([a-z]+-)/~$1/" @@@url@@@/([\d][\d\.a-z-]+)/@PACKAGE@/ooo/ @PACKAGE@@ANY_VERSION@@ARCHIVE_EXT@ debian uupdate'
     helperWatch siteNonNative 1.0 1.0-rc-1
 }
 

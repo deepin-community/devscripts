@@ -55,11 +55,6 @@ tearDown(){
 
 trap tearDown EXIT
 
-containsName(){
-  echo "$1" | grep -qF "$2"
-  echo $?
-}
-
 validXML(){
   echo "$1" | perl -ne 's/<[^\/].*?>.*?<\/.*>//g;$open++ if/<[^\/].*?>/;$open-- if/<\/.*>/;if(!$open and /^\s+\w/){$false++}}{exit ($false || $open) ? 1 : 0'
   echo $?
@@ -202,6 +197,13 @@ END
 
 helperCreateRepo () {
     mkdir -p $PKG/debian
+
+    cat <<END > $PKG/debian/rules
+#!/usr/bin/make -f
+%:
+	dh $@
+END
+    chmod +x $PKG/debian/rules
 
     cat <<END > $PKG/debian/watch
 version=3

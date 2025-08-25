@@ -1,3 +1,178 @@
+devscripts (2.25.19) unstable; urgency=medium
+
+  [ Yadd ]
+  * Fix autopkgtest
+  * Indicates that debian/watch version 5 breaks dh-nodejs <= 0.16.0~
+  * Update French translation
+  * Dependencies:
+    * Move libio-string-perl from recommended dependencies to required ones
+    * Move libmetacpan-client-perl from suggested dependencies to recommended
+      ones
+    * Suggests libgitlab-api-v4-perl (needed by salsa)
+  * uscan:
+    - add "Untrackable" field to disable uscan + allow one paragraph
+    - in version=5, rename Pretty and Date into Git-Pretty and Git-Date
+    - set a default value for Matching-Pattern
+    - better error message when libmetacpan-client-perl is missing (Metacpan
+      template)
+    - group some duplicated code
+    - move "modes" into dedicated folder
+    - use debian/upstream/metadata if debian/watch is missing and a
+      corresponding template exists (Closes: #1111114)
+    - Templates:
+      * add template for npmjs.com registry
+      * add Gitlab template and mode
+      * fix component filenames in Github template
+      * update Github examples
+      * add "Release-Only" parameter for Github and Gitlab templates
+
+  [ Julien Plissonneau Duquène ]
+  * Update and fix french translations
+
+  [ наб ]
+  * uscan: mode=git: don't choke on signed commits
+
+ -- Yadd <yadd@debian.org>  Sat, 23 Aug 2025 01:47:47 +0200
+
+devscripts (2.25.18) unstable; urgency=medium
+
+  [ Yadd ]
+  * uscan:
+    - When --update-watchfile, try to use templates
+    - Add libmetacpan-client-perl into suggested packages
+    - Add metacpan autopkgtest (with restriction needs-internet)
+  * Update French translation
+
+  [ Sean Whitton ]
+  * Delete git-deborig that is moving to the git-debpush package
+    (Related: #1105759)
+    - Drop deps and recs on libgit-wrapper-perl, liblist-compare-perl,
+      libtry-tiny-perl
+  * Add Recommends on git-debpush
+  * README.md: debrebuild requires libstring-shellquote-perl
+
+  [ Hugh McMaster ]
+  * uscan:
+    - test/test_uscan_git: Convert tests to watch file Version 5 and refactor2
+    - uscan/WatchSource.pm: Remove boolean 'gitmodules' option
+    - uscan: Better handle Git-Modules: 'yes' and 'all' values
+    - uscan/Downloader.pm: Pass '--quiet' to git if not in verbose or debug mode
+    - uscan/git.pm: Pass '--quiet' to git if not in verbose or debug mode
+    - uscan/WatchSource.pm: Avoid leading whitespace in raw watch file output
+
+  [ Otto Kekäläinen ]
+  * dep-14-convert: Use 'upstream' as fallback if no merges found (Closes: #1110088)
+
+  [ Alexandre Detiste ]
+  * what-patch: Remove dead code testing for former removed patch systems
+
+  [ Bas Couwenberg ]
+  * debchange: trixie is now stable, forky is testing.
+
+  [ Julien Plissonneau Duquène ]
+  * uscan:
+    - Add a test case for using --download-version with version mangling in
+      git mode.
+    - Match unmangled versions against --download-version (Closes: #1100020)
+    - Add NEWS entry about d/watch breaking changes
+
+  [ Dorle Osterode ]
+  * (de) po4a/po/de.po: Update translation
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Fri, 15 Aug 2025 22:48:48 +0100
+
+devscripts (2.25.17) experimental; urgency=medium
+
+  [ наб ]
+  * uscan: add sample Forgejo (Codeberg) stanzas
+
+  [ James Cowgill ]
+  * mk-origtargz:
+    - Exclude empty directories when using Files-Included
+      (Closes: #1021287)
+    - Add a test for Files-Included-<component>
+    - Document --include-file option
+  * uscan:
+    - Fix indentation in copyright file examples
+    - Add an example using the Files-Included stanza (Closes: #977795)
+
+  [ Dorle Osterode ]
+  * (de) po4a/po/de.po: Update translation
+
+  [ Hugh McMaster ]
+  * .gitignore: Add scripts/dep-14-convert-git-branch-names
+  * test/test_uscan_git:
+    - Update watch file for version 5 syntax
+    - Use global variable 'MODULE1' for 'subrepo'
+    - Update some error messages
+
+  [ Yadd ]
+  * Replace gpg by gnupg and sopv by gpgv into test dependencies because
+    devscripts tests do not work with sequoia gpg (Closes: #1109607)
+  * uscan:
+    - Add "auto" values for Uversion-Mangle and Filename-Mangle
+    - Add macros @COMPONENT@, @SEMANTIC_VERSION@, @STABLE_VERSION@
+    - Fix some debug messages broken by v5
+    - Apply pagemangle also when searchmode=plain (Closes: #1057773)
+    - support overriding +~ delimiter for groups (Closes: #976829)
+    - add aliases: Version-Regex and Version-Pattern are aliases of
+      Matching-Pattern
+    - Fix doc for boolean option (Closes: #1109879)
+    - Fix Git-Modules option (Closes: #1109883)
+    - Drop pasv option: no effect for a while (Closes: #1109878)
+    - Add template engine
+      * Add GitHub template
+      * Add Metacpan template
+  * Update French translations
+
+  [ Niels Thykier ]
+  * uscan templates:
+    - Template/Github.pm:
+      * Set `pgpmode` to `none` by default
+      * Do not override `Search-Mode` if provided in the file
+    - Template/Metacpan.pm:
+      * Set `pgpmode` to `none` by default
+      * Do not override `source` if provided
+      * Allow `::` in metacpan dists
+    - Fix some undef warnings
+
+ -- Yadd <yadd@debian.org>  Mon, 28 Jul 2025 22:34:14 +0200
+
+devscripts (2.25.16) experimental; urgency=medium
+
+  [ Mechtilde ]
+  * Improved the German translation of the manpage for the tool bts
+
+  [ Nick Brown ]
+  * uscan: correct setting of request headers
+
+  [ Hugh McMaster ]
+  * uscan:
+    - uscan/Downloader.pm: Clone main git repository and submodules separately
+    - uscan/git.pm: Refactor code to clone versionless repositories with or
+      without submodules and refactor '$newversion' generation
+    - test/test_uscan_git: Update submodule test names
+    - test/test_uscan_git: Add tests to clone from HEAD with submodules
+
+  [ Yadd ]
+  * salsa:
+    - Use current repository if project is missing (check_repo, del_repo,
+      forks, last_ci_status, and merge_requests) and add "path" subcommand
+    - Add update_watch5 command to update debian/watch to version 5
+  * uscan
+    - Add more git debug
+    - Add recommended dependency to libio-string-perl (used by uscan/http)
+    - Better uscan test framework based on LWP::Protocol::PSGI
+    - Add new debian/watch format: version 5
+      * uscan: force Version-Schema to "group" for main watchsource when
+        Version-Schema is "checksum"
+      * Split uscan manpage and create debian-watch(5) [version 5] and
+        debian-watch-4(5) for previous formats
+    - Add liblwp-protocol-psgi-perl in autopkgtest dependencies
+  * Update French translation
+
+ -- Yadd <yadd@debian.org>  Sun, 20 Jul 2025 10:32:11 +0200
+
 devscripts (2.25.15) unstable; urgency=medium
 
   [ Yadd ]
