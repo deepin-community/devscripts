@@ -1,0 +1,98 @@
+=pod
+
+=head1 NAME
+
+Templates for uscan.
+
+=head1 DESCRIPTION
+
+This document explain how to build a template for L<uscan(1)>.
+
+=head1 FORMAT OF THE TEMPLATE
+
+A L<uscan(1)> template is a Perl class with the following rules:
+
+=over
+
+=item * It must be in B<Devscripts::Uscan::Templates::> namespace
+
+=item * Its name must start by an uppercase character and others must
+be in lowercase
+
+=item * It must implement a function named B<transform>
+
+=back
+
+Example: C<Devscripts::Uscan::Templates::Github>
+
+=head1 THE C<transform> FUNCTION
+
+=over
+
+=item * It receives a single argument I<(C<$watchSource>)>
+
+=item * It must return the same type of object modified
+
+=item * It should clean its specific keys
+
+=item * It should not override parameters explicitly defined in B<debian/watch>
+
+=back
+
+=head2 Example
+
+Object received by B<transform>:
+
+  {
+    template => 'GitHub'
+    project  => 'simple-oidc-client',
+    author   => 'linagora',
+
+    version  => 5,
+    _raw     => 'Template: GitHub
+  Owner: linagora
+  Project: simple-oidc-client
+  Version-Mangle: auto
+  ',
+  }
+
+Object returned by B<Devscripts::Uscan::Templates::Github>:
+
+  {
+    source            => 'https://api.github.com/repos/linagora/simple-oidc-client/git/matching-refs/tags/',
+    matchingpattern   => 'https://api.github.com/repos/[^/]+/[^/]+/git/refs/tags/(?:[^/]+\\-)?@ANY_VERSION@',
+    searchmode        => 'plain',
+    downloadurlmangle => 's%(api.github.com/repos/[^/]+/[^/]+)/git/refs/%$1/tarball/refs/%g',
+    filenamemangle    => 's%.*/(?:[^/]+\\-)?@ANY_VERSION@%@PACKAGE@-$1.tar.gz%',
+    gpgmode           => 'none',
+    versionmangle     => 'auto',
+
+    version => 5,
+    _raw    => 'Template: GitHub
+  Owner: linagora
+  Project: simple-oidc-client
+  Version-Mangle: auto
+  '
+  }
+
+=head1 USE TEMPLATE WHEN UPDATING WATCHFILE
+
+When B<uscan --update-watch> is used, it can detect if a template can be used.
+To insert a template into this behavior, you must add an entry into the
+C<@templates> variable inside B<lib/Devscripts/Uscan/Version4.pm>.
+
+Each entry is a reference to an array with 2 entries:
+
+=over
+
+=item * a regular expression compiled with C<qr#...#>
+
+=item * a reference to a function
+
+This function receives a hash reference that contains the field of a
+B<watchsource> I<(a line in version 4)> and must return this reference
+modified or not. See B<Metacpan> and B<Github> examples in this file.
+
+=back
+
+=cut

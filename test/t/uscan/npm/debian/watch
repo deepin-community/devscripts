@@ -1,0 +1,9 @@
+Version: 5
+Version-Schema: group
+
+Template: Npmregistry
+Dist: @lemonldap-ng/lemonldap-ng-handler
+
+Component: logger
+Template: Npmregistry
+Dist: @lemonldap-ng/logger

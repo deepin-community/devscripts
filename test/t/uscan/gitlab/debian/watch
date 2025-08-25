@@ -1,0 +1,10 @@
+Version: 5
+
+Template: Gitlab
+Dist: https://salsa.debian.org/debian/devscripts
+
+Component: tools
+Source: https://salsa.debian.org/yadd/tools
+Mode: gitlab
+Matching-Pattern: @STABLE_VERSION@
+Pgp-Mode: none

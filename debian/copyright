@@ -239,10 +239,6 @@ Files: scripts/getbuildlog.*
 Copyright: 2008, Frank S. Thomas <fst@debian.org>
 License: GPL-2+
 
-Files: scripts/git-deborig*
-Copyright: 2016-2018, Sean Whitton <spwhitton@spwhitton.name>
-License: GPL-3+
-
 Files: scripts/grep-excuses.*
 Copyright: 2002, Joey Hess <joeyh@debian.org>
 License: GPL-2+

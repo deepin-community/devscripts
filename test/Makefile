@@ -19,6 +19,7 @@ OUR_TESTS= \
 	uscan_svn \
 	uscan_mangle \
 	uscan_group \
+	uscan_update \
 	perltidy \
 	wrap-and-sort \
 

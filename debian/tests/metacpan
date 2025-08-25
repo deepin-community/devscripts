@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+cd test
+TEST_INTERNET=1 prove -v -I../lib t/uscan.t

@@ -13,10 +13,16 @@ our @EXPORT = (
     ));
 
 # ACCESSORS
-our ($dehs, $dehs_tags, $dehs_start_output, $dehs_end_output, $found)
-  = (0, {}, 0, 0);
+our ($dehs, $dehs_tags, $dehs_start_output, $dehs_end_output, $found);
+reset();
 
 our $progname = basename($0);
+
+sub reset {
+    ($dehs, $dehs_tags, $dehs_start_output, $dehs_end_output, $found,)
+      = (0, {}, 0, 0,);
+    %Devscripts::Uscan::WatchSource::already_downloaded = ();
+}
 
 sub printwarn_raw {
     my ($msg, $w) = @_;

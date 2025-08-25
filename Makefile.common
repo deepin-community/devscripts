@@ -3,7 +3,8 @@ GEN_MAN1S := bts.1 build-rdeps.1 chdist.1 debcheckout.1 debcommit.1 \
 	     mk-build-deps.1 mk-origtargz.1 namecheck.1 rmadison.1 sadt.1 svnpath.1 \
 	     uscan.1 salsa.1 \
 	     tagpending.1 origtargz.1 transition-check.1 who-permits-upload.1 \
-	     git-deborig.1 hardening-check.1
+	     hardening-check.1
+GEN_MAN5S :=
 
 PREFIX = /usr
 BINDIR = $(PREFIX)/bin

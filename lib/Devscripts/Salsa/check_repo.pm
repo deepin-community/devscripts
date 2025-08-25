@@ -31,8 +31,11 @@ sub _check_repo {
     my $res = 0;
     my @fail;
     unless (@reponames or $self->config->all or $self->config->all_archived) {
-        ds_warn "Usage $0 check_repo <--all|--all-archived|names>";
-        return 1;
+        @reponames = ($self->localPath2projectPath);
+        unless (@reponames) {
+            ds_warn "Usage $0 check_repo <--all|--all-archived|names>";
+            return 1;
+        }
     }
     if (@reponames and $self->config->all) {
         ds_warn "--all with a reponame makes no sense";

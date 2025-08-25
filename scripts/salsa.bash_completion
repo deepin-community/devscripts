@@ -46,7 +46,7 @@ _salsa_completion () {
     opts+=" --disable-kgb --no-disable-kgb --kgb-options --tagpending"
     opts+=" --no-tagpending --disable-tagpending --no-disable-tagpending"
     # Branch
-    opts+=" --rename-head --no-rename-head --source-branch --dest-branch"
+    opts+=" --rename-head --no-rename-head --source-branch --dest-branch --debian-branch"
     opts+=" --enable-remove-source-branch --no-enable-remove-source-branch"
     opts+=" --disable-remove-source-branch --no-disable-remove-source-branch"
     # Merge requests
@@ -76,7 +76,7 @@ _salsa_completion () {
     commands+=" checkout fork forks last_ci_status merge_request"
     commands+=" merge_requests pipeline_schedule pipeline_schedules"
     commands+=" protect_branch protected_branches push push_repo"
-    commands+=" rename_branch update_safe"
+    commands+=" rename_branch update_safe update_watch5 path"
     # Other
     commands+=" purge_cache"
 

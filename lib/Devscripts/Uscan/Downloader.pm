@@ -36,19 +36,6 @@ BEGIN {
 has agent =>
   (is => 'rw', default => sub { "Debian uscan $main::uscan_version" });
 has timeout => (is => 'rw');
-has pasv => (
-    is      => 'rw',
-    default => 'default',
-    trigger => sub {
-        my ($self, $nv) = @_;
-        if ($nv) {
-            uscan_verbose "Set passive mode: $self->{pasv}";
-            $ENV{'FTP_PASSIVE'} = $self->pasv;
-        } elsif ($ENV{'FTP_PASSIVE'}) {
-            uscan_verbose "Unset passive mode";
-            delete $ENV{'FTP_PASSIVE'};
-        }
-    });
 has destdir => (is => 'rw');
 
 # 0: no repo, 1: shallow clone, 2: full clone
@@ -129,7 +116,7 @@ sub download ($$$$$$$$) {
                   . $response->status_line);
             return 0;
         }
-    } elsif ($mode eq 'ftp') {
+    } elsif ($mode eq 'ftp' or $mode eq 'metacpan' or $mode eq 'gitlab') {
         uscan_verbose "Requesting URL:\n   $url";
         $request  = HTTP::Request->new('GET', "$url");
         $response = $self->user_agent->request($request, $fname);
@@ -188,17 +175,20 @@ sub download ($$$$$$$$) {
             my ($infodir, $attr_file, $attr_bkp);
             if ($self->git_export_all) {
                 # override any export-subst and export-ignore attributes
+                uscan_debug 'git rev-parse --git-path info/';
                 spawn(
                     exec      => [qw|git rev-parse --git-path info/|],
                     to_string => \$infodir,
                 );
                 chomp $infodir;
                 mkdir $infodir unless -e $infodir;
+                uscan_debug 'git rev-parse --git-path info/attributes';
                 spawn(
                     exec => [qw|git rev-parse --git-path info/attributes|],
                     to_string => \$attr_file,
                 );
                 chomp $attr_file;
+                uscan_debug 'git rev-parse --git-path info/attributes-uscan';
                 spawn(
                     exec =>
                       [qw|git rev-parse --git-path info/attributes-uscan|],
@@ -230,28 +220,35 @@ sub download ($$$$$$$$) {
                 }
             }
         } else {
+            # clone main repository
             if ($self->gitrepo_state == 0) {
                 my @opts = ();
-                if ($optref->git->{modules}) {
-                    foreach my $m (@{ $optref->git->{modules} }) {
-                        push(@opts, "--recurse-submodules=$m");
-                    }
-                } else {
-                    push(@opts, '--bare');
-                }
-                $self->gitrepo_state(2);
+                push(@opts, '--quiet') if not $verbose;
+                push(@opts, '--bare')  if not $optref->git->{modules};
+
                 if ($optref->git->{mode} eq 'shallow') {
                     my $tag = $gitref;
                     $tag =~ s#^refs/(?:tags|heads)/##;
-
-                    if ($optref->git->{modules}) {
-                        push(@opts, '--shallow-submodules');
-                    }
                     push(@opts, '--depth=1', '-b', $tag);
                     $self->gitrepo_state(1);
+                } else {
+                    $self->gitrepo_state(2);
                 }
                 uscan_exec('git', 'clone', @opts, $base,
                     "$destdir/$gitrepo_dir");
+            }
+            # clone submodules
+            if ($optref->git->{modules}) {
+                my @opts = ();
+                push(@opts, '--quiet') if not $verbose;
+                push(@opts, qw/update --init --recursive/);
+                push(@opts, '--depth=1') if $self->gitrepo_state == 1;
+                push(@opts, '--');
+                foreach my $m (@{ $optref->git->{modules} }) {
+                    push(@opts, "$m");
+                }
+                chdir "$destdir/$gitrepo_dir";
+                uscan_exec('git', 'submodule', @opts);
             }
 
             chdir "$destdir/$gitrepo_dir"
@@ -266,6 +263,7 @@ sub download ($$$$$$$$) {
                 for (my $tmp, my $i = 0 ; $i < @gitpaths ; $i++) {
                     my @cmd
                       = ("git", "rev-parse", "--git-path", ${ gitpaths [$i] });
+                    uscan_debug join ' ', @cmd;
                     spawn(
                         exec      => [@cmd],
                         to_string => \$tmp,
@@ -274,6 +272,8 @@ sub download ($$$$$$$$) {
                     push(@{ $arr_refs[$i] }, split(/\n/, $tmp));
 
                     if ($optref->git->{modules}) {
+                        uscan_debug 'git submodule --quiet foreach '
+                          . join(' ', @cmd);
                         spawn(
                             exec =>
                               ['git', 'submodule', '--quiet', 'foreach', @cmd],
@@ -310,8 +310,7 @@ sub download ($$$$$$$$) {
                   "--output=$abs_dst/\$sha1.tar HEAD",
                   "&& tar -Af $abs_dst/$pkg-$ver.tar $abs_dst/\$sha1.tar",
                   "&& rm $abs_dst/\$sha1.tar";
-                uscan_exec_no_fail('git', 'submodule', '--quiet', 'foreach',
-                    $cmd) == 0
+                uscan_exec_no_fail('git', 'submodule', 'foreach', $cmd) == 0
                   or $clean_and_die->("git archive (submodules) failed");
             }
 

@@ -115,7 +115,7 @@ And now, in alphabetical order, the scripts:
   can be performed by sbuild or other builders in a chroot environment created
   by debootsnap. The generated artifacts will be verified against the
   hashes from the buildinfo file.
-  [sbuild | mmdebstrap, python3-pycurl, libdpkg-perl]
+  [sbuild | mmdebstrap, python3-pycurl, libdpkg-perl, libstring-shellquote-perl]
 
 - debrepro: A script that tests reproducibility of Debian packages. It will
   build a given source directory twice, with a set of variation between the
@@ -190,10 +190,6 @@ And now, in alphabetical order, the scripts:
   [quilt]
 
 - getbuildlog: download package build logs from Debian auto-builders. [wget]
-
-- git-deborig: try to produce Debian orig.tar using git-archive(1).
-  [libdpkg-perl, libgit-wrapper-perl, liblist-compare-perl,
-  libstring-shellquote-perl, libtry-tiny-perl]
 
 - grep-excuses: grep britney's excuses to find out what is happening to your
   packages. [libdbd-pg-perl, libterm-size-perl, libyaml-libyaml-perl, wget, w3m]

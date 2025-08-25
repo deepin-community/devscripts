@@ -54,8 +54,28 @@ use Devscripts::Uscan::Output;
 use Devscripts::Versort;
 use Dpkg::Changelog::Parse qw(changelog_parse);
 use File::Basename;
+use File::Temp 'tempdir';
 
 our @EXPORT = ('find_watch_files');
+
+my %templates = (
+    github => sub {
+        my ($res) = @_;
+        $res->{Repository} =~ s/\.git\s*$//;
+        my $src = $res->{Repository} || $res->{'Repository-Browse'};
+        if ($src and $src =~ qr#https://github.com/([^/]+)/([^/]+)/?#) {
+            return "Template: Github\nOwner: $1\nProject: $2\nPgp-Mode: none";
+        }
+        return;
+    },
+    cpan => sub {
+        my ($res) = @_;
+        if (my $name = $res->{'Upstream-Name'} || $res->{Name}) {
+            return "Template: Metacpan\nDist: $res->{Name}\nPgp-Mode: none";
+        }
+        return;
+    },
+);
 
 sub find_watch_files {
     my ($config) = @_;
@@ -117,6 +137,7 @@ sub find_watch_files {
     my @debdirs = ();
 
     my $origdir = cwd;
+    my $wfile   = 'debian/watch';
     for my $dir (@dirs) {
         $dir =~ s%/debian$%%;
 
@@ -132,7 +153,29 @@ sub find_watch_files {
         uscan_verbose "Check debian/watch and debian/changelog in $dir";
 
         # Check for debian/watch file
-        if (-r 'debian/watch') {
+        if (!-r $wfile and -r 'debian/upstream/metadata') {
+            uscan_verbose
+'Found debian/upstream/metadata instead of debian/watch, trying to read it';
+            if (open my $fh, '<', 'debian/upstream/metadata') {
+                my @lines = map { s/[\r\n]//g; $_ } <$fh>;
+                $fh->close;
+                my $repo = {
+                    map { s/^["'](.*)["']$/$1/; $_ }
+                    map { /:/ ? split(/\s*:\s+/, $_, 2) : () } @lines
+                };
+                if (my $sub = $templates{ lc $repo->{Archive} }) {
+                    if (my $res = $sub->($repo)) {
+                        my $dir   = tempdir(CLEANUP => 1);
+                        my $fname = "$dir/watch";
+                        open $fh, '>', $fname or die $!;
+                        print $fh "Version: 5\n\n$res\n";
+                        $fh->close;
+                        $wfile = $fname;
+                    }
+                }
+            }
+        }
+        if (-r $wfile) {
             unless (-r 'debian/changelog') {
                 uscan_warn
                   "Problems reading debian/changelog in $dir, skipping";
@@ -194,7 +237,7 @@ sub find_watch_files {
 
         uscan_verbose
 "$dir/debian/changelog sets package=\"$package\" version=\"$version\"";
-        push @results, [$dir, $package, $version, "debian/watch", cwd];
+        push @results, [$dir, $package, $version, $wfile, cwd];
     }
     unless (chdir $origdir) {
         uscan_die "Couldn't chdir back to $origdir! $!";

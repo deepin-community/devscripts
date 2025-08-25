@@ -25,9 +25,9 @@ _debchange()
 #--------------------------------------------------------------------------
 #FIXME: I don't want hard-coding codename...
 #--------------------------------------------------------------------------
-    oldstable_codename='bullseye'
-    stable_codename='bookworm'
-    testing_codename='trixie'
+    oldstable_codename='bookworm'
+    stable_codename='trixie'
+    testing_codename='forky'
 
     distro="oldstable-security oldstable-proposed-updates\
             "$oldstable_codename"-security\

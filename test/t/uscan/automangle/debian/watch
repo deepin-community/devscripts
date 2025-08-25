@@ -1,0 +1,13 @@
+Version: 5
+Version-Schema: group
+
+Source: https://foo
+Version-Regex: .*foo?@ANY_VERSION@@ARCHIVE_EXT@
+Pgp-Mode: none
+Uversion-Mangle: auto
+
+Component: bar
+Source: https://foo
+Version-Regex: .*bar?@ANY_VERSION@@ARCHIVE_EXT@
+Pgp-Mode: none
+Filename-Mangle: auto

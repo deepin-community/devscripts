@@ -77,28 +77,7 @@ fi
 # to add new patchsystem detection and reporting.
 for filename in $(echo "debian/rules"; grep ^include debian/rules | grep -vF '$(' | awk '{print $2}')
 do
-	grep -F patchsys.mk "$filename" | grep -q -v "^#" && {
-		if [ "$VERBOSE" -eq 0 ]; then
-			echo "cdbs"; exit 0;
-		else
-			echo "cdbs (patchsys.mk: see 'cdbs-edit-patch')"; exit 0;
-		fi
-	}
 	grep -F quilt "$filename" | grep -q -v "^#" && { echo "quilt"; exit 0; }
-	grep -F dbs-build.mk "$filename" | grep -q -v "^#" && {
-		if [ "$VERBOSE" -eq 0 ]; then
-			echo "dbs"; exit 0;
-		else
-			echo "dbs (see 'dbs-edit-patch')"; exit 0;
-		fi
-	}
-	grep -F dpatch "$filename" | grep -q -v "^#" && {
-		if [ "$VERBOSE" -eq 0 ]; then
-			echo "dpatch"; exit 0;
-		else
-			echo "dpatch (see 'patch-edit-patch')"; exit 0;
-		fi
-	}
 	grep -F '*.diff' "$filename" | grep -q -v "^#" && {
 		if [ "$VERBOSE" -eq 0 ]; then
 			echo "diff splash"; exit 0;

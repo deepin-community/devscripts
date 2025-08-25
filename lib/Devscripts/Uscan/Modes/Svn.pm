@@ -1,10 +1,10 @@
-package Devscripts::Uscan::svn;
+package Devscripts::Uscan::Modes::Svn;
 
 use strict;
 use Cwd qw/abs_path/;
 use Devscripts::Uscan::Output;
 use Devscripts::Uscan::Utils;
-use Devscripts::Uscan::_vcs;
+use Devscripts::Uscan::Modes::_vcs;
 use Dpkg::IPC;
 use File::Path 'remove_tree';
 use Moo::Role;
@@ -14,7 +14,7 @@ use Moo::Role;
 ######################################################
 sub svn_search {
     my ($self) = @_;
-    my ($newfile, $newversion);
+    my ($newfile, $newversion, $mangled_newversion);
     if ($self->versionless) {
         $newfile = $self->parse_result->{base};
         spawn(
@@ -27,12 +27,11 @@ sub svn_search {
             to_string  => \$newversion
         );
         chomp($newversion);
-        $newversion = sprintf '0.0~svn%d', $newversion;
+        $mangled_newversion = $newversion = sprintf '0.0~svn%d', $newversion;
         if (
             mangle(
-                $self->watchfile,  \$self->line,
-                'uversionmangle:', \@{ $self->uversionmangle },
-                \$newversion
+                $self->watchfile,            'uversionmangle:',
+                \@{ $self->uversionmangle }, \$mangled_newversion
             )
         ) {
             return undef;
@@ -44,11 +43,11 @@ sub svn_search {
     ################################################
     elsif ($self->mode eq 'svn') {
         my @args = ('list', $self->parse_result->{base});
-        ($newversion, $newfile)
+        ($mangled_newversion, $newversion, $newfile)
           = get_refs($self, ['svn', @args], qr/(.+)/, 'subversion');
-        return undef if !defined $newversion;
+        return undef if !defined $mangled_newversion;
     }
-    return ($newversion, $newfile);
+    return ($mangled_newversion, $newversion, $newfile);
 }
 
 sub svn_upstream_url {
@@ -60,7 +59,7 @@ sub svn_upstream_url {
     return $upstream_url;
 }
 
-*svn_newfile_base = \&Devscripts::Uscan::_vcs::_vcs_newfile_base;
+*svn_newfile_base = \&Devscripts::Uscan::Modes::_vcs::_vcs_newfile_base;
 
 sub svn_clean { }
 

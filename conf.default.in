@@ -555,11 +555,6 @@
 # Should we download newer upstream files we come across?
 # USCAN_DOWNLOAD=yes
 #
-# Should we use FTP PASV mode for ftp:// links?  'default' means let
-# Net::FTP(3) make the choice (primarily based on the FTP_PASSIVE
-# environment variable); 'yes' and 'no' override the default
-# USCAN_PASV=default
-#
 # Should we create a symlink from the downloaded tar.gz file to
 # pkg_version.orig.tar.gz, rename it like this or do nothing?
 # Options are 'symlink'/'yes', 'rename' or 'no'

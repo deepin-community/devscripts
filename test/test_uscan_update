@@ -1,0 +1,116 @@
+#!/bin/bash
+
+# Copyright (C) 2020, Xavier Guimard <yadd@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+# Public License for more details.
+#
+# On Debian systems, the complete text of the GNU General Public License
+# version 3 can be found in the /usr/share/common-licenses/GPL-3 file.
+
+set -u
+
+test_dir=$(readlink -f "${0%/*}")
+
+if test "${1:-}" = --installed; then
+    shift
+else
+    top_srcdir=$(readlink -f "${0%/*}/..")
+    make -C "$top_srcdir/scripts" uscan mk-origtargz uupdate debchange
+    PATH="$top_srcdir/scripts:$PATH"
+    export PATH
+    PERL5LIB="$top_srcdir/lib"
+    export PERL5LIB
+fi
+
+SUFFIX="1"
+if command -v dpkg-vendor >/dev/null; then
+    VENDER="$(dpkg-vendor --query Vendor 2>/dev/null|tr 'A-Z' 'a-z')"
+    case "$VENDER" in
+        debian) SUFFIX="1" ;;
+        *) SUFFIX="0${VENDER}1" ;;
+    esac
+fi
+
+COMMAND="uscan -v --update-watchfile"
+
+# comment out for debug
+#COMMAND="$COMMAND --debug"
+
+makeWatch4() {
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=4
+http://localhost/ .*$PKG-([\d\.]+).tar.gz $lv
+
+opts="dversionmangle=auto,component=bar1$cmpopt1" http://localhost/ .*bar1-([\d\.]+).tar.gz $lv1
+opts="dversionmangle=auto,component=bar2$cmpopt2" http://localhost/ .*bar2-([\d\.]+).tar.gz $lv2
+opts="dversionmangle=auto,component=bar3$cmpopt3" http://localhost/ .*bar3-([\d\.]+).tar.gz $lv3
+opts="dversionmangle=auto,component=bar4$cmpopt4" http://localhost/ .*bar4-([\d\.]+).tar.gz $lv4
+END
+}
+
+makeRepo() {
+    lv="$1"
+    cmpopt1="$2"
+    lv1="$3"
+    cmpopt2="$4"
+    lv2="$5"
+    cmpopt3="$6"
+    lv3="$7"
+    cmpopt4="$8"
+    lv4="$9"
+    prev="${10}"
+    version=${12:-4}
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/source
+
+    makeWatch4
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG ($prev) unstable; urgency=medium
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    echo -n '3.0 (quilt)' > "$TEMP_PKG_DIR"/$PKG/debian/source/format
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    # Upstream repo
+    ( cd "$TEMP_PKG_DIR"/repo ;
+      tar -czf $PKG-1.0.0.tar.gz $PKG/* )
+
+    for i in 1 2 3 4; do
+      # Upstream repo
+      mkdir -p "$TEMP_PKG_DIR"/repo/bar$i
+      touch "$TEMP_PKG_DIR"/repo/bar$i/content
+      ( cd "$TEMP_PKG_DIR"/repo ;
+        tar -czf bar$i-2.0.$i.tar.gz bar$i/* )
+      # Debian dir
+      mkdir $TEMP_PKG_DIR/$PKG/bar$i
+      echo '{"name":"bar'$i'","version":"'1.0.$i'"}' > $TEMP_PKG_DIR/$PKG/bar$i/package.json
+    done
+}
+
+testCmpIgnore() {
+    makeRepo "debian" "" "checksum" "" "group" "" "ignore" "" "ignore" "0.0.1" "1.0.0"
+    OUTPUT=$( cd "$TEMP_PKG_DIR/$PKG" ; $COMMAND -v )
+    assertEquals "Version should be 5" "Version: 5" "$(head -n 1 $TEMP_PKG_DIR/$PKG/debian/watch)"
+    assertEquals "Should have found 5 sources" 5 "$(grep 'Source: http://localhost/' $TEMP_PKG_DIR/$PKG/debian/watch|wc -l)"
+    assertEquals "Should have found 1 component of type group" 1 "$(grep 'Version-Schema: group' $TEMP_PKG_DIR/$PKG/debian/watch|wc -l)"
+    assertEquals "Should have found 1 component of type checksum" 1 "$(grep 'Version-Schema: checksum' $TEMP_PKG_DIR/$PKG/debian/watch|wc -l)"
+    assertEquals "Should have found 2 component of type ignore" 2 "$(grep 'Version-Schema: ignore' $TEMP_PKG_DIR/$PKG/debian/watch|wc -l)"
+}
+
+. shunit2

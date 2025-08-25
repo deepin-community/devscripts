@@ -82,11 +82,6 @@ spawnFtpServer(){
 
 trap cleanup 1 2 3 13 15
 
-containsName(){
-  echo "$1" | grep -qF "$2"
-  echo $?
-}
-
 . "${0%/*}/shunit2-helper-functions.sh"
 
 # The following tests do the following: (1) create a minimal Debian package

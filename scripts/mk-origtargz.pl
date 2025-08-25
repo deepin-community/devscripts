@@ -47,7 +47,7 @@ placed in F<debian/../..>. (In F<debian/copyright>, the B<Files-Excluded> and
 B<Files-Excluded->I<component> stanzas are a part of the first paragraph and
 there is a blank line before the following paragraphs which contain B<Files>
 and other stanzas. The B<Files-Included> stanza may be used to ignore
-parts of subdirectories specified by the B<Files-Excluded> stanza See
+parts of subdirectories specified by the B<Files-Excluded> stanza. See
 B<uscan>(1) "COPYRIGHT FILE EXAMPLE".)
 
 The archive type for B<zip> is detected by "B<file --dereference --brief
@@ -89,6 +89,11 @@ F<debian/changelog>.
 Remove files matching the given I<glob> from the tarball, as if it was listed in
 B<Files-Excluded>.
 
+=item B<--include-file> I<glob>
+
+Include previously excluded files matching the given I<glob> in the
+tarball, as if it was listed in B<Files-Included>.
+
 =item B<--copyright-file> I<filename>
 
 Remove files matching the patterns found in I<filename>, which should have the
@@ -101,9 +106,9 @@ Unmatched patterns will emit a warning so the user can verify whether it is
 correct.  If there are multiple patterns which match a file, only the last one
 will count as being matched.
 
-Both the B<--exclude-file> and B<--copyright-file> options amend the list of
-patterns found in F<debian/copyright>. If you do not want to read that file,
-you will have to use B<--package>.
+The B<--exclude-file>, B<--include-file> and B<--copyright-file>
+options amend the list of patterns found in F<debian/copyright>. If
+you do not want to read that file, you will have to use B<--package>.
 
 =item B<--signature> I<signature-mode>
 

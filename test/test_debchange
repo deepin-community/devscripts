@@ -117,7 +117,10 @@ checkUbuntuVersion() {
 }
 
 testDebianDistributions() {
+    checkDebianDistribution "forky"
+    checkDebianDistribution "forky-security"
     checkDebianDistribution "trixie"
+    checkDebianDistribution "trixie-proposed-updates"
     checkDebianDistribution "trixie-security"
     checkDebianDistribution "bookworm"
     checkDebianDistribution "bookworm-proposed-updates"
@@ -262,11 +265,11 @@ verifyGuessedDistribution() {
 testGuessedDistribution() {
     verifyGuessedDistribution unstable -i unstable
     verifyGuessedDistribution experimental -i experimental
-    verifyGuessedDistribution bookworm-backports -i bookworm-backports
+    verifyGuessedDistribution trixie-backports -i trixie-backports
     verifyGuessedDistribution trixie -i trixie
-    verifyGuessedDistribution unstable --sloppy bullseye-backports-sloppy
-    verifyGuessedDistribution unstable --bpo bookworm-backports
-    verifyGuessedDistribution unstable --stable bookworm
+    verifyGuessedDistribution unstable --sloppy bookworm-backports-sloppy
+    verifyGuessedDistribution unstable --bpo trixie-backports
+    verifyGuessedDistribution unstable --stable trixie
 }
 
 testSpecialCharacterMaintainer() {

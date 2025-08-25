@@ -193,6 +193,15 @@ sub make_orig_targz {
             ds_die($@);
             return $self->status(1);
         }
+        my @include_regexes;
+        eval {
+            @include_regexes
+              = map { glob_to_regex($_) } @{ $self->include_globs };
+        };
+        if ($@) {
+            ds_die($@);
+            return $self->status(1);
+        }
         for my $filename (sort @files) {
             my $last_match;
             for my $info (@exclude_info) {
@@ -204,25 +213,28 @@ sub make_orig_targz {
 			      @x
                 ) {
                     if (!$last_match) {
-                        # if the current entry is a directory, check if it
-                        # matches any exclude-ignored glob
                         my $ignore_this_exclude = 0;
-                        for my $ignore_exclude (@{ $self->include_globs }) {
-                            my $ignore_exclude_regex
-                              = glob_to_regex($ignore_exclude);
-
-                            if ($filename =~ $ignore_exclude_regex) {
-                                $ignore_this_exclude = 1;
-                                last;
-                            }
-                            if (   $filename =~ m,/$,
-                                && $ignore_exclude =~ $info->{regex}) {
+                        for my $include_regex (@include_regexes) {
+                            if ($filename
+                                =~ m@^(?:[^/]*/)?(?:$include_regex)(?:/.*)?$@x)
+                            {
                                 $ignore_this_exclude = 1;
                                 last;
                             }
                         }
-                        next if $ignore_this_exclude;
-                        $delete{$filename} = 1;
+
+                        # if this exclude is ignored, also resurrect
+                        # all parent directories of this file
+                        if ($ignore_this_exclude) {
+                            my @parts = File::Spec->splitdir($filename);
+                            while (pop(@parts)) {
+                                delete(
+                                    $delete{ File::Spec->catdir(@parts) . "/"
+                                    });
+                            }
+                        } else {
+                            $delete{$filename} = 1;
+                        }
                     }
                     $last_match = $info;
                 }

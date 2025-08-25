@@ -1,0 +1,5 @@
+Version: 5
+
+Source: https://foo
+Version-Regex: .*?@ANY_VERSION@@ARCHIVE_EXT@
+Pgp-Mode: none

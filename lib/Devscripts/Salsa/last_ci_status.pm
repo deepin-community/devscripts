@@ -13,8 +13,11 @@ use constant FAILED  => 'failed';
 sub last_ci_status {
     my ($self, @repos) = @_;
     unless (@repos or $self->config->all or $self->config->all_archived) {
-        ds_warn "Usage $0 ci_status <--all|--all-archived|names>";
-        return 1;
+        @repos = ($self->localPath2projectPath);
+        unless (@repos) {
+            ds_warn "Usage $0 ci_status <--all|--all-archived|names>";
+            return 1;
+        }
     }
     if (@repos and $self->config->all) {
         ds_warn "--all with a project name makes no sense";

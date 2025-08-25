@@ -8,6 +8,7 @@ use Moo::Role;
 
 sub del_repo {
     my ($self, $reponame) = @_;
+    $reponame ||= $self->localPath2projectPath;
     unless ($reponame) {
         ds_warn "Project name or path is missing";
         return 1;
